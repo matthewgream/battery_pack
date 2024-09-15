@@ -9,13 +9,13 @@
 #define DEFAULT_SERIAL_BAUD 115200
 
 #define DEFAULT_WIFI_HOST "BatteryMonitor"
-// #define DEFAULT_WIFI_SSID "SSID"
-// #define DEFAULT_WIFI_PASS "PASS"
+// #define DEFAULT_WIFI_SSID "SSID" // Secrets.hpp
+// #define DEFAULT_WIFI_PASS "PASS" // Secrets.hpp
 
 #define DEFAULT_MQTT_HOST "mqtt.local"
 #define DEFAULT_MQTT_PORT 1883
-// #define DEFAULT_MQTT_USER "USER"
-// #define DEFAULT_MQTT_PASS "PASS"
+// #define DEFAULT_MQTT_USER "USER" // Secrets.hpp
+// #define DEFAULT_MQTT_PASS "PASS" // Secrets.hpp
 #define DEFAULT_MQTT_TOPIC "batterymonitor/data"
 #define DEFAULT_MQTT_CLIENT "BatteryMonitor"
 
@@ -37,18 +37,17 @@
 #define DEFAULT_INTERVAL_PROCESS (1000 * 5)
 #define DEFAULT_INTERVAL_DELIVER (1000 * 15)
 #define DEFAULT_INTERVAL_CAPTURE (1000 * 15)
+#define DEFAULT_INTERVAL_DIAGNOSE (1000 * 60)
 
 // -----------------------------------------------------------------------------------------------
 
-typedef unsigned long interval_t;
-
 struct Config {
 
-    struct TemperatureInterfaceConfig { 
-        struct MuxInterfaceConfig { 
-            const int PIN_S0 = 2, PIN_S1 = 3, PIN_S2 = 4, PIN_S3 = 5, PIN_SIG = 6;
-        } mux;
-        const float REFERENCE_RESISTANCE = 10000.0, NOMINAL_RESISTANCE = 10000.0, NOMINAL_TEMPERATURE = 25.0, BETA = 3950.0;
+    struct TemperatureInterfaceConfig {
+        MuxInterface_CD74HC4067::Config mux = { .PIN_S0 = 2, .PIN_S1 = 3, .PIN_S2 = 4, .PIN_S3 = 5, .PIN_SIG = 6 };
+        struct Thermister {
+            const float REFERENCE_RESISTANCE = 10000.0, NOMINAL_RESISTANCE = 10000.0, NOMINAL_TEMPERATURE = 25.0;
+        } thermister;
         const int PROBE_NUMBER = 16, PROBE_ENVIRONMENT = 15;
         const float MINIMAL = -20.0, WARNING = 40.0, CRITICAL = 50.0;
     } temperature;
@@ -59,18 +58,17 @@ struct Config {
     struct ConnectConfig {
         const String host = DEFAULT_WIFI_HOST, ssid = DEFAULT_WIFI_SSID, pass = DEFAULT_WIFI_PASS;
     } network;
-    struct DeliverConfig {
-        const String name = DEFAULT_BLUE_NAME, service = DEFAULT_BLUE_SERVICE, characteristic = DEFAULT_BLUE_CHARACTERISTIC;
-    } deliver;
-    struct PublishConfig {
-        const String client = DEFAULT_MQTT_CLIENT, host = DEFAULT_MQTT_HOST, user = DEFAULT_MQTT_USER, pass = DEFAULT_MQTT_PASS, topic = DEFAULT_MQTT_TOPIC;
-        const uint16_t port = DEFAULT_MQTT_PORT;
-    } publish;
     struct NettimeConfig {
         const String server = DEFAULT_TIME_SERVER;
         const interval_t intervalUpdate = DEFAULT_TIME_UPDATE, intervalAdjust = DEFAULT_TIME_ADJUST;
         const int failureLimit = DEFAULT_TIME_FAILURES;
     } nettime;
+    struct DeliverConfig {
+        const String name = DEFAULT_BLUE_NAME, service = DEFAULT_BLUE_SERVICE, characteristic = DEFAULT_BLUE_CHARACTERISTIC;
+    } deliver;
+    struct PublishConfig {
+        MQTTPublisher::Config mqtt = { .client = DEFAULT_MQTT_CLIENT, .host = DEFAULT_MQTT_HOST, .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .topic = DEFAULT_MQTT_TOPIC, .port = DEFAULT_MQTT_PORT };
+    } publish;
     struct StorageConfig {
         const String filename = DEFAULT_STORAGE_NAME;
         const int failureLimit = DEFAULT_STORAGE_FAILURES;
@@ -80,8 +78,10 @@ struct Config {
     struct AlarmConfig {
         const int PIN_ALARM = 8;
     } alarm;
+    struct DiagnosticConfig {
+    } diagnostic;
 
-    const interval_t intervalProcess = DEFAULT_INTERVAL_PROCESS, intervalDeliver = DEFAULT_INTERVAL_DELIVER, intervalCapture = DEFAULT_INTERVAL_CAPTURE;
+    const interval_t intervalProcess = DEFAULT_INTERVAL_PROCESS, intervalDeliver = DEFAULT_INTERVAL_DELIVER, intervalCapture = DEFAULT_INTERVAL_CAPTURE, intervalDiagnose = DEFAULT_INTERVAL_DIAGNOSE;
 };
 
 // -----------------------------------------------------------------------------------------------
