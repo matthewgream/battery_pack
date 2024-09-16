@@ -5,12 +5,12 @@
 // -----------------------------------------------------------------------------------------------
 
 #include <HTTPClient.h>
+#include <ctime>
 
 class NetworkTimeFetcher {
     const String _server;
-    int _failures = 0;
+    unsigned long _failures = 0;
 public:
-    // XXX last time fetch
     NetworkTimeFetcher (const String& server) : _server (server) {}
     time_t fetch () {
         HTTPClient client;
@@ -37,12 +37,14 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
+#include <algorithm>
+#include <ctime>
+
 class TimeDriftCalculator {
     long _driftMs;
     bool _highDrift = false;
     static constexpr long MAX_DRIFT_MS = 60 * 1000;
 public:
-    // XXX average drift
     TimeDriftCalculator (const long driftMs) : _driftMs (driftMs) {}
     long updateDrift (time_t periodSecs, const unsigned long periodMs) {
         long driftMs = (((periodSecs * 1000) - periodMs) * (60 * 60 * 1000)) / periodMs; // ms per hour
@@ -66,6 +68,9 @@ public:
     bool highDrift () const { 
       return _highDrift;
     }
+    long drift () const {
+      return _driftMs;
+    }
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -83,7 +88,6 @@ protected:
     void onConnect (BLEServer *) override { _connected = true; }
     void onDisconnect (BLEServer *) override { _connected = false; }
 public:
-    // XXX last notify
     void advertise (const String& name, const String& serviceUUID, const String& characteristicUUID)  {
         BLEDevice::init (name);
         _server = BLEDevice::createServer ();
@@ -106,10 +110,13 @@ public:
     bool connected (void) const {
         return _connected;
     }
+    String address () const { return BLEDevice::getAddress ().toString (); }
+    int devices () const { return _server->getPeerDevices (true).size (); }
 };
 
 // -----------------------------------------------------------------------------------------------
 
+#include <WiFi.h>
 #include <PubSubClient.h>
 
 class MQTTPublisher {
@@ -123,7 +130,6 @@ private:
     WiFiClient _wifiClient;
     PubSubClient _mqttClient;
 public:
-    // XXX last publish
     MQTTPublisher (const Config& cfg) : config (cfg), _mqttClient (_wifiClient) {}
     void connect () {
         _mqttClient.setServer (config.host.c_str (), config.port);
@@ -131,8 +137,11 @@ public:
     bool publish (const String& topic, const String& data) {
         if (!connected ())
             return false;
-        _mqttClient.loop ();
         return _mqttClient.publish (topic.c_str (), data.c_str ());
+    }
+    void process () {
+        if (WiFi.isConnected ())
+            _mqttClient.loop ();
     }
     bool connected () {
         if (!WiFi.isConnected ())
@@ -140,6 +149,9 @@ public:
         if (!_mqttClient.connected ())
             _mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ());
         return _mqttClient.connected ();
+    }
+    int state () {
+        return _mqttClient.state ();
     }
 };
 
@@ -204,11 +216,14 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
-class MuxInterface_CD74HC4067 {
+#include <Arduino.h>
+
+class MuxInterface_CD74HC4067 { // technically this is ADC as well due to PIN_SIG
 public:
     typedef struct {
         const int PIN_S0, PIN_S1, PIN_S2, PIN_S3, PIN_SIG;
     } Config;
+    static constexpr int CHANNELS = 16;
 private:    
     const Config& config;
 public:

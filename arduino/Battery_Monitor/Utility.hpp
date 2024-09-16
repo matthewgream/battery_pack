@@ -63,6 +63,8 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
+#include <Arduino.h>
+
 typedef unsigned long interval_t;
 
 class Intervalable {
@@ -70,7 +72,7 @@ class Intervalable {
     interval_t _previous;
 public:
     Intervalable (const interval_t interval) : _interval (interval), _previous (0) {}
-    explicit operator bool () {                  
+    operator bool () {                  
         const interval_t current = millis ();
         if (current - _previous > _interval) {
             _previous = current;
@@ -82,8 +84,56 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
+#include <Arduino.h>
+
+class Uptime {
+    const unsigned long _started;
+public:
+    Uptime () : _started (millis ()) {}
+    unsigned long seconds () const {
+        return (millis () - _started) / 1000;
+    }
+};
+
+class Upstamp {
+    unsigned long _seconds = 0, _number = 0;
+public:
+    Upstamp () {}
+    unsigned long seconds () const { return _seconds; }
+    unsigned long number () const { return _number; }
+    Upstamp& operator ++ (int) {
+        _seconds = millis () / 1000;
+        _number ++;
+        return *this;
+    }                  
+};
+
+// -----------------------------------------------------------------------------------------------
+
 template <typename T> inline T map (const T x, const T in_min, const T in_max, const T out_min, const T out_max) {
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+// -----------------------------------------------------------------------------------------------
+
+#include <esp_mac.h>
+
+#define NIBBLE_TO_HEX_CHAR(nibble) ((char) ((nibble) < 10 ? '0' + (nibble) : 'A' + ((nibble) - 10)))
+#define BYTE_TO_HEX(byte) NIBBLE_TO_HEX_CHAR ((byte) >> 4), NIBBLE_TO_HEX_CHAR ((byte) & 0x0F)
+
+String mac_address (void) {
+    uint8_t macaddr [6];
+    esp_read_mac (macaddr, ESP_MAC_WIFI_STA);
+    const char macstr [12 + 1] = { BYTE_TO_HEX (macaddr [0]), BYTE_TO_HEX (macaddr [1]), BYTE_TO_HEX (macaddr [2]), BYTE_TO_HEX (macaddr [3]), BYTE_TO_HEX (macaddr [4]), BYTE_TO_HEX (macaddr [5]), '\0' };
+    return String (macstr);
+}
+
+// -----------------------------------------------------------------------------------------------
+
+float steinharthart_calculator (const float VALUE, const float VALUE_MAX, const float REFERENCE_RESISTANCE, const float NOMINAL_RESISTANCE, const float NOMINAL_TEMPERATURE) {
+    static constexpr float BETA = 3950.0;
+    const float STEINHART = (log ((REFERENCE_RESISTANCE / ((VALUE_MAX / VALUE) - 1.0)) / NOMINAL_RESISTANCE) / BETA) + (1.0 / (NOMINAL_TEMPERATURE + 273.15));
+    return (1.0 / STEINHART) - 273.15;
 }
 
 // -----------------------------------------------------------------------------------------------

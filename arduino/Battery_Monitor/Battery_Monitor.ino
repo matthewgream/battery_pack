@@ -8,8 +8,8 @@ static Program program;
 
 // -----------------------------------------------------------------------------------------------
 
-static constexpr char __compile_name [] = "battery monitor";
-static constexpr char __compile_vers [] = "0.99";
+static constexpr const char __compile_name [] = "battery monitor";
+static constexpr const char __compile_vers [] = "0.99";
 
 #define COMPILE_Y ((__DATE__[7] - '0') * 1000 + (__DATE__[8] - '0') * 100 + (__DATE__[9] - '0') * 10 + (__DATE__[10] - '0'))
 #define COMPILE_M ((__DATE__[0] == 'J') ? ((__DATE__[1] == 'a') ? 1 : ((__DATE__[2] == 'n') ? 6 : 7)) : (__DATE__[0] == 'F') ? 2 : (__DATE__[0] == 'M') ? ((__DATE__[2] == 'r') ? 3 : 5) \
