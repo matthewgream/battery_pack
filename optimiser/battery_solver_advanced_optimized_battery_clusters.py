@@ -177,8 +177,8 @@ def main():
     start_time = time.time()
     print("Starting advanced battery cell cluster optimization...")
 
-    original_data = load_json('paste.txt')
-    initial_solution = load_json('initial_solution.json')
+    original_data = load_json('battery_cells_data.txt')
+    initial_solution = load_json('battery_solution_initial.json')
 
     num_processes = mp.cpu_count()
     pool = mp.Pool(processes=num_processes)
@@ -196,9 +196,9 @@ def main():
     print(f"Total runtime: {(time.time() - start_time) / 3600:.2f} hours")
 
     # Save the best solution to a file
-    with open('advanced_optimized_battery_clusters.json', 'w') as f:
+    with open('battery_solver_advanced_optimized_battery_clusters.json', 'w') as f:
         json.dump(best_solution, f)
-    print("Best solution saved to advanced_optimized_battery_clusters.json")
+    print("Best solution saved to battery_solver_advanced_optimized_battery_clusters.json")
 
 def load_json(filename):
     with open(filename, 'r') as file:

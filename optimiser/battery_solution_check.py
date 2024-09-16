@@ -98,13 +98,13 @@ def validate_and_analyze_solution(original_data, solution_data, num_groups=10, c
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python check.py <solution_json_file>")
+        print("Usage: python battery_solution_check.py <solution_json_file>")
         sys.exit(1)
 
     solution_file = sys.argv[1]
     print(f"Validating and analyzing solution from {solution_file}")
     
-    original_data = load_json('paste.txt')
+    original_data = load_json('battery_cells_data.txt')
     solution_data = load_json(solution_file)
     
     if validate_and_analyze_solution(original_data, solution_data):

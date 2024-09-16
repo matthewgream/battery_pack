@@ -51,7 +51,7 @@ def generate_svg(cells_data, solution_data, output_file):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python generate_battery_svg.py <cells_data_file> [solution_file]")
+        print("Usage: python battery_solution_render.py <cells_data_file> [solution_file]")
         sys.exit(1)
 
     cells_data_file = sys.argv[1]
@@ -60,10 +60,9 @@ def main():
     if len(sys.argv) >= 3:
         solution_file = sys.argv[2]
         solution_data = load_json(solution_file)
-        output_file = 'battery_arrangement_grouped_correct_nestling.svg'
     else:
         solution_data = {}
-        output_file = 'battery_arrangement_correct_nestling.svg'
+    output_file = 'battery_solution.svg'
 
     generate_svg(cells_data, solution_data, output_file)
 
