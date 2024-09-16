@@ -54,7 +54,7 @@ struct Config {
     struct FanInterfaceConfig {
         const int PIN_PWM = 7, MIN_SPEED = 85, MAX_SPEED = 255;
     } fan;
-  
+
     struct ConnectConfig {
         const String host = DEFAULT_WIFI_HOST, ssid = DEFAULT_WIFI_SSID, pass = DEFAULT_WIFI_PASS;
     } network;

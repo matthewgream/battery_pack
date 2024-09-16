@@ -30,7 +30,7 @@ public:
         _failures ++;
         return (time_t) 0;
     }
-    int failures () const { 
+    int failures () const {
         return _failures;
     }
 };
@@ -51,7 +51,7 @@ public:
         driftMs = (_driftMs * 3 + driftMs) / 4; // 75% old value, 25% new value
         if (driftMs > MAX_DRIFT_MS || driftMs < -MAX_DRIFT_MS) _highDrift = true;
         return _driftMs = std::clamp (driftMs, -MAX_DRIFT_MS, MAX_DRIFT_MS);
-    }    
+    }
     long applyDrift (struct timeval &currentTime, const unsigned long periodMs) {
         const long adjustMs = (_driftMs * periodMs) / (60 * 60 * 1000);
         currentTime.tv_sec += adjustMs / 1000;
@@ -65,7 +65,7 @@ public:
         }
         return adjustMs;
     }
-    bool highDrift () const { 
+    bool highDrift () const {
       return _highDrift;
     }
     long drift () const {
@@ -193,7 +193,7 @@ public:
             file.close ();
             return true;
         }
-        return false; 
+        return false;
     }
     bool read (LineCallback& callback) const {
         File file = SPIFFS.open (_filename, FILE_READ);
@@ -224,7 +224,7 @@ public:
         const int PIN_S0, PIN_S1, PIN_S2, PIN_S3, PIN_SIG;
     } Config;
     static constexpr int CHANNELS = 16;
-private:    
+private:
     const Config& config;
 public:
     MuxInterface_CD74HC4067 (const Config& cfg) : config (cfg) {}

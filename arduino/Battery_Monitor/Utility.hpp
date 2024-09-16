@@ -9,7 +9,7 @@
 template <typename T, int W = 16>
 class MovingAverage {
     static_assert (W > 0, "Window size must be positive");
-    static_assert (std::is_arithmetic <T>::value, "T must be an arithmetic type");  
+    static_assert (std::is_arithmetic <T>::value, "T must be an arithmetic type");
     std::array <T, W> V;
     T S = T (0);
     int I = 0, C = 0;
@@ -36,7 +36,7 @@ private:
     float _lastError = 0.0f;
     unsigned long _lastTime = 0;
 public:
-    PidController (const float kp, const float ki, const float kd) : _Kp (kp), _Ki (ki), _Kd (kd) {} 
+    PidController (const float kp, const float ki, const float kd) : _Kp (kp), _Ki (ki), _Kd (kd) {}
     float apply (const float setpoint, const float current) {
         const unsigned long time = millis ();
         const float delta = (time - _lastTime) / 1000.0f;
@@ -55,7 +55,7 @@ public:
 class AlphaSmoothing {
     const float _alpha;
     float _value = 0.0f;
-public:    
+public:
     AlphaSmoothing (const float alpha) : _alpha (alpha) {}
     float apply (const float value) {
         return (_value = (_alpha * value + (1.0f - _alpha) * _value));
@@ -73,7 +73,7 @@ class Intervalable {
     interval_t _previous;
 public:
     Intervalable (const interval_t interval) : _interval (interval), _previous (0) {}
-    operator bool () {                  
+    operator bool () {
         const interval_t current = millis ();
         if (current - _previous > _interval) {
             _previous = current;
@@ -110,13 +110,13 @@ public:
         _seconds = millis () / 1000;
         _number ++;
         return *this;
-    }                  
+    }
 };
 
 // -----------------------------------------------------------------------------------------------
 
 template <typename T> inline T map (const T x, const T in_min, const T in_max, const T out_min, const T out_max) {
-    static_assert (std::is_arithmetic <T>::value, "T must be an arithmetic type");  
+    static_assert (std::is_arithmetic <T>::value, "T must be an arithmetic type");
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
