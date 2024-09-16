@@ -1,3 +1,34 @@
 
 https://docs.google.com/spreadsheets/d/1nIypuU6Yo7al4vPYv5pmPqtEnIxG7LupgtRaQy6-S0I/view
 https://script.google.com/u/0/home/projects/1WdgNSFODsvGVUW9D3aOnENeT_1vaDqy4YU4pCIYA1KY3frv_aO5ZXVyZ/edit
+
+***
+
+gfmc@lo-virtual:~/battery_pack/optimiser$ python3 battery_solution_check.py battery_solution_initial.json
+Validating and analyzing solution from battery_solution_initial.json
+Checking Groups: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 are valid
+Surface areas: 14, 16, 19, 9, 11, 10, 11, 10, 14
+Total surface area: 114
+
+Metrics:
+Current Path Length: 48.07
+Degradation Balance: 6.68
+Edge Cooling Score: 49
+Surface Area (Min/Max/StdDev): 9/19/3.32
+
+Solution is valid and satisfies all constraints.
+gfmc@lo-virtual:~/battery_pack/optimiser$ python3 battery_solution_check.py battery_solver_advanced_optimized_battery_clusters.json
+Validating and analyzing solution from battery_solver_advanced_optimized_battery_clusters.json
+Checking Groups: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 are valid
+Surface areas: 14, 14, 14, 14, 14, 14, 14, 14, 14
+Total surface area: 126
+
+Metrics:
+Current Path Length: 50.19
+Degradation Balance: 5.90
+Edge Cooling Score: 49
+Surface Area (Min/Max/StdDev): 14/14/0.00
+
+Solution is valid and satisfies all constraints.
+
+***
