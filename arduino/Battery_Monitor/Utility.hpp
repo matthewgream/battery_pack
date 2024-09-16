@@ -6,20 +6,21 @@
 
 #include <array>
 
+template <typename T, int W = 16>
 class MovingAverage {
-    static constexpr int WINDOW_SIZE = 16;
-    std::array <float, WINDOW_SIZE> values;
-    int index = 0, count = 0;
+    static_assert (W > 0, "Window size must be positive");
+    static_assert (std::is_arithmetic <T>::value, "T must be an arithmetic type");  
+    std::array <T, W> V;
+    T S = T (0);
+    int I = 0, C = 0;
 public:
-    float update (const float value) {
-        values [index] = value;
-        index = (index + 1) % WINDOW_SIZE;
-        if (count < WINDOW_SIZE)
-            count ++;
-        float sum = 0;
-        for (int i = 0; i < count; i ++) 
-           sum += values [i];
-        return sum / count;
+    T update (const T X) {
+        if (C == W) S -= V [I];
+        else C ++;
+        V [I] = X;
+        S += X;
+        I = (I + 1) % W;
+        return static_cast <T> (S) / C;
     }
 };
 
@@ -36,7 +37,7 @@ private:
     unsigned long _lastTime = 0;
 public:
     PidController (const float kp, const float ki, const float kd) : _Kp (kp), _Ki (ki), _Kd (kd) {} 
-    float process (const float setpoint, const float current) {
+    float apply (const float setpoint, const float current) {
         const unsigned long time = millis ();
         const float delta = (time - _lastTime) / 1000.0f;
         const float error = setpoint - current;
@@ -56,7 +57,7 @@ class AlphaSmoothing {
     float _value = 0.0f;
 public:    
     AlphaSmoothing (const float alpha) : _alpha (alpha) {}
-    float process (const float value) {
+    float apply (const float value) {
         return (_value = (_alpha * value + (1.0f - _alpha) * _value));
     }
 };
@@ -95,6 +96,10 @@ public:
     }
 };
 
+// -----------------------------------------------------------------------------------------------
+
+#include <Arduino.h>
+
 class Upstamp {
     unsigned long _seconds = 0, _number = 0;
 public:
@@ -111,6 +116,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 template <typename T> inline T map (const T x, const T in_min, const T in_max, const T out_min, const T out_max) {
+    static_assert (std::is_arithmetic <T>::value, "T must be an arithmetic type");  
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
@@ -118,10 +124,9 @@ template <typename T> inline T map (const T x, const T in_min, const T in_max, c
 
 #include <esp_mac.h>
 
+String mac_address (void) {
 #define NIBBLE_TO_HEX_CHAR(nibble) ((char) ((nibble) < 10 ? '0' + (nibble) : 'A' + ((nibble) - 10)))
 #define BYTE_TO_HEX(byte) NIBBLE_TO_HEX_CHAR ((byte) >> 4), NIBBLE_TO_HEX_CHAR ((byte) & 0x0F)
-
-String mac_address (void) {
     uint8_t macaddr [6];
     esp_read_mac (macaddr, ESP_MAC_WIFI_STA);
     const char macstr [12 + 1] = { BYTE_TO_HEX (macaddr [0]), BYTE_TO_HEX (macaddr [1]), BYTE_TO_HEX (macaddr [2]), BYTE_TO_HEX (macaddr [3]), BYTE_TO_HEX (macaddr [4]), BYTE_TO_HEX (macaddr [5]), '\0' };
@@ -135,6 +140,19 @@ float steinharthart_calculator (const float VALUE, const float VALUE_MAX, const 
     const float STEINHART = (log ((REFERENCE_RESISTANCE / ((VALUE_MAX / VALUE) - 1.0)) / NOMINAL_RESISTANCE) / BETA) + (1.0 / (NOMINAL_TEMPERATURE + 273.15));
     return (1.0 / STEINHART) - 273.15;
 }
+
+// -----------------------------------------------------------------------------------------------
+
+template <typename F>
+void exception_catcher (F&& f) {
+    try {
+        f ();
+    } catch (const std::exception& e) {
+        DEBUG_PRINT ("exception: "); DEBUG_PRINTLN (e.what ());
+    } catch (...) {
+        DEBUG_PRINT ("exception: "); DEBUG_PRINTLN ("unknown");
+    }
+};
 
 // -----------------------------------------------------------------------------------------------
 

@@ -29,9 +29,10 @@
 // -----------------------------------------------------------------------------------------------
 
 class Component {
+protected:  
+    ~Component () {};
 public:
     typedef std::vector <Component*> List;
-    virtual ~Component () = default;
     virtual void begin () {}
     virtual void process () {}
 };
@@ -39,10 +40,11 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 class Diagnosticable {
+protected:  
+    ~Diagnosticable () {};
 public:
     typedef std::vector <Diagnosticable*> List; 
-    virtual ~Diagnosticable () = default;
-    virtual void collect (JsonDocument &doc) = 0;
+    virtual void collect (JsonObject &obj) const = 0;
 };
 
 class DiagnosticManager : public Component {
@@ -52,8 +54,9 @@ public:
     DiagnosticManager (const Config::DiagnosticConfig& cfg, const Diagnosticable::List diagnosticables) : config (cfg), _diagnosticables (diagnosticables) {}
     JsonDocument assemble () {
         JsonDocument doc;
+        JsonObject obj = doc.to <JsonObject> ();
         for (const auto& diagnosticable : _diagnosticables)
-            diagnosticable->collect (doc);
+            diagnosticable->collect (obj);
         return doc;
     }
 };
@@ -75,9 +78,10 @@ static const char * _ALARM_NAME [] = { "TEMP_MIN", "TEMP_MAX", "STORE_FAIL", "ST
 #define ALARM_NAME(x)               (_ALARM_NAME [x])
 
 class Alarmable {
+protected:  
+    ~Alarmable () {};
 public:
     typedef std::vector <Alarmable*> List; 
-    virtual ~Alarmable () = default;
     virtual AlarmSet alarm () const = 0;
 };
 
@@ -103,8 +107,8 @@ public:
             _alarms = alarms;
         }
     }
-    void collect (JsonDocument &doc) override {
-        JsonObject alarm = doc ["alarm"].to <JsonObject> ();      
+    void collect (JsonObject &obj) const override {
+        JsonObject alarm = obj ["alarm"].to <JsonObject> ();      
         JsonArray name = alarm ["name"].to <JsonArray> (), active = alarm ["active"].to <JsonArray> (), numb = alarm ["numb"].to <JsonArray> (), time = alarm ["time"].to <JsonArray> ();
         for (int i = 0; i < ALARM_COUNT; i ++)
             name.add (ALARM_NAME (i)), active.add (ALARM_ACTIVE (_alarms, i)), time.add (_counts [i].seconds ()), numb.add (_counts [i].number ());
@@ -129,8 +133,8 @@ public:
         analogReadResolution (ADC_RESOLUTION);
         _muxInterface.configure ();
     }
-    void collect (JsonDocument &doc) override {
-        JsonObject temperature = doc ["temperature"].to <JsonObject> ();
+    void collect (JsonObject &obj) const override {
+        JsonObject temperature = obj ["temperature"].to <JsonObject> ();
         JsonObject values = temperature ["values"].to <JsonObject> ();
         JsonArray valuesNow = values ["now"].to <JsonArray> (), valuesMin = values ["min"].to <JsonArray> (), valuesMax = values ["max"].to <JsonArray> ();
         for (int i = 0; i < MuxInterface_CD74HC4067::CHANNELS; i ++)
@@ -138,7 +142,7 @@ public:
     }
     //
     float get (const int channel) const {
-        // assert channel < MuxInterface_CD74HC4067::CHANNELS
+        assert (channel >= 0 && channel < MuxInterface_CD74HC4067::CHANNELS && "Channel out of range");
         uint16_t value = _muxInterface.get (channel);
         const_cast <TemperatureInterface*> (this)->updatevalues (channel, value);
         return steinharthart_calculator (value, ADC_MAXVALUE, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
@@ -164,8 +168,8 @@ public:
         pinMode (config.PIN_PWM, OUTPUT);
         analogWrite (config.PIN_PWM, PWM_MINVALUE);
     }
-    void collect (JsonDocument &doc) override {
-        JsonObject fan = doc ["fan"].to <JsonObject> ();
+    void collect (JsonObject &obj) const override {
+        JsonObject fan = obj ["fan"].to <JsonObject> ();
         JsonObject values = fan ["values"].to <JsonObject> ();
         values ["now"] = _speed;
         values ["min"] = _speedMin;
@@ -209,8 +213,8 @@ public:
         WiFi.mode (WIFI_STA);
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
     }
-    void collect (JsonDocument &doc) override {
-        JsonObject wifi = doc ["wifi"].to <JsonObject> ();
+    void collect (JsonObject &obj) const override {
+        JsonObject wifi = obj ["wifi"].to <JsonObject> ();
         wifi ["mac"] = mac_address ();
         if ((wifi ["connected"] = WiFi.isConnected ())) {
             wifi ["address"] = WiFi.localIP ();
@@ -263,8 +267,8 @@ public:
             _previousTimeAdjust = currentTime;
         }
     }
-    void collect (JsonDocument &doc) override {
-        JsonObject clock = doc ["clock"].to <JsonObject> ();
+    void collect (JsonObject &obj) const override {
+        JsonObject clock = obj ["clock"].to <JsonObject> ();
         clock ["time"] = getTimeString ();
         clock ["drift"] = _drifter.drift ();
         clock ["last"] = _last.seconds ();
@@ -277,7 +281,7 @@ public:
         if (_drifter.highDrift ()) alarms |= ALARM_TIME_DRIFT;
         return alarms;
     }
-    String getTimeString () {
+    String getTimeString () const {
         struct tm timeinfo;
         char timeString [sizeof ("yyyy-mm-ddThh:mm:ssZ") + 1] = { '\0' };
         if (getLocalTime (&timeinfo))
@@ -297,8 +301,8 @@ public:
     void begin () override {
         _bluetooth.advertise (config.name, config.service, config.characteristic);
     }
-    void collect (JsonDocument &doc) override {
-        JsonObject blue = doc ["blue"].to <JsonObject> ();
+    void collect (JsonObject &obj) const override {
+        JsonObject blue = obj ["blue"].to <JsonObject> ();
         if ((blue ["connected"] = _bluetooth.connected ())) {
             blue ["address"] = _bluetooth.address ();          
             blue ["devices"] = _bluetooth.devices ();          
@@ -334,11 +338,12 @@ public:
         _last ++;
         return true;
     }
-    void collect (JsonDocument &doc) override {
-        JsonObject mqtt = doc ["mqtt"].to <JsonObject> ();      
-        if ((mqtt ["connected"] = _mqtt.connected ())) {
+
+    void collect (JsonObject &obj) const override {
+        JsonObject mqtt = obj ["mqtt"].to <JsonObject> ();      
+        if ((mqtt ["connected"] = const_cast <MQTTPublisher *> (&_mqtt)->connected ())) {
         }
-        mqtt ["state"] = _mqtt.state ();
+        mqtt ["state"] = const_cast <MQTTPublisher *> (&_mqtt)->state ();
         mqtt ["last"] = _last.seconds ();
         mqtt ["numb"] = _last.number ();
     }
@@ -360,8 +365,8 @@ public:
     void begin () override {
         _failures = _file.begin () ? 0 : _failures + 1;
     }
-    void collect (JsonDocument &doc) override {
-        JsonObject storage = doc ["storage"].to <JsonObject> ();
+    void collect (JsonObject &obj) const override {
+        JsonObject storage = obj ["storage"].to <JsonObject> ();
         JsonObject size = storage ["size"].to <JsonObject> ();
         size ["current"] = _file.size ();
         size ["maximum"] = config.lengthMaximum;
@@ -380,7 +385,7 @@ public:
     size_t size () const { 
         return _file.size ();
     }
-    void writeData (const String& data) {
+    void append (const String& data) {
         if (!_file.append (data))
             _failures ++;
         else {
@@ -388,10 +393,10 @@ public:
             _last ++;
         }
     }
-    bool readData (LineCallback& callback) const {
+    bool retrieve (LineCallback& callback) const {
         return _file.read (callback);
     }
-    void clearData () {
+    void erase () {
         _erasures ++; 
         _file.erase ();
     }
@@ -412,7 +417,7 @@ class TemperatureManagerBatterypack: public TemperatureManager, public Alarmable
     static constexpr int _num = 15; // config.temperature.PROBE_NUMBER - 1
     typedef std::array <float, _num> Values;
     Values _values; 
-    std::array <MovingAverage, _num> _filters;
+    std::array <MovingAverage <float>, _num> _filters;
 public:    
     TemperatureManagerBatterypack (const Config::TemperatureInterfaceConfig& cfg, TemperatureInterface& temperature) : TemperatureManager (cfg, temperature) {};
     void process () override {
@@ -448,7 +453,7 @@ public:
 
 class TemperatureManagerEnvironment : public TemperatureManager, public Alarmable {
     float _value;
-    MovingAverage _filter;
+    MovingAverage <float> _filter;
 public:    
     TemperatureManagerEnvironment (const Config::TemperatureInterfaceConfig& cfg, TemperatureInterface& temperature) : TemperatureManager (cfg, temperature) {};
     void process () override {
@@ -477,8 +482,8 @@ public:
     FanManager (const Config::FanInterfaceConfig& cfg, FanInterface& fan, const TemperatureManagerBatterypack& temperatures, PidController& controller, AlphaSmoothing& smoother) : config (cfg), _fan (fan), _temperatures (temperatures), _controllerAlgorithm (controller), _smootherAlgorithm (smoother) {}
     void process () override {
         const float setpoint = _temperatures.setpoint (), current = _temperatures.current ();
-        const float speedCalculated = _controllerAlgorithm.process (setpoint, current);
-        const int speedSmoothed = _smootherAlgorithm.process (std::clamp ((int) map<float> (speedCalculated, -100, 100, config.MIN_SPEED, config.MAX_SPEED), config.MIN_SPEED, config.MAX_SPEED));
+        const float speedCalculated = _controllerAlgorithm.apply (setpoint, current);
+        const int speedSmoothed = _smootherAlgorithm.apply (std::clamp ((int) map  <float> (speedCalculated, -100, 100, config.MIN_SPEED, config.MAX_SPEED), config.MIN_SPEED, config.MAX_SPEED));
         _fan.setSpeed (speedSmoothed);
     }
 };
@@ -551,13 +556,13 @@ class Program : public Component, public Diagnosticable {
         if (publish.connected ()) {
             if (storage.size () > 0) {
                 StorageLineHandler handler (publish);
-                if (storage.readData (handler))
-                    storage.clearData ();
+                if (storage.retrieve (handler))
+                    storage.erase ();
             }
             if (!publish.publish (data))
-              storage.writeData (data);
+              storage.append (data);
         } else
-            storage.writeData (data);
+            storage.append (data);
     }
 
     //
@@ -567,10 +572,10 @@ class Program : public Component, public Diagnosticable {
         if (serializeJson (diagnostics.assemble (), diag) && !diag.isEmpty ())
             dataDeliver (diag);
     }    
-    void collect (JsonDocument &doc) override {
-       JsonObject application = doc ["application"].to <JsonObject> ();
-       application ["uptime"] = uptime.seconds ();      
-       application ["iterations"] = iterations.number ();
+    void collect (JsonObject &obj) const override {
+        JsonObject program = obj ["program"].to <JsonObject> ();
+        program ["uptime"] = uptime.seconds ();      
+        program ["iterations"] = iterations.number ();
     }
 
     //

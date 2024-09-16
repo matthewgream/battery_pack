@@ -30,27 +30,11 @@ void setup () {
     DEBUG_PRINTLN ("*** " + __compile_name + " V" + __compile_vers + "-" + __compile_time + " ***");
     DEBUG_PRINTLN ();
 
-    try {
-        program.setup ();
-    } catch (const std::exception& e) {
-        DEBUG_PRINT ("exception: ");
-        DEBUG_PRINTLN (e.what ());
-    } catch (...) {
-        DEBUG_PRINT ("exception: ");
-        DEBUG_PRINTLN ("unknown");
-    }
+    exception_catcher ([&] () { program.setup (); });
 }
 
 void loop () {
-    try {
-        program.loop ();
-    } catch (const std::exception& e) {
-        DEBUG_PRINT ("exception: ");
-        DEBUG_PRINTLN (e.what ());
-    } catch (...) {
-        DEBUG_PRINT ("exception: ");
-        DEBUG_PRINTLN ("unknown");
-    }
+    exception_catcher ([&] () { program.loop (); });
     program.sleep ();
 }
 
