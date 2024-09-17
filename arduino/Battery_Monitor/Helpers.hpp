@@ -17,10 +17,10 @@ public:
         client.begin (_server);
         if (client.GET () > 0) {
             String header = client.header ("Date");
-            client.end ();
             if (!header.isEmpty ()) {
                 struct tm timeinfo;
                 if (strptime (header.c_str (), "%a, %d %b %Y %H:%M:%S GMT", &timeinfo) != NULL) {
+                    client.end ();
                     _failures = 0;
                     return mktime (&timeinfo);
                 }
@@ -110,8 +110,14 @@ public:
     bool connected (void) const {
         return _connected;
     }
-    String address () const { return BLEDevice::getAddress ().toString (); }
-    int devices () const { return _server->getPeerDevices (true).size (); }
+
+    void serialize (JsonObject &obj) const {
+        JsonObject bluetooth = obj ["bluetooth"].to <JsonObject> ();
+        if ((bluetooth ["connected"] = _connected)) {
+            bluetooth ["address"] = BLEDevice::getAddress ().toString ();
+            bluetooth ["devices"] = _server->getPeerDevices (true).size ();
+        }
+    }    
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -150,8 +156,14 @@ public:
             _mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ());
         return _mqttClient.connected ();
     }
-    int state () {
-        return _mqttClient.state ();
+
+    void serialize (JsonObject &obj) const {
+        PubSubClient& mqttClient = const_cast <MQTTPublisher *> (this)->_mqttClient;
+        JsonObject mqtt = obj ["mqtt"].to <JsonObject> ();
+        if ((mqtt ["connected"] = (WiFi.isConnected () && mqttClient.connected ()))) {
+            //
+        }
+        mqtt ["state"] = mqttClient.state ();    
     }
 };
 

@@ -1,8 +1,8 @@
 
 // -----------------------------------------------------------------------------------------------
 
-static Upstamp __ConnectManager_WiFiEvents_connected;
-static Upstamp __ConnectManager_WiFiEvents_disconnected;
+static ActivationTracker __ConnectManager_WiFiEvents_connected;
+static ActivationTracker __ConnectManager_WiFiEvents_disconnected;
 static void __ConnectManager_WiFiEvents (WiFiEvent_t event) {
     if (event == ARDUINO_EVENT_WIFI_STA_CONNECTED)
         __ConnectManager_WiFiEvents_connected ++;
@@ -29,11 +29,9 @@ public:
             wifi ["rssi"] = WiFi.RSSI ();
         }
         JsonObject connect = wifi ["connect"].to <JsonObject> ();
-        connect ["last"] = __ConnectManager_WiFiEvents_connected.seconds ();
-        connect ["numb"] = __ConnectManager_WiFiEvents_connected.number ();
+        __ConnectManager_WiFiEvents_connected.serialize (connect);
         JsonObject disconnect = wifi ["disconnect"].to <JsonObject> ();
-        disconnect ["last"] = __ConnectManager_WiFiEvents_disconnected.seconds ();
-        disconnect ["numb"] = __ConnectManager_WiFiEvents_disconnected.number ();
+        __ConnectManager_WiFiEvents_disconnected.serialize (disconnect);
     }
 };
 
@@ -48,7 +46,7 @@ class NettimeManager : public Component, public Alarmable, public Diagnosticable
     TimeDriftCalculator _drifter;
     unsigned long _previousTimeUpdate = 0, _previousTimeAdjust = 0;
     time_t _previousTime = 0;
-    Upstamp _last;
+    ActivationTracker _activations;
 public:
     NettimeManager (const Config::NettimeConfig& cfg) : config (cfg), _fetcher (cfg.server), _drifter (_persistentDriftMs) {
       if (_persistentTime.tv_sec > 0)
@@ -60,7 +58,7 @@ public:
           if (currentTime - _previousTimeUpdate >= config.intervalUpdate) {
               const time_t fetchedTime = _fetcher.fetch ();
               if (fetchedTime > 0) {
-                  _last ++;
+                  _activations ++;
                   _persistentTime.tv_sec = fetchedTime; _persistentTime.tv_usec = 0;
                   settimeofday (&_persistentTime, nullptr);
                   if (_previousTime > 0)
@@ -81,15 +79,13 @@ public:
         JsonObject nettime = obj ["nettime"].to <JsonObject> ();
         nettime ["now"] = getTimeString ();
         nettime ["drift"] = _drifter.drift ();
-        JsonObject update = nettime ["update"].to <JsonObject> ();
-        update ["last"] = _last.seconds ();
-        update ["numb"] = _last.number ();
+        _activations.serialize (nettime);
     }
     //
     AlarmSet alarm () const override {
-        AlarmSet alarms = ALARM_NONE;
-        if (_fetcher.failures () > config.failureLimit) alarms |= ALARM_TIME_NETWORK;
-        if (_drifter.highDrift ()) alarms |= ALARM_TIME_DRIFT;
+        AlarmSet alarms;
+        if (_fetcher.failures () > config.failureLimit) alarms += ALARM_TIME_NETWORK;
+        if (_drifter.highDrift ()) alarms += ALARM_TIME_DRIFT;
         return alarms;
     }
     String getTimeString () const {
@@ -99,6 +95,7 @@ public:
             strftime (timeString, sizeof (timeString), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
         return String (timeString);
     }
+    operator String () const { return getTimeString (); }
 };
 
 // -----------------------------------------------------------------------------------------------

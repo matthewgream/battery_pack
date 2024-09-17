@@ -58,27 +58,39 @@ class Program : public Component, public Diagnosticable {
     DiagnosticManager diagnostics;
 
     Uptime uptime;
-    Upstamp iterations;
+    ActivationTracker activations;
 
     //
+
+    class JsonCollector {
+    private:
+        JsonDocument doc;
+    public:
+        JsonCollector (const String type, const String time) {
+            doc ["type"] = type;
+            doc ["time"] = time;
+        }
+        JsonDocument& document () { return doc; }
+        operator String () const {
+            String output;
+            serializeJson (doc, output);
+            return output;
+        }
+    };
 
     String diagCollect () {
-        JsonDocument doc;
-        doc ["type"] = "diag", doc ["time"] = nettime.getTimeString ();
+        JsonCollector collector ("diag", nettime);
 
+        JsonDocument &doc = collector.document ();
         diagnostics.collect (doc);
-
-        String output;
-        serializeJson (doc, output);
-        return output;
+        
+        return collector;
     }
 
-    //
-
     String dataCollect () {
-        JsonDocument doc;
-        doc ["type"] = "data", doc ["time"] = nettime.getTimeString ();
+        JsonCollector collector ("data", nettime);
 
+        JsonDocument &doc = collector.document ();
         JsonObject temperatures = doc ["temperatures"].to <JsonObject> ();
         temperatures ["environment"] = temperatureManagerEnvironment.getTemperature ();
         JsonObject batterypack = temperatures ["batterypack"].to <JsonObject> ();
@@ -92,9 +104,7 @@ class Program : public Component, public Diagnosticable {
         fan ["fanspeed"] = fanInterface.getSpeed ();
         doc ["alarms"] = alarms.getAlarms ();
 
-        String output;
-        serializeJson (doc, output);
-        return output;
+        return collector;
     }
 
     //
@@ -128,7 +138,7 @@ class Program : public Component, public Diagnosticable {
     void collect (JsonObject &obj) const override {
         JsonObject program = obj ["program"].to <JsonObject> ();
         program ["uptime"] = uptime.seconds ();
-        program ["iterations"] = iterations.number ();
+        program ["activations"] = activations.number ();
     }
 
     //
@@ -143,7 +153,7 @@ class Program : public Component, public Diagnosticable {
         }
         if (diagnose)
             doDeliver (diagCollect ());
-        iterations ++;
+        activations ++;
     }
 
 public:

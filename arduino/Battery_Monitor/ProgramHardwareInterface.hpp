@@ -50,7 +50,7 @@ class FanInterface : public Component, public Diagnosticable {
     static constexpr int PWM_RESOLUTION = 8, PWM_MINVALUE = 0, PWM_MAXVALUE = ((1 << PWM_RESOLUTION) - 1);
     const Config::FanInterfaceConfig& config;
     int _speed = PWM_MINVALUE, _speedMin = PWM_MAXVALUE, _speedMax = PWM_MINVALUE;
-    Upstamp _last;
+    ActivationTracker _activations;
 public:
     FanInterface (const Config::FanInterfaceConfig& cfg) : config (cfg) {}
     void begin () override {
@@ -63,15 +63,13 @@ public:
         values ["now"] = _speed;
         values ["min"] = _speedMin;
         values ["max"] = _speedMax;
-        JsonObject run = fan ["run"].to <JsonObject> ();
-        run ["last"] = _last.seconds ();
-        run ["numb"] = _last.number ();
+        _activations.serialize (fan);
         // % duty
     }
     //
     void setSpeed (const int speed) {
         const int speedNew = std::clamp (speed, PWM_MINVALUE, PWM_MAXVALUE);
-        if (speedNew > config.MIN_SPEED && _speed <= config.MIN_SPEED) _last ++;
+        if (speedNew > config.MIN_SPEED && _speed <= config.MIN_SPEED) _activations ++;
         if (speedNew < _speedMin) _speedMin = speedNew;
         if (speedNew > _speedMax) _speedMax = speedNew;
         analogWrite (config.PIN_PWM, _speed = speedNew);

@@ -37,9 +37,9 @@ public:
     }
     //
     AlarmSet alarm () const override {
-      AlarmSet alarms = ALARM_NONE;
-      if (_min <= config.MINIMAL) alarms |= ALARM_TEMPERATURE_MINIMAL;
-      if (_max >= config.CRITICAL) alarms |= ALARM_TEMPERATURE_MAXIMAL;
+      AlarmSet alarms;
+      if (_min <= config.MINIMAL) alarms += ALARM_TEMPERATURE_MINIMAL;
+      if (_max >= config.CRITICAL) alarms += ALARM_TEMPERATURE_MAXIMAL;
       return alarms;
     }
     float min () const { return _min; }
@@ -61,9 +61,9 @@ public:
         _value = _filter.update (_temperature.get (config.PROBE_ENVIRONMENT));
     }
     AlarmSet alarm () const override {
-      AlarmSet alarms = ALARM_NONE;
-      if (_value <= config.MINIMAL) alarms |= ALARM_TEMPERATURE_MINIMAL;
-      if (_value >= config.CRITICAL) alarms |= ALARM_TEMPERATURE_MAXIMAL;
+      AlarmSet alarms;
+      if (_value <= config.MINIMAL) alarms += ALARM_TEMPERATURE_MINIMAL;
+      if (_value >= config.CRITICAL) alarms += ALARM_TEMPERATURE_MAXIMAL;
       return alarms;
     }
     //

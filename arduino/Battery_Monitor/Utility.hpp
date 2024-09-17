@@ -99,17 +99,23 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 
-class Upstamp {
+class ActivationTracker {
     unsigned long _seconds = 0, _number = 0;
 public:
-    Upstamp () {}
+    ActivationTracker () {}
     unsigned long seconds () const { return _seconds; }
     unsigned long number () const { return _number; }
-    Upstamp& operator ++ (int) {
+    ActivationTracker& operator ++ (int) {
         _seconds = millis () / 1000;
         _number ++;
         return *this;
+    }
+    void serialize (JsonObject &obj) const {
+        JsonObject last = obj ["activations"].to <JsonObject> ();
+        last ["last"] = _seconds;
+        last ["number"] = _number;
     }
 };
 

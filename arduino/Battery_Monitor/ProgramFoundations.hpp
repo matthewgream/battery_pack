@@ -34,8 +34,8 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
-typedef uint32_t AlarmSet;
-#define _ALARM_NUMB(x)               (1UL < (x))
+typedef uint32_t _AlarmType;
+#define _ALARM_NUMB(x)              ((_AlarmType) (1UL < (x)))
 #define ALARM_NONE                  (0UL)
 #define ALARM_TEMPERATURE_MINIMAL   _ALARM_NUMB (0)
 #define ALARM_TEMPERATURE_MAXIMAL   _ALARM_NUMB (1)
@@ -43,10 +43,28 @@ typedef uint32_t AlarmSet;
 #define ALARM_STORAGE_SIZE          _ALARM_NUMB (3)
 #define ALARM_TIME_DRIFT            _ALARM_NUMB (4)
 #define ALARM_TIME_NETWORK          _ALARM_NUMB (5)
-#define ALARM_COUNT                 (6)
-#define ALARM_ACTIVE(a,x)           ((a) & _ALARM_NUMB (x))
-static const char * _ALARM_NAME [] = { "TEMP_MIN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "TIME_DRIFT", "TIME_NETWORK" };
-#define ALARM_NAME(x)               (_ALARM_NAME [x])
+#define _ALARM_COUNT                 (6)
+static const char * _ALARM_NAMES [] = { "TEMP_MIN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "TIME_DRIFT", "TIME_NETWORK" };
+#define _ALARM_NAME(x)               (_ALARM_NAMES [x])
+
+class AlarmSet {
+protected:
+    _AlarmType _alarmSet = ALARM_NONE;
+public:
+    inline const char * name (const int number) const { return _ALARM_NAME (number); }
+    inline size_t size () const { return _ALARM_COUNT; }
+    inline bool isNone () const { return (_alarmSet == ALARM_NONE); }
+    inline bool isActive (const int number) const { return (_alarmSet & _ALARM_NUMB (number)); }
+    inline operator _AlarmType () const { return _alarmSet; }
+    inline AlarmSet& operator+= (const _AlarmType alarm) { _alarmSet |= alarm; return *this; }
+    inline AlarmSet& operator+= (const AlarmSet& alarmset) { _alarmSet |= alarmset._alarmSet; return *this; }
+    String toStringBitmap () const {
+        String s; 
+        for (int number = 0; number < _ALARM_COUNT; number ++)
+            s += (_alarmSet & _ALARM_NUMB (number)) ? '1' : '0';
+        return s;
+    }
+};
 
 class Alarmable {
 protected:
@@ -59,38 +77,42 @@ public:
 class AlarmManager : public Component, public Diagnosticable {
     const Config::AlarmConfig& config;
     Alarmable::List _alarmables;
-    AlarmSet _alarms = ALARM_NONE;
-    std::array <Upstamp, ALARM_COUNT> _counts;
+    AlarmSet _alarms;
+    std::array <ActivationTracker, _ALARM_COUNT> _activations, _deactivations;
 public:
     AlarmManager (const Config::AlarmConfig& cfg, const Alarmable::List alarmables) : config (cfg), _alarmables (alarmables) {}
     void begin () override {
         pinMode (config.PIN_ALARM, OUTPUT);
     }
     void process () override {
-        AlarmSet alarms = ALARM_NONE;
+        AlarmSet alarms;
         for (const auto& alarmable : _alarmables)
-            alarms |= alarmable->alarm ();
+            alarms += alarmable->alarm ();
         if (alarms != _alarms) {
-            for (int i = 0; i < ALARM_COUNT; i ++)
-                if (ALARM_ACTIVE (alarms, i) && !ALARM_ACTIVE (_alarms, i))
-                    _counts [i] ++;
-            digitalWrite (config.PIN_ALARM, (alarms != ALARM_NONE) ? HIGH : LOW);
+            for (int number = 0; number < alarms.size (); number ++)
+                if (alarms.isActive (number) && !_alarms.isActive (number))
+                    _activations [number] ++;
+                else if (!alarms.isActive (number) && _alarms.isActive (number))
+                    _deactivations [number] ++;
+            digitalWrite (config.PIN_ALARM, alarms.isNone () ? LOW : HIGH);
             _alarms = alarms;
         }
     }
     void collect (JsonObject &obj) const override {
         JsonObject alarm = obj ["alarm"].to <JsonObject> ();
         JsonArray alarms = alarm ["alarms"].to <JsonArray> ();
-        for (int i = 0; i < ALARM_COUNT; i ++) {
+        for (int number = 0; number < _alarms.size (); number ++) {
             JsonObject entry = alarms.add <JsonObject> ();
-            entry ["name"] = ALARM_NAME (i);
-            entry ["active"] = ALARM_ACTIVE (_alarms, i);
-            entry ["last"] = _counts [i].seconds ();
-            entry ["numb"] = _counts [i].number ();
+            entry ["name"] = _alarms.name (number);
+            entry ["active"] = _alarms.isActive (number);
+            JsonObject activations = entry ["activations"].to <JsonObject> ();            
+            _activations [number].serialize (activations);
+            JsonObject deactivations = entry ["deactivations"].to <JsonObject> ();            
+            _deactivations [number].serialize (deactivations);
         }
     }
     //
-    AlarmSet getAlarms () const { return _alarms; }
+    String getAlarms () const { return _alarms.toStringBitmap (); }
 };
 
 // -----------------------------------------------------------------------------------------------
