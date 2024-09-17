@@ -3,47 +3,54 @@
 
 class DeliverManager : public Component, public Diagnosticable {
     const Config::DeliverConfig& config;
-    BluetoothNotifier _bluetooth;
+    BluetoothNotifier _blue;
     ActivationTracker _activations;
 public:
     DeliverManager (const Config::DeliverConfig& cfg) : config (cfg) {}
     void begin () override {
-        _bluetooth.advertise (config.name, config.service, config.characteristic);
+        _blue.advertise (config.blue.name, config.blue.service, config.blue.characteristic);
     }
     void collect (JsonObject &obj) const override {
         JsonObject deliver = obj ["deliver"].to <JsonObject> ();
-        _bluetooth.serialize (deliver);
+        _blue.serialize (deliver);
         _activations.serialize (deliver);
     }
     void deliver (const String& data) {
-        if (_bluetooth.connected ()) {
+        if (_blue.connected ()) {
             _activations ++;
-            _bluetooth.notify (data);
+            _blue.notify (data);
         }
     }
 };
 
 // -----------------------------------------------------------------------------------------------
 
-class PublishManager : public Component, public Diagnosticable {
+class PublishManager : public Component, public Alarmable, public Diagnosticable {
     const Config::PublishConfig& config;
     MQTTPublisher _mqtt;
     ActivationTracker _activations;
+    unsigned long _failures = 0;
 public:
     PublishManager (const Config::PublishConfig& cfg) : config (cfg), _mqtt (cfg.mqtt) {}
     void begin () override {
-        _mqtt.connect ();
+        _mqtt.setup ();
     }
     void process () override {
         _mqtt.process ();
     }
     bool publish (const String& data) {
-        if (!_mqtt.connected () || !_mqtt.publish (config.mqtt.topic, data))
+        if (!_mqtt.connected () || !_mqtt.publish (config.mqtt.topic, data)) {
+            _failures ++;
             return false;
+        } else _failures = 0;
         _activations ++;
         return true;
     }
-
+    AlarmSet alarm () const override {
+        AlarmSet alarms;
+        if (_failures > config.failureLimit) alarms += ALARM_PUBLISH_FAIL;
+        return alarms;
+    }
     void collect (JsonObject &obj) const override {
         JsonObject publish = obj ["publish"].to <JsonObject> ();
         _mqtt.serialize (publish);
@@ -58,9 +65,9 @@ public:
 class StorageManager : public Component, public Alarmable, public Diagnosticable {
     const Config::StorageConfig& config;
     SPIFFSFile _file;
+    ActivationTracker _activations;
     unsigned long _failures = 0;
     unsigned long _erasures = 0;
-    ActivationTracker _activations;
 public:
     typedef SPIFFSFile::LineCallback LineCallback;
     StorageManager (const Config::StorageConfig& cfg) : config (cfg), _file (config.filename, config.lengthMaximum) {}

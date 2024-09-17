@@ -3,9 +3,9 @@
 
 class TemperatureInterface : public Component, public Diagnosticable {
     static constexpr int ADC_RESOLUTION = 12, ADC_MINVALUE = 0, ADC_MAXVALUE = ((1 << ADC_RESOLUTION) - 1);
+    typedef struct { uint16_t v_now, v_min, v_max; } ValueSet;
     const Config::TemperatureInterfaceConfig& config;
     MuxInterface_CD74HC4067 _muxInterface;
-    typedef struct { uint16_t v_now, v_min, v_max; } ValueSet;
     std::array <ValueSet, MuxInterface_CD74HC4067::CHANNELS> _muxValues;
 public:
     TemperatureInterface (const Config::TemperatureInterfaceConfig& cfg) : config (cfg), _muxInterface (cfg.mux) {

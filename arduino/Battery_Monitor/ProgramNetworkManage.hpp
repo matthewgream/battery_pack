@@ -44,9 +44,10 @@ class NettimeManager : public Component, public Alarmable, public Diagnosticable
     const Config::NettimeConfig& config;
     NetworkTimeFetcher _fetcher;
     TimeDriftCalculator _drifter;
+    ActivationTracker _activations;
+    unsigned long _failures = 0;
     unsigned long _previousTimeUpdate = 0, _previousTimeAdjust = 0;
     time_t _previousTime = 0;
-    ActivationTracker _activations;
 public:
     NettimeManager (const Config::NettimeConfig& cfg) : config (cfg), _fetcher (cfg.server), _drifter (_persistentDriftMs) {
       if (_persistentTime.tv_sec > 0)
@@ -59,13 +60,14 @@ public:
               const time_t fetchedTime = _fetcher.fetch ();
               if (fetchedTime > 0) {
                   _activations ++;
+                  _failures = 0;
                   _persistentTime.tv_sec = fetchedTime; _persistentTime.tv_usec = 0;
                   settimeofday (&_persistentTime, nullptr);
                   if (_previousTime > 0)
                       _persistentDriftMs = _drifter.updateDrift (fetchedTime - _previousTime, currentTime - _previousTimeUpdate);
                   _previousTime = fetchedTime;
                   _previousTimeUpdate = currentTime;
-              }
+              } else _failures ++;
           }
         }
         if (currentTime - _previousTimeAdjust >= config.intervalAdjust) {
@@ -84,7 +86,7 @@ public:
     //
     AlarmSet alarm () const override {
         AlarmSet alarms;
-        if (_fetcher.failures () > config.failureLimit) alarms += ALARM_TIME_NETWORK;
+        if (_failures > config.failureLimit) alarms += ALARM_TIME_NETWORK;
         if (_drifter.highDrift ()) alarms += ALARM_TIME_DRIFT;
         return alarms;
     }

@@ -9,7 +9,6 @@
 
 class NetworkTimeFetcher {
     const String _server;
-    unsigned long _failures = 0;
 public:
     NetworkTimeFetcher (const String& server) : _server (server) {}
     time_t fetch () {
@@ -21,17 +20,12 @@ public:
                 struct tm timeinfo;
                 if (strptime (header.c_str (), "%a, %d %b %Y %H:%M:%S GMT", &timeinfo) != NULL) {
                     client.end ();
-                    _failures = 0;
                     return mktime (&timeinfo);
                 }
             }
         }
         client.end ();
-        _failures ++;
         return (time_t) 0;
-    }
-    int failures () const {
-        return _failures;
     }
 };
 
@@ -137,7 +131,7 @@ private:
     PubSubClient _mqttClient;
 public:
     MQTTPublisher (const Config& cfg) : config (cfg), _mqttClient (_wifiClient) {}
-    void connect () {
+    void setup () {
         _mqttClient.setServer (config.host.c_str (), config.port);
     }
     bool publish (const String& topic, const String& data) {

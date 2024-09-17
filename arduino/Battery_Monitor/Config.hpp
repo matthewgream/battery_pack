@@ -18,15 +18,17 @@
 // #define DEFAULT_MQTT_PASS "PASS" // Secrets.hpp
 #define DEFAULT_MQTT_TOPIC "batterymonitor/data"
 #define DEFAULT_MQTT_CLIENT "BatteryMonitor"
+#define DEFAULT_PUBLISH_FAILURES (3)
 
 #define DEFAULT_BLUE_NAME "BatteryMonitor"
 #define DEFAULT_BLUE_SERVICE "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define DEFAULT_BLUE_CHARACTERISTIC "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+#define DEFAULT_DELIVER_FAILURES (3)
 
-#define DEFAULT_TIME_SERVER "http://google.com"
-#define DEFAULT_TIME_UPDATE (1000 * 60 * 60)
-#define DEFAULT_TIME_ADJUST (1000 * 60)
-#define DEFAULT_TIME_FAILURES (3)
+#define DEFAULT_NETTIME_SERVER "http://google.com"
+#define DEFAULT_NETTIME_UPDATE (1000 * 60 * 60)
+#define DEFAULT_NETTIME_ADJUST (1000 * 60)
+#define DEFAULT_NETTIME_FAILURES (3)
 
 #define DEFAULT_STORAGE_NAME "data.log"
 #define DEFAULT_STORAGE_WRITE (1000 * 30)
@@ -52,27 +54,29 @@ struct Config {
         const float MINIMAL = -20.0, WARNING = 40.0, CRITICAL = 50.0;
     } temperature;
     struct FanInterfaceConfig {
-        const int PIN_PWM = 7, MIN_SPEED = 85, MAX_SPEED = 255;
+        const int PIN_PWM = 7;
+        const int MIN_SPEED = 85, MAX_SPEED = 255;
     } fan;
 
     struct ConnectConfig {
         const String host = DEFAULT_WIFI_HOST, ssid = DEFAULT_WIFI_SSID, pass = DEFAULT_WIFI_PASS;
     } network;
     struct NettimeConfig {
-        const String server = DEFAULT_TIME_SERVER;
-        const interval_t intervalUpdate = DEFAULT_TIME_UPDATE, intervalAdjust = DEFAULT_TIME_ADJUST;
-        const int failureLimit = DEFAULT_TIME_FAILURES;
+        const String server = DEFAULT_NETTIME_SERVER;
+        const interval_t intervalUpdate = DEFAULT_NETTIME_UPDATE, intervalAdjust = DEFAULT_NETTIME_ADJUST;
+        const int failureLimit = DEFAULT_NETTIME_FAILURES;
     } nettime;
     struct DeliverConfig {
-        const String name = DEFAULT_BLUE_NAME, service = DEFAULT_BLUE_SERVICE, characteristic = DEFAULT_BLUE_CHARACTERISTIC;
+        struct BlueConfig { const String name = DEFAULT_BLUE_NAME, service = DEFAULT_BLUE_SERVICE, characteristic = DEFAULT_BLUE_CHARACTERISTIC; } blue;
     } deliver;
     struct PublishConfig {
         MQTTPublisher::Config mqtt = { .client = DEFAULT_MQTT_CLIENT, .host = DEFAULT_MQTT_HOST, .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .topic = DEFAULT_MQTT_TOPIC, .port = DEFAULT_MQTT_PORT };
+        const int failureLimit = DEFAULT_PUBLISH_FAILURES;
     } publish;
     struct StorageConfig {
         const String filename = DEFAULT_STORAGE_NAME;
-        const int failureLimit = DEFAULT_STORAGE_FAILURES;
         const size_t lengthMaximum = DEFAULT_STORAGE_LENGTH_MAXIMUM, lengthCritical = DEFAULT_STORAGE_LENGTH_CRITICAL;
+        const int failureLimit = DEFAULT_STORAGE_FAILURES;
     } storage;
 
     struct AlarmConfig {

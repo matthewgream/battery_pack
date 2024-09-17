@@ -12,9 +12,9 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 class TemperatureManagerBatterypack: public TemperatureManager, public Alarmable {
-    float _min, _max, _avg;
     static constexpr int _num = 15; // config.temperature.PROBE_NUMBER - 1
     typedef std::array <float, _num> Values;
+    float _min, _max, _avg;
     Values _values;
     std::array <MovingAverage <float>, _num> _filters;
 public:
@@ -75,12 +75,12 @@ public:
 class FanManager : public Component {
     const Config::FanInterfaceConfig &config;
     FanInterface &_fan;
-    const TemperatureManagerBatterypack& _temperatures;
     PidController &_controllerAlgorithm;
     AlphaSmoothing &_smootherAlgorithm;
+    const TemperatureManagerBatterypack& _temperatures;
 
 public:
-    FanManager (const Config::FanInterfaceConfig& cfg, FanInterface& fan, const TemperatureManagerBatterypack& temperatures, PidController& controller, AlphaSmoothing& smoother) : config (cfg), _fan (fan), _temperatures (temperatures), _controllerAlgorithm (controller), _smootherAlgorithm (smoother) {}
+    FanManager (const Config::FanInterfaceConfig& cfg, FanInterface& fan, const TemperatureManagerBatterypack& temperatures, PidController& controller, AlphaSmoothing& smoother) : config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _temperatures (temperatures) {}
     void process () override {
         const float setpoint = _temperatures.setpoint (), current = _temperatures.current ();
         const float speedCalculated = _controllerAlgorithm.apply (setpoint, current);
