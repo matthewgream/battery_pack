@@ -13,6 +13,7 @@ class MovingAverage {
     std::array <T, W> V;
     T S = T (0);
     int I = 0, C = 0;
+
 public:
     T update (const T X) {
         if (C == W) S -= V [I];
@@ -30,11 +31,11 @@ public:
 #include <algorithm>
 
 class PidController {
-private:
     const float _Kp, _Ki, _Kd;
     float _p, _i = 0.0f, _d;
     float _lastError = 0.0f;
     unsigned long _lastTime = 0;
+
 public:
     PidController (const float kp, const float ki, const float kd) : _Kp (kp), _Ki (ki), _Kd (kd) {}
     float apply (const float setpoint, const float current) {
@@ -55,6 +56,7 @@ public:
 class AlphaSmoothing {
     const float _alpha;
     float _value = 0.0f;
+
 public:
     AlphaSmoothing (const float alpha) : _alpha (alpha) {}
     float apply (const float value) {
@@ -71,6 +73,7 @@ typedef unsigned long interval_t;
 class Intervalable {
     const interval_t _interval;
     interval_t _previous;
+
 public:
     Intervalable (const interval_t interval) : _interval (interval), _previous (0) {}
     operator bool () {
@@ -89,6 +92,7 @@ public:
 
 class Uptime {
     const unsigned long _started;
+
 public:
     Uptime () : _started (millis ()) {}
     unsigned long seconds () const {
@@ -103,6 +107,7 @@ public:
 
 class ActivationTracker {
     unsigned long _seconds = 0, _number = 0;
+
 public:
     ActivationTracker () {}
     unsigned long seconds () const { return _seconds; }
@@ -146,6 +151,26 @@ float steinharthart_calculator (const float VALUE, const float VALUE_MAX, const 
     const float STEINHART = (log ((REFERENCE_RESISTANCE / ((VALUE_MAX / VALUE) - 1.0)) / NOMINAL_RESISTANCE) / BETA) + (1.0 / (NOMINAL_TEMPERATURE + 273.15));
     return (1.0 / STEINHART) - 273.15;
 }
+
+// -----------------------------------------------------------------------------------------------
+
+#include <ArduinoJson.h>
+
+class JsonCollector {
+    JsonDocument doc;
+
+public:
+    JsonCollector (const String &type, const String &time) {
+        doc ["type"] = type;
+        doc ["time"] = time;
+    }
+    JsonDocument& document () { return doc; }
+    operator String () const {
+        String output;
+        serializeJson (doc, output);
+        return output;
+    }
+};
 
 // -----------------------------------------------------------------------------------------------
 

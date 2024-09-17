@@ -7,6 +7,13 @@ class TemperatureInterface : public Component, public Diagnosticable {
     const Config::TemperatureInterfaceConfig& config;
     MuxInterface_CD74HC4067 _muxInterface;
     std::array <ValueSet, MuxInterface_CD74HC4067::CHANNELS> _muxValues;
+    void updatevalues (const int channel, const uint16_t value) {
+        ValueSet &valueSet = _muxValues [channel]; 
+        valueSet.v_now = value;
+        if (value > valueSet.v_min) valueSet.v_min = value;
+        if (value < valueSet.v_max) valueSet.v_max = value;
+    }
+
 public:
     TemperatureInterface (const Config::TemperatureInterfaceConfig& cfg) : config (cfg), _muxInterface (cfg.mux) {
         for (int channel = 0; channel < MuxInterface_CD74HC4067::CHANNELS; channel ++)
@@ -16,7 +23,15 @@ public:
         analogReadResolution (ADC_RESOLUTION);
         _muxInterface.configure ();
     }
-    void collect (JsonObject &obj) const override {
+    float get (const int channel) const {
+        assert (channel >= 0 && channel < MuxInterface_CD74HC4067::CHANNELS && "Channel out of range");
+        uint16_t value = _muxInterface.get (channel);
+        const_cast <TemperatureInterface*> (this)->updatevalues (channel, value);
+        return steinharthart_calculator (value, ADC_MAXVALUE, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
+    }
+
+protected:
+    void serializeDiagnostics (JsonObject &obj) const override {
         JsonObject temperature = obj ["temperature"].to <JsonObject> ();
         JsonArray values = temperature ["values"].to <JsonArray> ();
         for (int channel = 0; channel < MuxInterface_CD74HC4067::CHANNELS; channel ++) {
@@ -28,20 +43,6 @@ public:
             entry ["max"] = valueSet.v_max;
         }
     }
-    //
-    float get (const int channel) const {
-        assert (channel >= 0 && channel < MuxInterface_CD74HC4067::CHANNELS && "Channel out of range");
-        uint16_t value = _muxInterface.get (channel);
-        const_cast <TemperatureInterface*> (this)->updatevalues (channel, value);
-        return steinharthart_calculator (value, ADC_MAXVALUE, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
-    }
-private:
-    void updatevalues (const int channel, const uint16_t value) {
-        ValueSet &valueSet = _muxValues [channel]; 
-        valueSet.v_now = value;
-        if (value > valueSet.v_min) valueSet.v_min = value;
-        if (value < valueSet.v_max) valueSet.v_max = value;
-    }
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -51,22 +52,13 @@ class FanInterface : public Component, public Diagnosticable {
     const Config::FanInterfaceConfig& config;
     int _speed = PWM_MINVALUE, _speedMin = PWM_MAXVALUE, _speedMax = PWM_MINVALUE;
     ActivationTracker _activations;
+
 public:
     FanInterface (const Config::FanInterfaceConfig& cfg) : config (cfg) {}
     void begin () override {
         pinMode (config.PIN_PWM, OUTPUT);
         analogWrite (config.PIN_PWM, PWM_MINVALUE);
     }
-    void collect (JsonObject &obj) const override {
-        JsonObject fan = obj ["fan"].to <JsonObject> ();
-        JsonObject values = fan ["values"].to <JsonObject> ();
-        values ["now"] = _speed;
-        values ["min"] = _speedMin;
-        values ["max"] = _speedMax;
-        _activations.serialize (fan);
-        // % duty
-    }
-    //
     void setSpeed (const int speed) {
         const int speedNew = std::clamp (speed, PWM_MINVALUE, PWM_MAXVALUE);
         if (speedNew > config.MIN_SPEED && _speed <= config.MIN_SPEED) _activations ++;
@@ -76,6 +68,17 @@ public:
     }
     int getSpeed () const {
         return _speed;
+    }
+
+protected:
+    void serializeDiagnostics (JsonObject &obj) const override {
+        JsonObject fan = obj ["fan"].to <JsonObject> ();
+        JsonObject values = fan ["values"].to <JsonObject> ();
+        values ["now"] = _speed;
+        values ["min"] = _speedMin;
+        values ["max"] = _speedMax;
+        _activations.serialize (fan);
+        // % duty
     }
 };
 

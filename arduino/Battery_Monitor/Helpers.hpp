@@ -9,6 +9,7 @@
 
 class NetworkTimeFetcher {
     const String _server;
+
 public:
     NetworkTimeFetcher (const String& server) : _server (server) {}
     time_t fetch () {
@@ -38,6 +39,7 @@ class TimeDriftCalculator {
     long _driftMs;
     bool _highDrift = false;
     static constexpr long MAX_DRIFT_MS = 60 * 1000;
+
 public:
     TimeDriftCalculator (const long driftMs) : _driftMs (driftMs) {}
     long updateDrift (time_t periodSecs, const unsigned long periodMs) {
@@ -78,9 +80,11 @@ class BluetoothNotifier : protected BLEServerCallbacks {
     BLEServer *_server = nullptr;
     BLECharacteristic *_characteristic = nullptr;
     bool _connected = false;
+
 protected:
     void onConnect (BLEServer *) override { _connected = true; }
     void onDisconnect (BLEServer *) override { _connected = false; }
+
 public:
     void advertise (const String& name, const String& serviceUUID, const String& characteristicUUID)  {
         BLEDevice::init (name);
@@ -104,7 +108,7 @@ public:
     bool connected (void) const {
         return _connected;
     }
-
+    //
     void serialize (JsonObject &obj) const {
         JsonObject bluetooth = obj ["bluetooth"].to <JsonObject> ();
         if ((bluetooth ["connected"] = _connected)) {
@@ -120,6 +124,7 @@ public:
 #include <PubSubClient.h>
 
 class MQTTPublisher {
+
 public:
     typedef struct {
         const String client, host, user, pass, topic;
@@ -127,8 +132,10 @@ public:
     } Config;
 private:
     const Config& config;
+
     WiFiClient _wifiClient;
     PubSubClient _mqttClient;
+
 public:
     MQTTPublisher (const Config& cfg) : config (cfg), _mqttClient (_wifiClient) {}
     void setup () {
@@ -150,7 +157,7 @@ public:
             _mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ());
         return _mqttClient.connected ();
     }
-
+    //
     void serialize (JsonObject &obj) const {
         PubSubClient& mqttClient = const_cast <MQTTPublisher *> (this)->_mqttClient;
         JsonObject mqtt = obj ["mqtt"].to <JsonObject> ();
@@ -169,6 +176,7 @@ class SPIFFSFile {
     const String _filename;
     const size_t _maximum;
     size_t _size = 0;
+
 public:
     class LineCallback {
     public:
@@ -225,6 +233,7 @@ public:
 #include <Arduino.h>
 
 class MuxInterface_CD74HC4067 { // technically this is ADC as well due to PIN_SIG
+
 public:
     typedef struct {
         const int PIN_S0, PIN_S1, PIN_S2, PIN_S3, PIN_SIG;
@@ -232,6 +241,7 @@ public:
     static constexpr int CHANNELS = 16;
 private:
     const Config& config;
+
 public:
     MuxInterface_CD74HC4067 (const Config& cfg) : config (cfg) {}
     void configure () {
@@ -241,7 +251,6 @@ public:
         pinMode (config.PIN_S3, OUTPUT);
         pinMode (config.PIN_SIG, INPUT);
     }
-    //
     uint16_t get (const int channel) const {
         digitalWrite (config.PIN_S0, channel & 1);
         digitalWrite (config.PIN_S1, (channel >> 1) & 1);

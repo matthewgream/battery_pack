@@ -62,22 +62,6 @@ class Program : public Component, public Diagnosticable {
 
     //
 
-    class JsonCollector {
-    private:
-        JsonDocument doc;
-    public:
-        JsonCollector (const String type, const String time) {
-            doc ["type"] = type;
-            doc ["time"] = time;
-        }
-        JsonDocument& document () { return doc; }
-        operator String () const {
-            String output;
-            serializeJson (doc, output);
-            return output;
-        }
-    };
-
     String diagCollect () {
         JsonCollector collector ("diag", nettime);
 
@@ -86,7 +70,6 @@ class Program : public Component, public Diagnosticable {
         
         return collector;
     }
-
     String dataCollect () {
         JsonCollector collector ("data", nettime);
 
@@ -135,21 +118,13 @@ class Program : public Component, public Diagnosticable {
 
     //
 
-    void collect (JsonObject &obj) const override {
-        JsonObject program = obj ["program"].to <JsonObject> ();
-        program ["uptime"] = uptime.seconds ();
-        program ["activations"] = activations.number ();
-    }
-
-    //
-
     Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
     void process () override {
         const bool deliver = intervalDeliver, capture = intervalDeliver, diagnose = intervalDiagnose;
         if (deliver || capture) {
-          const String data = dataCollect ();
-          if (deliver) doDeliver (data);
-          if (capture) doCapture (data);
+            const String data = dataCollect ();
+            if (deliver) doDeliver (data);
+            if (capture) doCapture (data);
         }
         if (diagnose)
             doDeliver (diagCollect ());
@@ -174,6 +149,13 @@ public:
     void setup () { for (const auto& component : components) component->begin (); }
     void loop () { for (const auto& component : components) component->process (); }
     void sleep () { delay (config.intervalProcess); }
+
+protected:
+    void serializeDiagnostics (JsonObject &obj) const override {
+        JsonObject program = obj ["program"].to <JsonObject> ();
+        program ["uptime"] = uptime.seconds ();
+        program ["activations"] = activations.number ();
+    }
 };
 
 // -----------------------------------------------------------------------------------------------
