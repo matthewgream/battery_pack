@@ -19,7 +19,7 @@ protected:
 
 public:
     typedef std::vector <Diagnosticable*> List;
-    virtual void serializeDiagnostics (JsonObject &obj) const = 0;
+    virtual void collectDiagnostics (JsonObject &obj) const = 0;
 };
 
 class DiagnosticManager : public Component {
@@ -31,7 +31,7 @@ public:
     void collect (JsonDocument &doc) const {
         JsonObject obj = doc.to <JsonObject> ();
         for (const auto& diagnosticable : _diagnosticables)
-            diagnosticable->serializeDiagnostics (obj);
+            diagnosticable->collectDiagnostics (obj);
     }
 };
 
@@ -76,7 +76,7 @@ protected:
 
 public:
     typedef std::vector <Alarmable*> List;
-    virtual AlarmSet collectAlarms () const = 0;
+    virtual void collectAlarms (AlarmSet& alarms) const = 0;
 };
 
 class AlarmManager : public Component, public Diagnosticable {
@@ -93,7 +93,7 @@ public:
     void process () override {
         AlarmSet alarms;
         for (const auto& alarmable : _alarmables)
-            alarms += alarmable->collectAlarms ();
+            alarmable->collectAlarms (alarms);
         if (alarms != _alarms) {
             for (int number = 0; number < alarms.size (); number ++)
                 if (alarms.isAny (number) && !_alarms.isAny (number))
@@ -107,17 +107,15 @@ public:
     String getAlarms () const { return _alarms.toStringBitmap (); }
 
 protected:
-    void serializeDiagnostics (JsonObject &obj) const override {
+    void collectDiagnostics (JsonObject &obj) const override {
         JsonObject alarm = obj ["alarm"].to <JsonObject> ();
         JsonArray alarms = alarm ["alarms"].to <JsonArray> ();
         for (int number = 0; number < _alarms.size (); number ++) {
             JsonObject entry = alarms.add <JsonObject> ();
             entry ["name"] = _alarms.name (number);
             entry ["active"] = _alarms.isAny (number);
-            JsonObject activations = entry ["activations"].to <JsonObject> ();            
-            _activations [number].serialize (activations);
-            JsonObject deactivations = entry ["deactivations"].to <JsonObject> ();            
-            _deactivations [number].serialize (deactivations);
+            _activations [number].serialize (entry ["activated"].to <JsonObject> ());
+            _deactivations [number].serialize (entry ["deactivated"].to <JsonObject> ());
         }
     }
 };

@@ -42,13 +42,13 @@ class TimeDriftCalculator {
 
 public:
     TimeDriftCalculator (const long driftMs) : _driftMs (driftMs) {}
-    long updateDrift (time_t periodSecs, const unsigned long periodMs) {
+    long updateDrift (time_t periodSecs, const interval_t periodMs) {
         long driftMs = (((periodSecs * 1000) - periodMs) * (60 * 60 * 1000)) / periodMs; // ms per hour
         driftMs = (_driftMs * 3 + driftMs) / 4; // 75% old value, 25% new value
         if (driftMs > MAX_DRIFT_MS || driftMs < -MAX_DRIFT_MS) _highDrift = true;
         return _driftMs = std::clamp (driftMs, -MAX_DRIFT_MS, MAX_DRIFT_MS);
     }
-    long applyDrift (struct timeval &currentTime, const unsigned long periodMs) {
+    long applyDrift (struct timeval &currentTime, const interval_t periodMs) {
         const long adjustMs = (_driftMs * periodMs) / (60 * 60 * 1000);
         currentTime.tv_sec += adjustMs / 1000;
         currentTime.tv_usec += (adjustMs % 1000) * 1000;
@@ -151,7 +151,9 @@ public:
         _mqttClient.setServer (config.host.c_str (), config.port);
     }
     bool publish (const String& topic, const String& data) {
-        if (!connected ())
+        if (!WiFi.isConnected ())
+            return false;
+        if (!_mqttClient.connected () && !_mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ()))
             return false;
         return _mqttClient.publish (topic.c_str (), data.c_str ());
     }
@@ -160,11 +162,7 @@ public:
             _mqttClient.loop ();
     }
     bool connected () {
-        if (!WiFi.isConnected ())
-            return false;
-        if (!_mqttClient.connected ())
-            _mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ());
-        return _mqttClient.connected ();
+        return WiFi.isConnected () && _mqttClient.connected ();
     }
     //
     void serialize (JsonObject &obj) const {

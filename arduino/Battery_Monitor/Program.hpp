@@ -135,10 +135,12 @@ public:
     void sleep () { delay (config.intervalProcess); }
 
 protected:
-    void serializeDiagnostics (JsonObject &obj) const override {
+    void collectDiagnostics (JsonObject &obj) const override {
         JsonObject program = obj ["program"].to <JsonObject> ();
+        extern const String build_info; 
+        program ["build"] = build_info;
         program ["uptime"] = uptime.seconds ();
-        program ["activations"] = activations.number ();
+        activations.serialize (program ["iterations"].to <JsonObject> ());
     }
 };
 

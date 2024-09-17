@@ -22,6 +22,11 @@
 
 // -----------------------------------------------------------------------------------------------
 
+typedef unsigned long interval_t;
+typedef unsigned long counter_t;
+
+// -----------------------------------------------------------------------------------------------
+
 #include <array>
 #include <type_traits>
 #include <cstddef>
@@ -54,12 +59,12 @@ class PidController {
     const float _Kp, _Ki, _Kd;
     float _p, _i = 0.0f, _d;
     float _lastError = 0.0f;
-    unsigned long _lastTime = 0;
+    interval_t _lastTime = 0;
 
 public:
     PidController (const float kp, const float ki, const float kd) : _Kp (kp), _Ki (ki), _Kd (kd) {}
     float apply (const float setpoint, const float current) {
-        const unsigned long time = millis ();
+        const interval_t time = millis ();
         const float delta = (time - _lastTime) / 1000.0f;
         const float error = setpoint - current;
         _p = _Kp * error;
@@ -88,8 +93,6 @@ public:
 
 #include <Arduino.h>
 
-typedef unsigned long interval_t;
-
 class Intervalable {
     const interval_t _interval;
     interval_t _previous;
@@ -111,11 +114,11 @@ public:
 #include <Arduino.h>
 
 class Uptime {
-    const unsigned long _started;
+    const interval_t _started;
 
 public:
     Uptime () : _started (millis ()) {}
-    unsigned long seconds () const {
+    interval_t seconds () const {
         return (millis () - _started) / 1000;
     }
 };
@@ -126,27 +129,31 @@ public:
 #include <ArduinoJson.h>
 
 class ActivationTracker {
-    unsigned long _seconds = 0, _number = 0;
+    interval_t _seconds = 0, _number = 0;
 
 public:
     ActivationTracker () {}
-    unsigned long seconds () const { return _seconds; }
-    unsigned long number () const { return _number; }
+    interval_t seconds () const { return _seconds; }
+    interval_t  number () const { return _number; }
     ActivationTracker& operator ++ (int) {
         _seconds = millis () / 1000;
         _number ++;
         return *this;
     }
     void serialize (JsonObject &obj) const {
-        JsonObject last = obj ["activations"].to <JsonObject> ();
-        last ["last"] = _seconds;
-        last ["number"] = _number;
+        obj ["last"] = _seconds;
+        obj ["number"] = _number;
+    }
+    void serialize (JsonObject &&obj) const { // XXX not 100% sure about this
+        obj ["last"] = _seconds;
+        obj ["number"] = _number;
     }
 };
 
 // -----------------------------------------------------------------------------------------------
 
-template <typename T> inline T map (const T x, const T in_min, const T in_max, const T out_min, const T out_max) {
+template <typename T>
+inline T map (const T x, const T in_min, const T in_max, const T out_min, const T out_max) {
     static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
@@ -209,6 +216,18 @@ void exception_catcher (F&& f) {
         DEBUG_PRINT ("exception: "); DEBUG_PRINTLN ("unknown");
     }
 }
+
+// -----------------------------------------------------------------------------------------------
+
+template <typename T>
+class Singleton {
+    static_assert (std::is_class_v <T>, "T must be a class type");
+    inline static T* _instance = nullptr; 
+public:
+    inline static T* instance () { return _instance; }
+    Singleton (T* t) { _instance = t; } 
+    virtual ~Singleton () { _instance = nullptr; }
+};
 
 // -----------------------------------------------------------------------------------------------
 

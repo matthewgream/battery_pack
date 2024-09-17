@@ -2,16 +2,6 @@
 // -----------------------------------------------------------------------------------------------
 
 class ConnectManager;
-
-template <typename T>
-class Singleton {
-    inline static T* _instance = nullptr; 
-public:
-    inline static T* instance () { return _instance; }
-    Singleton (T* t) { _instance = t; } 
-    virtual ~Singleton () { _instance = nullptr; }
-};
-
 static void __ConnectManager_WiFiEventHandler (WiFiEvent_t event);
 
 class ConnectManager : public Component, public Diagnosticable, private Singleton <ConnectManager>  {
@@ -37,17 +27,15 @@ public:
     }
 
 protected:
-    void serializeDiagnostics (JsonObject &obj) const override {
+    void collectDiagnostics (JsonObject &obj) const override {
         JsonObject wifi = obj ["wifi"].to <JsonObject> ();
         wifi ["mac"] = mac_address ();
         if ((wifi ["connected"] = WiFi.isConnected ())) {
             wifi ["address"] = WiFi.localIP ();
             wifi ["rssi"] = WiFi.RSSI ();
         }
-        JsonObject connected = wifi ["connected"].to <JsonObject> ();
-        _connected.serialize (connected);
-        JsonObject disconnected = wifi ["disconnected"].to <JsonObject> ();
-        _disconnected.serialize (disconnected);
+        _connected.serialize (wifi ["connected"].to <JsonObject> ());
+        _disconnected.serialize (wifi ["disconnected"].to <JsonObject> ());
     }
 };
 
@@ -66,8 +54,8 @@ class NettimeManager : public Component, public Alarmable, public Diagnosticable
     NetworkTimeFetcher _fetcher;
     TimeDriftCalculator _drifter;
     ActivationTracker _activations;
-    unsigned long _failures = 0;
-    unsigned long _previousTimeUpdate = 0, _previousTimeAdjust = 0;
+    counter_t _failures = 0;
+    interval_t _previousTimeUpdate = 0, _previousTimeAdjust = 0;
     time_t _previousTime = 0;
 
 public:
@@ -76,7 +64,7 @@ public:
           settimeofday (&_persistentTime, nullptr);
     }
     void process () override {
-        unsigned long currentTime = millis ();
+        interval_t currentTime = millis ();
         if (WiFi.isConnected ()) {
           if (currentTime - _previousTimeUpdate >= config.intervalUpdate) {
               const time_t fetchedTime = _fetcher.fetch ();
@@ -109,17 +97,15 @@ public:
     operator String () const { return getTimeString (); }
 
 protected:
-    AlarmSet collectAlarms () const override {
-        AlarmSet alarms;
+    void collectAlarms (AlarmSet& alarms) const override {
         if (_failures > config.failureLimit) alarms += ALARM_TIME_NETWORK;
         if (_drifter.highDrift ()) alarms += ALARM_TIME_DRIFT;
-        return alarms;
     }
-    void serializeDiagnostics (JsonObject &obj) const override {
+    void collectDiagnostics (JsonObject &obj) const override {
         JsonObject nettime = obj ["nettime"].to <JsonObject> ();
         nettime ["now"] = getTimeString ();
         nettime ["drift"] = _drifter.drift ();
-        _activations.serialize (nettime);
+        _activations.serialize (nettime ["fetched"].to <JsonObject> ());
     }
 };
 

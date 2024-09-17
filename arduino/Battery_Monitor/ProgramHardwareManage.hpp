@@ -45,11 +45,9 @@ public:
     float current () const { return _max; }
 
 protected:
-    AlarmSet collectAlarms () const override {
-      AlarmSet alarms;
+    void collectAlarms (AlarmSet& alarms) const override {
       if (_min <= config.MINIMAL) alarms += ALARM_TEMPERATURE_MINIMAL;
       if (_max >= config.CRITICAL) alarms += ALARM_TEMPERATURE_MAXIMAL;
-      return alarms;
     }
 };
 
@@ -67,11 +65,9 @@ public:
     float getTemperature () const { return _value; }
 
 protected:
-    AlarmSet collectAlarms () const override {
-      AlarmSet alarms;
+    void collectAlarms (AlarmSet& alarms) const override {
       if (_value <= config.MINIMAL) alarms += ALARM_TEMPERATURE_MINIMAL;
       if (_value >= config.CRITICAL) alarms += ALARM_TEMPERATURE_MAXIMAL;
-      return alarms;
     }
 };
 
