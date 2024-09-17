@@ -4,15 +4,35 @@
 
 // -----------------------------------------------------------------------------------------------
 
+#include <Arduino.h>
+
+//#define DEBUG
+#ifdef DEBUG
+    bool DEBUG_AVAILABLE = false;
+    #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD); DEBUG_AVAILABLE = !Serial ? false : true;
+    #define DEBUG_END(...) Serial.flush (); Serial.end ()
+    #define DEBUG_PRINT(...) if (DEBUG_AVAILABLE) Serial.print (__VA_ARGS__)
+    #define DEBUG_PRINTLN(...) if (DEBUG_AVAILABLE) Serial.println (__VA_ARGS__)
+#else
+    #define DEBUG_START(...)
+    #define DEBUG_END(...)
+    #define DEBUG_PRINT(...)
+    #define DEBUG_PRINTLN(...)
+#endif
+
+// -----------------------------------------------------------------------------------------------
+
 #include <array>
+#include <type_traits>
+#include <cstddef>
 
 template <typename T, int W = 16>
 class MovingAverage {
+    static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
     static_assert (W > 0, "Window size must be positive");
-    static_assert (std::is_arithmetic <T>::value, "T must be an arithmetic type");
-    std::array <T, W> V;
+    std::array <T, W> V {};
     T S = T (0);
-    int I = 0, C = 0;
+    std::size_t I = 0, C = 0;
 
 public:
     T update (const T X) {
@@ -21,7 +41,7 @@ public:
         V [I] = X;
         S += X;
         I = (I + 1) % W;
-        return static_cast <T> (S) / C;
+        return  S / static_cast <T> (C);
     }
 };
 
@@ -127,7 +147,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 template <typename T> inline T map (const T x, const T in_min, const T in_max, const T out_min, const T out_max) {
-    static_assert (std::is_arithmetic <T>::value, "T must be an arithmetic type");
+    static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
@@ -174,16 +194,21 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
+#include <type_traits>
+#include <exception>
+#include <utility>
+
 template <typename F>
 void exception_catcher (F&& f) {
+    static_assert (std::is_invocable_v <F>, "F must be an invocable type");
     try {
-        f ();
+        std::forward <F> (f) ();
     } catch (const std::exception& e) {
         DEBUG_PRINT ("exception: "); DEBUG_PRINTLN (e.what ());
     } catch (...) {
         DEBUG_PRINT ("exception: "); DEBUG_PRINTLN ("unknown");
     }
-};
+}
 
 // -----------------------------------------------------------------------------------------------
 

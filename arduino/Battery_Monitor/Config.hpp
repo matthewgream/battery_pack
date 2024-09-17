@@ -67,7 +67,7 @@ struct Config {
         const int failureLimit = DEFAULT_NETTIME_FAILURES;
     } nettime;
     struct DeliverConfig {
-        struct BlueConfig { const String name = DEFAULT_BLUE_NAME, service = DEFAULT_BLUE_SERVICE, characteristic = DEFAULT_BLUE_CHARACTERISTIC; } blue;
+        BluetoothNotifier::Config blue = { .name = DEFAULT_BLUE_NAME, .serviceUUID = DEFAULT_BLUE_SERVICE, .characteristicUUID = DEFAULT_BLUE_CHARACTERISTIC };
     } deliver;
     struct PublishConfig {
         MQTTPublisher::Config mqtt = { .client = DEFAULT_MQTT_CLIENT, .host = DEFAULT_MQTT_HOST, .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .topic = DEFAULT_MQTT_TOPIC, .port = DEFAULT_MQTT_PORT };

@@ -26,7 +26,7 @@ public:
             }
         }
         client.end ();
-        return (time_t) 0;
+        return static_cast <time_t> (0);
     }
 };
 
@@ -77,6 +77,14 @@ public:
 #include <BLE2902.h>
 
 class BluetoothNotifier : protected BLEServerCallbacks {
+
+public:
+    typedef struct {
+        const String name, serviceUUID, characteristicUUID;
+    } Config;
+private:
+    const Config& config;
+
     BLEServer *_server = nullptr;
     BLECharacteristic *_characteristic = nullptr;
     bool _connected = false;
@@ -86,16 +94,17 @@ protected:
     void onDisconnect (BLEServer *) override { _connected = false; }
 
 public:
-    void advertise (const String& name, const String& serviceUUID, const String& characteristicUUID)  {
-        BLEDevice::init (name);
+    BluetoothNotifier (const Config& cfg) : config (cfg) {}
+    void advertise ()  {
+        BLEDevice::init (config.name);
         _server = BLEDevice::createServer ();
         _server->setCallbacks (this);
-        BLEService *service = _server->createService (serviceUUID);
-        _characteristic = service->createCharacteristic (characteristicUUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+        BLEService *service = _server->createService (config.serviceUUID);
+        _characteristic = service->createCharacteristic (config.characteristicUUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
         _characteristic->addDescriptor (new BLE2902 ());
         service->start ();
         BLEAdvertising *advertising = BLEDevice::getAdvertising ();
-        advertising->addServiceUUID (serviceUUID);
+        advertising->addServiceUUID (config.serviceUUID);
         advertising->setScanResponse (true);
         advertising->setMinPreferred (0x06);
         advertising->setMinPreferred (0x12);

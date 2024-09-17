@@ -44,10 +44,10 @@ protected:
             wifi ["address"] = WiFi.localIP ();
             wifi ["rssi"] = WiFi.RSSI ();
         }
-        JsonObject connect = wifi ["connect"].to <JsonObject> ();
-        _connected.serialize (connect);
-        JsonObject disconnect = wifi ["disconnect"].to <JsonObject> ();
-        _disconnected.serialize (disconnect);
+        JsonObject connected = wifi ["connected"].to <JsonObject> ();
+        _connected.serialize (connected);
+        JsonObject disconnected = wifi ["disconnected"].to <JsonObject> ();
+        _disconnected.serialize (disconnected);
     }
 };
 

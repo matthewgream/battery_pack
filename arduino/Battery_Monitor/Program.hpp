@@ -21,7 +21,6 @@
 #include <array>
 #include <vector>
 
-#include "Debug.hpp"
 #include "Utility.hpp"
 #include "Helpers.hpp"
 #include "Config.hpp"
@@ -36,7 +35,18 @@
 
 // -----------------------------------------------------------------------------------------------
 
+class Program;
+class OperationalManager {
+    const Program& _program;
+    public:
+        OperationalManager (const Program& program) : _program (program) {};
+        void collect (JsonDocument &doc) const;
+};
+
+// -----------------------------------------------------------------------------------------------
+
 class Program : public Component, public Diagnosticable {
+    friend class OperationalManager;
     const Config config;
 
     PidController fanControllingAlgorithm;
@@ -56,42 +66,19 @@ class Program : public Component, public Diagnosticable {
 
     AlarmManager alarms;
     DiagnosticManager diagnostics;
+    OperationalManager operational;
 
     Uptime uptime;
     ActivationTracker activations;
 
     //
 
-    String diagCollect () {
-        JsonCollector collector ("diag", nettime);
-
-        JsonDocument &doc = collector.document ();
-        diagnostics.collect (doc);
-        
+    template <typename Func>
+    String doCollect (const String& name, Func func) const {
+        JsonCollector collector (name, nettime);
+        func (collector.document ());
         return collector;
     }
-    String dataCollect () {
-        JsonCollector collector ("data", nettime);
-
-        JsonDocument &doc = collector.document ();
-        JsonObject temperatures = doc ["temperatures"].to <JsonObject> ();
-        temperatures ["environment"] = temperatureManagerEnvironment.getTemperature ();
-        JsonObject batterypack = temperatures ["batterypack"].to <JsonObject> ();
-        batterypack ["avg"] = temperatureManagerBatterypack.avg ();
-        batterypack ["min"] = temperatureManagerBatterypack.min ();
-        batterypack ["max"] = temperatureManagerBatterypack.max ();
-        JsonArray values = batterypack ["values"].to <JsonArray> ();
-        for (const auto& temperature : temperatureManagerBatterypack.getTemperatures ())
-            values.add (temperature);
-        JsonObject fan = doc ["fan"].to <JsonObject> ();
-        fan ["fanspeed"] = fanInterface.getSpeed ();
-        doc ["alarms"] = alarms.getAlarms ();
-
-        return collector;
-    }
-
-    //
-
     void doDeliver (const String& data) {
         deliver.deliver (data);
     }
@@ -115,19 +102,16 @@ class Program : public Component, public Diagnosticable {
         } else
             storage.append (data);
     }
-
-    //
-
     Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
     void process () override {
         const bool deliver = intervalDeliver, capture = intervalDeliver, diagnose = intervalDiagnose;
         if (deliver || capture) {
-            const String data = dataCollect ();
+            const String data = doCollect ("data", [this] (JsonDocument& doc) { operational.collect (doc); });
             if (deliver) doDeliver (data);
             if (capture) doCapture (data);
         }
         if (diagnose)
-            doDeliver (diagCollect ());
+            doDeliver (doCollect ("diag", [this] (JsonDocument& doc) { diagnostics.collect (doc); }));
         activations ++;
     }
 
@@ -139,7 +123,7 @@ public:
         network (config.network), nettime (config.nettime),
         deliver (config.deliver), publish (config.publish), storage (config.storage),
         alarms (config.alarm, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &publish, &storage }),
-        diagnostics (config.diagnostic, { &temperatureInterface, &fanInterface, &network, &nettime, &deliver, &publish, &storage, &alarms, this }),
+        diagnostics (config.diagnostic, { &temperatureInterface, &fanInterface, &network, &nettime, &deliver, &publish, &storage, &alarms, this }), operational (*this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
         components ({ &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager,
             &alarms, &network, &nettime, &deliver, &publish, &storage, &diagnostics, this }) {
@@ -157,6 +141,23 @@ protected:
         program ["activations"] = activations.number ();
     }
 };
+
+// -----------------------------------------------------------------------------------------------
+
+void OperationalManager::collect (JsonDocument &doc) const {
+    JsonObject temperatures = doc ["temperatures"].to <JsonObject> ();
+    temperatures ["environment"] = _program.temperatureManagerEnvironment.getTemperature ();
+    JsonObject batterypack = temperatures ["batterypack"].to <JsonObject> ();
+    batterypack ["avg"] = _program.temperatureManagerBatterypack.avg ();
+    batterypack ["min"] = _program.temperatureManagerBatterypack.min ();
+    batterypack ["max"] = _program.temperatureManagerBatterypack.max ();
+    JsonArray values = batterypack ["values"].to <JsonArray> ();
+    for (const auto& temperature : _program.temperatureManagerBatterypack.getTemperatures ())
+        values.add (temperature);
+    JsonObject fan = doc ["fan"].to <JsonObject> ();
+    fan ["fanspeed"] = _program.fanInterface.getSpeed ();
+    doc ["alarms"] = _program.alarms.getAlarms ();
+}
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------

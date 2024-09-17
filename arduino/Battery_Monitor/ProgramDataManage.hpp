@@ -7,9 +7,9 @@ class DeliverManager : public Component, public Diagnosticable {
     ActivationTracker _activations;
 
 public:
-    DeliverManager (const Config::DeliverConfig& cfg) : config (cfg) {}
+    DeliverManager (const Config::DeliverConfig& cfg) : config (cfg), _blue (cfg.blue) {}
     void begin () override {
-        _blue.advertise (config.blue.name, config.blue.service, config.blue.characteristic);
+        _blue.advertise ();
     }
     void deliver (const String& data) {
         if (_blue.connected ()) {
