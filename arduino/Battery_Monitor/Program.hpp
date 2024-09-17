@@ -110,8 +110,10 @@ class Program : public Component, public Diagnosticable {
             if (deliver) doDeliver (data);
             if (capture) doCapture (data);
         }
-        if (diagnose)
-            doDeliver (doCollect ("diag", [this] (JsonDocument& doc) { diagnostics.collect (doc); }));
+        if (diagnose) {
+            const String diag = doCollect ("diag", [this] (JsonDocument& doc) { diagnostics.collect (doc); });
+            doDeliver (diag);
+        }
         activations ++;
     }
 
