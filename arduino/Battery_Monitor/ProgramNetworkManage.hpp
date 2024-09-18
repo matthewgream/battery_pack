@@ -14,7 +14,7 @@ public:
     void begin () override {
         WiFi.onEvent (__ConnectManager_WiFiEventHandler, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED);
         WiFi.onEvent (__ConnectManager_WiFiEventHandler, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-        WiFi.setHostname (config.host.c_str ());
+        WiFi.setHostname (config.client.c_str ());
         WiFi.setAutoReconnect (true);
         WiFi.mode (WIFI_STA);
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
@@ -59,7 +59,7 @@ class NettimeManager : public Component, public Alarmable, public Diagnosticable
     time_t _previousTime = 0;
 
 public:
-    NettimeManager (const Config::NettimeConfig& cfg) : config (cfg), _fetcher (cfg.server), _drifter (_persistentDriftMs) {
+    NettimeManager (const Config::NettimeConfig& cfg) : config (cfg), _fetcher (cfg.useragent, cfg.server), _drifter (_persistentDriftMs) {
       if (_persistentTime.tv_sec > 0)
           settimeofday (&_persistentTime, nullptr);
     }

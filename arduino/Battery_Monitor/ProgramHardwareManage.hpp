@@ -85,7 +85,8 @@ public:
     void process () override {
         const float setpoint = _temperatures.setpoint (), current = _temperatures.current ();
         const float speedCalculated = _controllerAlgorithm.apply (setpoint, current);
-        const int speedSmoothed = _smootherAlgorithm.apply (std::clamp ((int) map  <float> (speedCalculated, -100, 100, config.MIN_SPEED, config.MAX_SPEED), config.MIN_SPEED, config.MAX_SPEED));
+        const float speedConstrained = std::clamp (map  <float> (speedCalculated, -100.0, 100.0, (float) config.MIN_SPEED, (float) config.MAX_SPEED), (float) config.MIN_SPEED, (float) config.MAX_SPEED);
+        const float speedSmoothed = _smootherAlgorithm.apply (speedConstrained);
         _fan.setSpeed (speedSmoothed);
     }
 };

@@ -8,12 +8,13 @@
 #include <ctime>
 
 class NetworkTimeFetcher {
-    const String _server;
+    const String _useragent, _server;
 
 public:
-    NetworkTimeFetcher (const String& server) : _server (server) {}
+    NetworkTimeFetcher (const String& useragent, const String& server) : _useragent (useragent), _server (server) {}
     time_t fetch () {
         HTTPClient client;
+        client.setUserAgent (_useragent);        
         client.begin (_server);
         if (client.GET () > 0) {
             String header = client.header ("Date");
@@ -70,6 +71,8 @@ public:
 };
 
 // -----------------------------------------------------------------------------------------------
+
+#include <ArduinoJson.h>
 
 #include <BLEDevice.h>
 #include <BLEServer.h>
@@ -128,6 +131,8 @@ public:
 };
 
 // -----------------------------------------------------------------------------------------------
+
+#include <ArduinoJson.h>
 
 #include <WiFi.h>
 #include <PubSubClient.h>

@@ -129,12 +129,13 @@ public:
 #include <ArduinoJson.h>
 
 class ActivationTracker {
-    interval_t _seconds = 0, _number = 0;
+    interval_t _seconds = 0;
+    counter_t _number = 0;
 
 public:
     ActivationTracker () {}
     interval_t seconds () const { return _seconds; }
-    interval_t  number () const { return _number; }
+    counter_t  number () const { return _number; }
     ActivationTracker& operator ++ (int) {
         _seconds = millis () / 1000;
         _number ++;
@@ -151,6 +152,8 @@ public:
 };
 
 // -----------------------------------------------------------------------------------------------
+
+#include <type_traits>
 
 template <typename T>
 inline T map (const T x, const T in_min, const T in_max, const T out_min, const T out_max) {
@@ -218,6 +221,8 @@ void exception_catcher (F&& f) {
 }
 
 // -----------------------------------------------------------------------------------------------
+
+#include <type_traits>
 
 template <typename T>
 class Singleton {

@@ -48,9 +48,10 @@ protected:
 // -----------------------------------------------------------------------------------------------
 
 class FanInterface : public Component, public Diagnosticable {
-    static constexpr int PWM_RESOLUTION = 8, PWM_MINVALUE = 0, PWM_MAXVALUE = ((1 << PWM_RESOLUTION) - 1);
+    static constexpr int PWM_RESOLUTION = 8;
+    static constexpr uint8_t PWM_MINVALUE = 0, PWM_MAXVALUE = ((1 << PWM_RESOLUTION) - 1);
     const Config::FanInterfaceConfig& config;
-    int _speed = PWM_MINVALUE, _speedMin = PWM_MAXVALUE, _speedMax = PWM_MINVALUE;
+    uint8_t _speed = PWM_MINVALUE, _speedMin = PWM_MAXVALUE, _speedMax = PWM_MINVALUE;
     ActivationTracker _activations;
 
 public:
@@ -59,14 +60,14 @@ public:
         pinMode (config.PIN_PWM, OUTPUT);
         analogWrite (config.PIN_PWM, PWM_MINVALUE);
     }
-    void setSpeed (const int speed) {
-        const int speedNew = std::clamp (speed, PWM_MINVALUE, PWM_MAXVALUE);
+    void setSpeed (const uint8_t speed) {
+        const uint8_t speedNew = std::clamp (speed, PWM_MINVALUE, PWM_MAXVALUE);
         if (speedNew > config.MIN_SPEED && _speed <= config.MIN_SPEED) _activations ++;
         if (speedNew < _speedMin) _speedMin = speedNew;
         if (speedNew > _speedMax) _speedMax = speedNew;
         analogWrite (config.PIN_PWM, _speed = speedNew);
     }
-    int getSpeed () const {
+    uint8_t getSpeed () const {
         return _speed;
     }
 
