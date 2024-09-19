@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Battery Monitor</string>
+    <string name="app_vers">0.99</string>
 </resources>

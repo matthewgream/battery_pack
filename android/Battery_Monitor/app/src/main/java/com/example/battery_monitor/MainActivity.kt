@@ -35,18 +35,17 @@ class MainActivity : Activity () {
         bluetoothTerminate ()
     }
 
-
     //
 
     override fun onCreateOptionsMenu (menu: Menu): Boolean {
-        if (!EmulationManager.isEmulator ()) return false
+        if (!EmulationTools.isEmulator ()) return false
         menuInflater.inflate (R.menu.menu_main, menu)
         return true
     }
     override fun onOptionsItemSelected (item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.inject_operational_data -> dataProcessor (EmulationManager.createTestDataOperational (this))
-            R.id.inject_diagnostic_data -> dataProcessor (EmulationManager.createTestDataDiagnostic (this))
+            R.id.inject_operational_data -> dataProcessor (EmulationTools.createTestDataOperational (this))
+            R.id.inject_diagnostic_data -> dataProcessor (EmulationTools.createTestDataDiagnostic (this))
             else -> return super.onOptionsItemSelected (item)
         }
         return true
@@ -152,4 +151,7 @@ class MainActivity : Activity () {
             view.text = text
         }
     }
+
+    //
+
 }
