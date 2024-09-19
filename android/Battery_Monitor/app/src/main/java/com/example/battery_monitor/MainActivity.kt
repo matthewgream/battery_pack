@@ -8,152 +8,148 @@ import android.view.Menu
 import android.view.MenuItem
 import android.widget.TextView
 import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.*
 import android.util.TypedValue
 
-class MainActivity : Activity() {
+class MainActivity : Activity () {
 
-    private val PERMISSION_REQUEST_CODE = 1
+    private val bluetoothPermissionsList = arrayOf (android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
+    private val bluetoothPermissionsCode = 1
+    private var bluetoothPermissionsOkay = false;
     private val bluetoothManager: BluetoothManager by lazy {
-        BluetoothManager(
+        BluetoothManager (
             context = this,
-            dataCallback = { jsonString -> bluetoothProcessReceivedData(jsonString) },
-            statusCallback = { isConnected -> bluetoothUpdateConnectionStatus(isConnected) }
+            dataCallback = { jsonString -> bluetoothProcessReceivedData (jsonString) },
+            statusCallback = { isConnected -> bluetoothUpdateConnectionStatus (isConnected) }
         )
     }
-    private var bluetoothPermitted = false;
 
-    // Connection Status View
-    private val connectionStatusTextView: TextView by lazy { findViewById(R.id.connectionStatusTextView) }
-    // Operational Data Views
-    private val timeTextView: TextView by lazy { findViewById(R.id.timeTextView) }
-    private val envTempTextView: TextView by lazy { findViewById(R.id.envTempTextView) }
-    private val batteryLabelTextView: TextView by lazy { findViewById(R.id.batteryLabelTextView) }
-    private val batteryTempMinTextView: TextView by lazy { findViewById(R.id.batteryTempMinTextView) }
-    private val batteryTempAvgTextView: TextView by lazy { findViewById(R.id.batteryTempAvgTextView) }
-    private val batteryTempMaxTextView: TextView by lazy { findViewById(R.id.batteryTempMaxTextView) }
-    private val batteryTempValuesView: BatteryTemperatureView by lazy { findViewById(R.id.batteryTempValuesView) }
-    private val fanSpeedTextView: TextView by lazy { findViewById(R.id.fanSpeedTextView) }
-    private val alarmsTextView: TextView by lazy { findViewById(R.id.alarmsTextView) }
-    // Diagnostic Data View
-    private val diagDataTextView: TextView by lazy { findViewById(R.id.diagDataTextView) }
+    //
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        bluetoothInitialise()
+    override fun onCreate (savedInstanceState: Bundle?) {
+        super.onCreate (savedInstanceState)
+        setContentView (R.layout.activity_main)
+        bluetoothInitialise ()
+    }
+    override fun onDestroy () {
+        super.onDestroy ()
+        bluetoothTerminate ()
     }
 
-    private fun bluetoothInitialise() {
-        if (checkSelfPermission(android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
-            checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(
-                android.Manifest.permission.BLUETOOTH_SCAN,
-                android.Manifest.permission.BLUETOOTH_CONNECT
-            ), PERMISSION_REQUEST_CODE)
-        } else {
-            bluetoothPermitted = true;
-            bluetoothUpdateConnectionStatus (false)
-            bluetoothManager.scan()
+
+    //
+
+    override fun onCreateOptionsMenu (menu: Menu): Boolean {
+        if (!EmulationManager.isEmulator ()) return false
+        menuInflater.inflate (R.menu.menu_main, menu)
+        return true
+    }
+    override fun onOptionsItemSelected (item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.inject_operational_data -> dataProcessor (EmulationManager.createTestDataOperational (this))
+            R.id.inject_diagnostic_data -> dataProcessor (EmulationManager.createTestDataDiagnostic (this))
+            else -> return super.onOptionsItemSelected (item)
         }
+        return true
     }
 
-    private fun bluetoothUpdateConnectionStatus(isConnected: Boolean) {
-        runOnUiThread {
-            connectionStatusTextView.text = when {
-                !bluetoothPermitted -> "Not permitted"
-                isConnected -> "Connected"
-                else -> "Disconnected"
-            }
-            connectionStatusTextView.setTextColor (getColor(if (isConnected) R.color.connected_color else R.color.disconnected_color))
-        }
+    //
+
+    override fun onRequestPermissionsResult (requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if (requestCode == bluetoothPermissionsCode) bluetoothPermissionsResponse (grantResults)
     }
 
-    private fun bluetoothProcessReceivedData(jsonString: String) {
+    //
+
+    private fun bluetoothInitialise () { if (!bluetoothPermissionsCheck ()) bluetoothPermissionsRequest () else bluetoothPermissionsOkay () }
+    private fun bluetoothTerminate () { if (bluetoothPermissionsOkay) bluetoothManager.deviceDisconnect () }
+    private fun bluetoothPermissionsCheck (): Boolean { return bluetoothPermissionsList.all { checkSelfPermission (it) == PackageManager.PERMISSION_GRANTED } }
+    private fun bluetoothPermissionsRequest () { requestPermissions (bluetoothPermissionsList, bluetoothPermissionsCode) }
+    private fun bluetoothPermissionsResponse (results: IntArray) {
+        if (results.isNotEmpty () && results.all { it == PackageManager.PERMISSION_GRANTED }) bluetoothPermissionsOkay () else bluetoothPermissionsNotOkay ()
+    }
+    private fun bluetoothPermissionsOkay () {
+        bluetoothPermissionsOkay = true
+        bluetoothUpdateConnectionStatus (false)
+        bluetoothManager.scan ()
+    }
+    private fun bluetoothPermissionsNotOkay () {
+        bluetoothPermissionsOkay = false
+        bluetoothUpdateConnectionStatus (false)
+    }
+    private fun bluetoothUpdateConnectionStatus (isConnected: Boolean) {
+        dataConnection (bluetoothManager.isAvailable (), bluetoothPermissionsOkay, isConnected)
+    }
+    private fun bluetoothProcessReceivedData (jsonString: String) {
         try {
-            val json = JSONObject(jsonString)
-            when (json.getString("type")) {
-                "data" -> updateOperationalUI(json)
-                "diag" -> updateDiagnosticUI(json)
-                else -> Log.w("JSON", "Unknown JSON type received")
-            }
+            dataProcessor (JSONObject (jsonString))
         } catch (e: Exception) {
-            Log.e("JSON", "Error parsing JSON", e)
+            Log.e ("JSON", "JSON parse error", e)
         }
     }
 
-    private fun updateOperationalUI(json: JSONObject) {
+    //
+
+    private fun dataConnection (available: Boolean, permitted: Boolean, connected: Boolean) {
+        val view: TextView = findViewById (R.id.connectionStatusTextView)
+        val text = when {
+            !available -> "Bluetooth not available"
+            !permitted -> "Bluetooth not permitted"
+            !connected -> "Bluetooth not connected"
+            else -> "Bluetooth connected"
+        }
+        val color = getColor (if (connected) R.color.connected_color else R.color.disconnected_color)
+
         runOnUiThread {
-            timeTextView.text = "Time: ${formatTime(json.getLong("time"))}"
-            envTempTextView.text = "Temp: ${json.getJSONObject("temperatures").getDouble("environment")}°C"
+            view.text = text;
+            view.setTextColor (color)
+        }
+    }
+    private fun dataProcessor (json: JSONObject) {
+        when (val type = json.getString ("type")) {
+            "data" -> dataRenderOperational (json)
+            "diag" -> dataRenderDiagnostic (json)
+            else -> Log.w ("JSON", "JSON type unknown: $type")
+        }
+    }
+    private fun dataRenderOperational (json: JSONObject) {
+        val timeTextView: TextView = findViewById (R.id.timeTextView)
+        val envTempTextView: TextView = findViewById (R.id.envTempTextView)
+        val batteryLabelTextView: TextView = findViewById (R.id.batteryLabelTextView)
+        val batteryTempMinTextView: TextView = findViewById (R.id.batteryTempMinTextView)
+        val batteryTempAvgTextView: TextView = findViewById (R.id.batteryTempAvgTextView)
+        val batteryTempMaxTextView: TextView = findViewById (R.id.batteryTempMaxTextView)
+        val batteryTempValuesView: BatteryTemperatureView = findViewById (R.id.batteryTempValuesView)
+        val fanSpeedTextView: TextView = findViewById (R.id.fanSpeedTextView)
+        val alarmsTextView: TextView = findViewById (R.id.alarmsTextView)
+
+        runOnUiThread {
+            timeTextView.text = formatTime (json.getLong ("time"))
+            val environment = json.getJSONObject ("temperatures").getDouble ("environment");
+            envTempTextView.text = "$environment°C"
 
             batteryLabelTextView.text = "Battery:"
-            val batterypack = json.getJSONObject("temperatures").getJSONObject("batterypack")
-            batteryTempAvgTextView.text = "Avg: ${batterypack.getDouble("avg")}°C"
-            batteryTempMinTextView.text = "Min: ${batterypack.getDouble("min")}°C"
-            batteryTempMaxTextView.text = "Max: ${batterypack.getDouble("max")}°C"
+            val batterypack = json.getJSONObject ("temperatures").getJSONObject ("batterypack")
+            batteryTempAvgTextView.text = "Avg: ${batterypack.getDouble ("avg")}°C"
+            batteryTempMinTextView.text = "Min: ${batterypack.getDouble ("min")}°C"
+            batteryTempMaxTextView.text = "Max: ${batterypack.getDouble ("max")}°C"
+            val values = batterypack.getJSONArray ("values")
+            batteryTempValuesView.setTemperatureValues ((0 until values.length ()).map { values.getDouble (it).toFloat () })
 
-            val values = batterypack.getJSONArray("values")
-            val temperatureValues = (0 until values.length()).map { values.getDouble(it).toFloat() }
-            batteryTempValuesView.setTemperatureValues(temperatureValues)
+            val fanspeed = json.getJSONObject ("fan").getInt ("fanspeed");
+            fanSpeedTextView.text = "Fan: $fanspeed %"
 
-            fanSpeedTextView.text = "Fan: ${json.getJSONObject("fan").getInt("fanspeed")} %"
-
-            val alarms = json.getInt("alarms")
+            val alarms = json.getInt ("alarms")
             alarmsTextView.text = "Alarms: $alarms"
-            alarmsTextView.setTextColor(if (alarms > 0) getColor(R.color.alarm_active_color) else getColor(R.color.alarm_inactive_color))
+            alarmsTextView.setTextColor (getColor (if (alarms > 0) R.color.alarm_active_color else R.color.alarm_inactive_color))
         }
     }
+    private fun dataRenderDiagnostic (json: JSONObject) {
+        val view: TextView = findViewById (R.id.diagDataTextView)
+        val text = json.toString (4)  // 4 spaces for indentation
 
-    private fun updateDiagnosticUI(json: JSONObject) {
         runOnUiThread {
-            diagDataTextView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
-            diagDataTextView.text = json.toString(4)  // 4 spaces for indentation
+            view.setTextSize (TypedValue.COMPLEX_UNIT_SP, 10f)
+            view.text = text
         }
-    }
-
-    private fun formatTime(timestamp: Long): String {
-        return SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(timestamp * 1000))
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        return if (EmulationManager.isEmulator()) {
-            menuInflater.inflate(R.menu.main_menu, menu)
-            true
-        } else {
-            false
-        }
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.inject_operational_data -> {
-                bluetoothProcessReceivedData (EmulationManager.createTestOperationalData(this))
-                true
-            }
-            R.id.inject_diagnostic_data -> {
-                bluetoothProcessReceivedData (EmulationManager.createTestDiagnosticData(this))
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                bluetoothPermitted = true
-                bluetoothUpdateConnectionStatus (false)
-                bluetoothManager.scan()
-            } else {
-                bluetoothUpdateConnectionStatus (false)
-            }
-        }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        bluetoothManager.deviceDisconnect()
     }
 }
