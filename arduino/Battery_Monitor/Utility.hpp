@@ -6,10 +6,10 @@
 
 #include <Arduino.h>
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
     bool DEBUG_AVAILABLE = false;
-    #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD); DEBUG_AVAILABLE = !Serial ? false : true;
+    #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD); DEBUG_AVAILABLE = !Serial ? false : true; if (DEBUG_AVAILABLE) delay (5*1000L);
     #define DEBUG_END(...) Serial.flush (); Serial.end ()
     #define DEBUG_PRINT(...) if (DEBUG_AVAILABLE) Serial.print (__VA_ARGS__)
     #define DEBUG_PRINTLN(...) if (DEBUG_AVAILABLE) Serial.println (__VA_ARGS__)
@@ -31,22 +31,20 @@ typedef unsigned long counter_t;
 #include <type_traits>
 #include <cstddef>
 
-template <typename T, int W = 16>
+template <typename T, int WINDOW = 16>
 class MovingAverage {
     static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
-    static_assert (W > 0, "Window size must be positive");
-    std::array <T, W> V {};
-    T S = T (0);
-    std::size_t I = 0, C = 0;
+    static_assert (WINDOW > 0, "WINDOW size must be positive");
+    std::array <T, WINDOW> values {};
+    T sum = T (0);
+    std::size_t index = 0, count = 0;
 
 public:
-    T update (const T X) {
-        if (C == W) S -= V [I];
-        else C ++;
-        V [I] = X;
-        S += X;
-        I = (I + 1) % W;
-        return  S / static_cast <T> (C);
+    T update (const T value) {
+        if (count == WINDOW) sum -= values [index]; else count ++;
+        values [index] = value; index = (index + 1) % WINDOW;
+        sum += value;
+        return  sum / static_cast <T> (count);
     }
 };
 
@@ -230,7 +228,11 @@ class Singleton {
     inline static T* _instance = nullptr; 
 public:
     inline static T* instance () { return _instance; }
-    Singleton (T* t) { _instance = t; } 
+    Singleton (T* t) {
+      if (_instance != nullptr)
+          throw std::runtime_error ("duplicate Singleton initializer");
+      _instance = t;
+    } 
     virtual ~Singleton () { _instance = nullptr; }
 };
 

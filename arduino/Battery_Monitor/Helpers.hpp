@@ -14,20 +14,26 @@ public:
     NetworkTimeFetcher (const String& useragent, const String& server) : _useragent (useragent), _server (server) {}
     time_t fetch () {
         HTTPClient client;
+        String header = "";
+        time_t time = 0;
         client.setUserAgent (_useragent);        
         client.begin (_server);
         if (client.GET () > 0) {
-            String header = client.header ("Date");
+            header = client.header ("Date");
             if (!header.isEmpty ()) {
                 struct tm timeinfo;
-                if (strptime (header.c_str (), "%a, %d %b %Y %H:%M:%S GMT", &timeinfo) != NULL) {
-                    client.end ();
-                    return mktime (&timeinfo);
-                }
+                if (strptime (header.c_str (), "%a, %d %b %Y %H:%M:%S GMT", &timeinfo) != NULL)
+                    time = mktime (&timeinfo);
             }
         }
         client.end ();
-        return static_cast <time_t> (0);
+        DEBUG_PRINT ("NetworkTimeFetcher::fetch: server=");
+        DEBUG_PRINT (_server);
+        DEBUG_PRINT (", header=[");
+        DEBUG_PRINT (header);
+        DEBUG_PRINT ("], time=");
+        DEBUG_PRINTLN (time);
+        return time;
     }
 };
 
@@ -47,7 +53,10 @@ public:
         long driftMs = (((periodSecs * 1000) - periodMs) * (60 * 60 * 1000)) / periodMs; // ms per hour
         driftMs = (_driftMs * 3 + driftMs) / 4; // 75% old value, 25% new value
         if (driftMs > MAX_DRIFT_MS || driftMs < -MAX_DRIFT_MS) _highDrift = true;
-        return _driftMs = std::clamp (driftMs, -MAX_DRIFT_MS, MAX_DRIFT_MS);
+        _driftMs = std::clamp (driftMs, -MAX_DRIFT_MS, MAX_DRIFT_MS);
+        DEBUG_PRINT ("TimeDriftCalculator::updateDrift: driftMs=");
+        DEBUG_PRINTLN (_driftMs);
+        return _driftMs;
     }
     long applyDrift (struct timeval &currentTime, const interval_t periodMs) {
         const long adjustMs = (_driftMs * periodMs) / (60 * 60 * 1000);
@@ -60,6 +69,8 @@ public:
             currentTime.tv_sec -= 1 + (-currentTime.tv_usec / 1000000);
             currentTime.tv_usec = 1000000 - (-currentTime.tv_usec % 1000000);
         }
+        DEBUG_PRINT ("TimeDriftCalculator::applyDrift: adjustMs=");
+        DEBUG_PRINTLN (adjustMs);
         return adjustMs;
     }
     bool highDrift () const {
@@ -93,8 +104,14 @@ private:
     bool _connected = false;
 
 protected:
-    void onConnect (BLEServer *) override { _connected = true; }
-    void onDisconnect (BLEServer *) override { _connected = false; }
+    void onConnect (BLEServer *) override { 
+        _connected = true;
+        DEBUG_PRINTLN ("BluetoothNotifier::onConnect");
+    }
+    void onDisconnect (BLEServer *) override {
+        _connected = false;
+        DEBUG_PRINTLN ("BluetoothNotifier::onDisconnect");
+    }
 
 public:
     BluetoothNotifier (const Config& cfg) : config (cfg) {}
@@ -112,10 +129,13 @@ public:
         advertising->setMinPreferred (0x06);
         advertising->setMinPreferred (0x12);
         BLEDevice::startAdvertising ();
+        DEBUG_PRINTLN ("BluetoothNotifier::advertise");
     }
     void notify (const String& data) {
         _characteristic->setValue (data.c_str ());
         _characteristic->notify ();
+        DEBUG_PRINT ("BluetoothNotifier::notify: length=");
+        DEBUG_PRINTLN (data.length ());
     }
     bool connected (void) const {
         return _connected;
@@ -150,6 +170,22 @@ private:
     WiFiClient _wifiClient;
     PubSubClient _mqttClient;
 
+    bool connect () {
+        const bool result = _mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ());
+        DEBUG_PRINT ("MQTTPublisher::connect: host=");
+        DEBUG_PRINT (config.host);
+        DEBUG_PRINT (", port=");
+        DEBUG_PRINT (config.port);
+        DEBUG_PRINT (", client=");
+        DEBUG_PRINT (config.client);
+        DEBUG_PRINT (", user=");
+        DEBUG_PRINT (config.user);
+        DEBUG_PRINT (", pass=");
+        DEBUG_PRINT (config.pass);
+        DEBUG_PRINT (", result=");
+        DEBUG_PRINTLN (result);
+        return result;
+    }
 public:
     MQTTPublisher (const Config& cfg) : config (cfg), _mqttClient (_wifiClient) {}
     void setup () {
@@ -158,9 +194,15 @@ public:
     bool publish (const String& topic, const String& data) {
         if (!WiFi.isConnected ())
             return false;
-        if (!_mqttClient.connected () && !_mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ()))
-            return false;
-        return _mqttClient.publish (topic.c_str (), data.c_str ());
+        if (!_mqttClient.connected ())
+            if (!connect ())
+                return false;
+        const bool result = _mqttClient.publish (topic.c_str (), data.c_str ());
+        DEBUG_PRINT ("MQTTPublisher::publish: length=");
+        DEBUG_PRINT (data.length ());
+        DEBUG_PRINT (", result=");
+        DEBUG_PRINTLN (result);
+        return result;
     }
     void process () {
         if (WiFi.isConnected ())
@@ -197,7 +239,7 @@ public:
     SPIFFSFile (const String& filename, const size_t maximum): _filename (filename), _maximum (maximum) {}
     bool begin () {
         if (!SPIFFS.begin (true)) {
-            DEBUG_PRINTLN ("Error mounting SPIFFS");
+            DEBUG_PRINTLN ("SPIFFSFile::begin: failed on SPIFFS.begin ()");
             return false;
         }
         File file = SPIFFS.open (_filename, FILE_READ);
@@ -205,11 +247,17 @@ public:
             _size = file.size ();
             file.close ();
         }
+        DEBUG_PRINT ("SPIFFSFile::begin: size=");
+        DEBUG_PRINTLN (_size);
         return true;
     }
     //
     size_t size () const { return _size; }
     bool append (const String& data) {
+        DEBUG_PRINT ("SPIFFSFile::append: size=");
+        DEBUG_PRINT (_size);
+        DEBUG_PRINT (", length=");
+        DEBUG_PRINTLN (data.length ());
         if (_size + data.length () > _maximum)
             erase ();
         File file = SPIFFS.open (_filename, FILE_APPEND);
@@ -222,6 +270,8 @@ public:
         return false;
     }
     bool read (LineCallback& callback) const {
+        DEBUG_PRINT ("SPIFFSFile::read: size=");
+        DEBUG_PRINTLN (_size);
         File file = SPIFFS.open (_filename, FILE_READ);
         if (file) {
             while (file.available ()) {
@@ -235,6 +285,8 @@ public:
         return true;
     }
     void erase () {
+        DEBUG_PRINT ("SPIFFSFile::erase: size=");
+        DEBUG_PRINTLN (_size);
         SPIFFS.remove (_filename);
         _size = 0;
     }

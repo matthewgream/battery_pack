@@ -27,7 +27,10 @@ class DiagnosticManager : public Component {
     Diagnosticable::List _diagnosticables;
 
 public:
-    DiagnosticManager (const Config::DiagnosticConfig& cfg, const Diagnosticable::List diagnosticables) : config (cfg), _diagnosticables (diagnosticables) {}
+    DiagnosticManager (const Config::DiagnosticConfig& cfg, const Diagnosticable::List diagnosticables) : config (cfg), _diagnosticables (diagnosticables) {
+        DEBUG_PRINT ("DiagnosticManager::constructor: diagnosticables=");
+        DEBUG_PRINTLN (_diagnosticables.size ());
+    }
     void collect (JsonDocument &doc) const {
         JsonObject obj = doc.to <JsonObject> ();
         for (const auto& diagnosticable : _diagnosticables)
@@ -86,7 +89,10 @@ class AlarmManager : public Component, public Diagnosticable {
     std::array <ActivationTracker, _ALARM_COUNT> _activations, _deactivations;
 
 public:
-    AlarmManager (const Config::AlarmConfig& cfg, const Alarmable::List alarmables) : config (cfg), _alarmables (alarmables) {}
+    AlarmManager (const Config::AlarmConfig& cfg, const Alarmable::List alarmables) : config (cfg), _alarmables (alarmables) {
+        DEBUG_PRINT ("AlarmManager::constructor: alarmables=");
+        DEBUG_PRINTLN (_alarmables.size ());
+    }
     void begin () override {
         pinMode (config.PIN_ALARM, OUTPUT);
     }
@@ -101,6 +107,11 @@ public:
                 else if (!alarms.isAny (number) && _alarms.isAny (number))
                     _deactivations [number] ++;
             digitalWrite (config.PIN_ALARM, alarms.isNone () ? LOW : HIGH);
+            DEBUG_PRINT ("AlarmManager::process: alarms: ");
+            DEBUG_PRINT (alarms.toStringBitmap ());
+            DEBUG_PRINT (" <-- ");
+            DEBUG_PRINT (_alarms.toStringBitmap ());
+            DEBUG_PRINTLN ();
             _alarms = alarms;
         }
     }

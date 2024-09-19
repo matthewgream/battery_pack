@@ -18,12 +18,29 @@ public:
         WiFi.setAutoReconnect (true);
         WiFi.mode (WIFI_STA);
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
+        DEBUG_PRINT ("ConnectManager::begin: ssid=");
+        DEBUG_PRINT (config.ssid);
+        DEBUG_PRINT (", pass=");
+        DEBUG_PRINT (config.pass);
+        DEBUG_PRINT (", mac=");
+        DEBUG_PRINT (mac_address ());
+        DEBUG_PRINT (", host=");
+        DEBUG_PRINTLN (config.client);
     }
+
+protected:
+    friend void __ConnectManager_WiFiEventHandler (WiFiEvent_t event);
     void events (const WiFiEvent_t event) {
-        if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED)
+        if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED) {
             _connected ++;
-        else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED)
+            DEBUG_PRINT ("ConnectManager::events: WIFI_CONNECTED, localIP=");
+            DEBUG_PRINT (WiFi.localIP ());
+            DEBUG_PRINT (", rssi=");
+            DEBUG_PRINTLN (WiFi.RSSI ());
+        } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
             _disconnected ++;
+            DEBUG_PRINTLN ("ConnectManager::events: WIFI_DISCONNECTED");
+        }
     }
 
 protected:
@@ -62,6 +79,12 @@ public:
     NettimeManager (const Config::NettimeConfig& cfg) : config (cfg), _fetcher (cfg.useragent, cfg.server), _drifter (_persistentDriftMs) {
       if (_persistentTime.tv_sec > 0)
           settimeofday (&_persistentTime, nullptr);
+      DEBUG_PRINT ("NettimeManager::constructor: persistentTime=");
+      DEBUG_PRINT (_persistentTime.tv_sec); DEBUG_PRINT ("/"); DEBUG_PRINT (_persistentTime.tv_usec);
+      DEBUG_PRINT (", persistentDrift=");
+      DEBUG_PRINT (_persistentDriftMs);
+      DEBUG_PRINT (", time=");
+      DEBUG_PRINTLN (getTimeString ());
     }
     void process () override {
         interval_t currentTime = millis ();
@@ -77,6 +100,8 @@ public:
                   _previousTime = fetchedTime;
                   _previousTimeUpdate = currentTime;
                   _failures = 0;
+                  DEBUG_PRINT ("NettimeManager::process: time=");
+                  DEBUG_PRINTLN (getTimeString ());
               } else _failures ++;
           }
         }

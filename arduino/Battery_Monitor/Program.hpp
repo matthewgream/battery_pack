@@ -93,6 +93,7 @@ class Program : public Component, public Diagnosticable {
         };
         if (publish.connected ()) {
             if (storage.size () > 0) {
+                DEBUG_PRINTLN ("Program::doCapture: publish.connected () && storage.size () > 0");
                 StorageLineHandler handler (publish);
                 if (storage.retrieve (handler))
                     storage.erase ();
@@ -105,14 +106,30 @@ class Program : public Component, public Diagnosticable {
     Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
     void process () override {
         const bool deliver = intervalDeliver, capture = intervalDeliver, diagnose = intervalDiagnose;
+        DEBUG_PRINT ("Program::process: deliver=");
+        DEBUG_PRINT (deliver);
+        DEBUG_PRINT (", capture=");
+        DEBUG_PRINT (capture);
+        DEBUG_PRINT (", diagnose=");
+        DEBUG_PRINTLN (diagnose);
         if (deliver || capture) {
             const String data = doCollect ("data", [this] (JsonDocument& doc) { operational.collect (doc); });
             if (deliver) doDeliver (data);
             if (capture) doCapture (data);
+            DEBUG_PRINT ("Program::process: data, length=");
+            DEBUG_PRINT (data.length ());
+            DEBUG_PRINTLN (", content=<<<");
+            DEBUG_PRINTLN (data);
+            DEBUG_PRINTLN ("<<<");
         }
         if (diagnose) {
             const String diag = doCollect ("diag", [this] (JsonDocument& doc) { diagnostics.collect (doc); });
             doDeliver (diag);
+            DEBUG_PRINT ("Program::process: diag, length=");
+            DEBUG_PRINT (diag.length ());
+            DEBUG_PRINTLN (", content=<<<");
+            DEBUG_PRINTLN (diag);
+            DEBUG_PRINTLN ("<<<");
         }
         activations ++;
     }
@@ -129,6 +146,14 @@ public:
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
         components ({ &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager,
             &alarms, &network, &nettime, &deliver, &publish, &storage, &diagnostics, this }) {
+        DEBUG_PRINT ("Program::constructor: intervals - process=");
+        DEBUG_PRINT (config.intervalProcess);
+        DEBUG_PRINT (", deliver=");
+        DEBUG_PRINT (config.intervalDeliver);
+        DEBUG_PRINT (", capture=");
+        DEBUG_PRINT (config.intervalCapture);
+        DEBUG_PRINT (", diagnose=");
+        DEBUG_PRINTLN (config.intervalDiagnose);
     };
 
     Component::List components;
