@@ -1,4 +1,3 @@
 <resources>
-    <string name="app_name">Battery_Monitor</string>
-    <string name="status_disconnected">Status: Disconnected</string>
+    <string name="app_name">Battery Monitor</string>
 </resources>
