@@ -118,7 +118,7 @@ class MainActivity : Activity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        return if (EmulationTools.isEmulator()) {
+        return if (EmulationManager.isEmulator()) {
             menuInflater.inflate(R.menu.main_menu, menu)
             true
         } else {
@@ -129,11 +129,11 @@ class MainActivity : Activity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.inject_operational_data -> {
-                bluetoothProcessReceivedData (EmulationTools.createTestOperationalData(this))
+                bluetoothProcessReceivedData (EmulationManager.createTestOperationalData(this))
                 true
             }
             R.id.inject_diagnostic_data -> {
-                bluetoothProcessReceivedData (EmulationTools.createTestDiagnosticData(this))
+                bluetoothProcessReceivedData (EmulationManager.createTestDiagnosticData(this))
                 true
             }
             else -> super.onOptionsItemSelected(item)
