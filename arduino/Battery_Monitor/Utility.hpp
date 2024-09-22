@@ -9,7 +9,7 @@
 #define DEBUG
 #ifdef DEBUG
     bool DEBUG_AVAILABLE = false;
-    #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD); DEBUG_AVAILABLE = !Serial ? false : true; if (DEBUG_AVAILABLE) delay (5*1000L);
+    #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD); DEBUG_AVAILABLE = true; if (DEBUG_AVAILABLE) delay (5*1000L);
     #define DEBUG_END(...) Serial.flush (); Serial.end ()
     #define DEBUG_PRINT(...) if (DEBUG_AVAILABLE) Serial.print (__VA_ARGS__)
     #define DEBUG_PRINTLN(...) if (DEBUG_AVAILABLE) Serial.println (__VA_ARGS__)

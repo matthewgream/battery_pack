@@ -30,27 +30,31 @@ protected:
 
 class PublishManager : public Component, public Alarmable, public Diagnosticable {
     const Config::PublishConfig& config;
+    ConnectManager &_network;
     MQTTPublisher _mqtt;
     ActivationTracker _activations;
     counter_t _failures = 0;
 
 public:
-    PublishManager (const Config::PublishConfig& cfg) : config (cfg), _mqtt (cfg.mqtt) {}
+    PublishManager (const Config::PublishConfig& cfg, ConnectManager &network) : config (cfg), _network (network), _mqtt (cfg.mqtt) {}
     void begin () override {
         _mqtt.setup ();
     }
     void process () override {
-        _mqtt.process ();
+        if (_network.isAvailable ())
+            _mqtt.process ();
     }
     bool publish (const String& data) {
-        if (_mqtt.connected () && _mqtt.publish (config.mqtt.topic, data)) {
-            _activations ++;
-            _failures = 0;
-            return true;
-        } else _failures ++;
+        if (_network.isAvailable ()) {
+          if (_mqtt.connected () && _mqtt.publish (config.mqtt.topic, data)) {
+              _activations ++;
+              _failures = 0;
+              return true;
+          } else _failures ++;
+        }
         return false;
     }
-    bool connected () { return _mqtt.connected (); }
+    bool connected () { return _network.isAvailable () && _mqtt.connected (); }
 
 protected:
     void collectAlarms (AlarmSet& alarms) const override {

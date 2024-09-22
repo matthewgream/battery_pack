@@ -25,11 +25,12 @@
 #define DEFAULT_BLUE_NAME DEFAULT_NAME
 #define DEFAULT_BLUE_SERVICE "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define DEFAULT_BLUE_CHARACTERISTIC "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+#define DEFAULT_BLUE_PIN 123456
 #define DEFAULT_DELIVER_FAILURES (3)
 
 #define DEFAULT_NETTIME_USERAGENT (String (DEFAULT_NAME) + String ("/1.0"))
-#define DEFAULT_NETTIME_SERVER "http://google.com"
-#define DEFAULT_NETTIME_UPDATE (1000 * 60 * 60)
+#define DEFAULT_NETTIME_SERVER "https://www.google.com"
+#define DEFAULT_NETTIME_UPDATE (1000 * 60 * 2)
 #define DEFAULT_NETTIME_ADJUST (1000 * 60)
 #define DEFAULT_NETTIME_FAILURES (3)
 
@@ -70,7 +71,7 @@ struct Config {
         const int failureLimit = DEFAULT_NETTIME_FAILURES;
     } nettime;
     struct DeliverConfig {
-        BluetoothNotifier::Config blue = { .name = DEFAULT_BLUE_NAME, .serviceUUID = DEFAULT_BLUE_SERVICE, .characteristicUUID = DEFAULT_BLUE_CHARACTERISTIC };
+        BluetoothNotifier::Config blue = { .name = DEFAULT_BLUE_NAME, .serviceUUID = DEFAULT_BLUE_SERVICE, .characteristicUUID = DEFAULT_BLUE_CHARACTERISTIC, .pin = DEFAULT_BLUE_PIN };
     } deliver;
     struct PublishConfig {
         MQTTPublisher::Config mqtt = { .client = DEFAULT_MQTT_CLIENT, .host = DEFAULT_MQTT_HOST, .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .topic = DEFAULT_MQTT_TOPIC, .port = DEFAULT_MQTT_PORT };

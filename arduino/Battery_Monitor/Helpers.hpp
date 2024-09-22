@@ -18,7 +18,9 @@ public:
         time_t time = 0;
         client.setUserAgent (_useragent);        
         client.begin (_server);
-        if (client.GET () > 0) {
+        const char *headerList [] = { "Date" };
+        client.collectHeaders (headerList, sizeof (headerList) / sizeof (headerList [0]));
+        if (client.sendRequest ("HEAD") > 0) {
             header = client.header ("Date");
             if (!header.isEmpty ()) {
                 struct tm timeinfo;
@@ -95,6 +97,7 @@ class BluetoothNotifier : protected BLEServerCallbacks {
 public:
     typedef struct {
         const String name, serviceUUID, characteristicUUID;
+        uint32_t pin;
     } Config;
 private:
     const Config& config;
@@ -120,15 +123,18 @@ public:
         _server = BLEDevice::createServer ();
         _server->setCallbacks (this);
         BLEService *service = _server->createService (config.serviceUUID);
-        _characteristic = service->createCharacteristic (config.characteristicUUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+        _characteristic = service->createCharacteristic (config.characteristicUUID, BLECharacteristic::PROPERTY_READ |  BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY);
         _characteristic->addDescriptor (new BLE2902 ());
+        _characteristic->setAccessPermissions (ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
         service->start ();
-        BLEAdvertising *advertising = BLEDevice::getAdvertising ();
+        BLEAdvertising *advertising = BLEDevice::getAdvertising();
         advertising->addServiceUUID (config.serviceUUID);
         advertising->setScanResponse (true);
         advertising->setMinPreferred (0x06);
         advertising->setMinPreferred (0x12);
-        BLEDevice::startAdvertising ();
+        advertising->start ();
+        BLESecurity *security = new BLESecurity ();
+        security->setStaticPIN (config.pin); 
         DEBUG_PRINTLN ("BluetoothNotifier::advertise");
     }
     void notify (const String& data) {
@@ -192,8 +198,6 @@ public:
         _mqttClient.setServer (config.host.c_str (), config.port);
     }
     bool publish (const String& topic, const String& data) {
-        if (!WiFi.isConnected ())
-            return false;
         if (!_mqttClient.connected ())
             if (!connect ())
                 return false;
@@ -205,11 +209,10 @@ public:
         return result;
     }
     void process () {
-        if (WiFi.isConnected ())
-            _mqttClient.loop ();
+        _mqttClient.loop ();
     }
     bool connected () {
-        return WiFi.isConnected () && _mqttClient.connected ();
+        return _mqttClient.connected ();
     }
     //
     void serialize (JsonObject &obj) const {

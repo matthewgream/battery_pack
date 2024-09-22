@@ -41,7 +41,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 typedef uint32_t _AlarmType;
-#define _ALARM_NUMB(x)              ((_AlarmType) (1UL < (x)))
+#define _ALARM_NUMB(x)              ((_AlarmType) (1UL << (x)))
 #define ALARM_NONE                  (0UL)
 #define ALARM_TEMPERATURE_MINIMAL   _ALARM_NUMB (0)
 #define ALARM_TEMPERATURE_MAXIMAL   _ALARM_NUMB (1)
@@ -72,6 +72,8 @@ public:
         return s;
     }
 };
+inline bool operator== (const AlarmSet &a, const AlarmSet &b) { return (_AlarmType) a == (_AlarmType) b; }
+inline bool operator!= (const AlarmSet &a, const AlarmSet &b) { return (_AlarmType) a != (_AlarmType) b; }
 
 class Alarmable {
 protected:

@@ -118,8 +118,8 @@ class Program : public Component, public Diagnosticable {
             if (capture) doCapture (data);
             DEBUG_PRINT ("Program::process: data, length=");
             DEBUG_PRINT (data.length ());
-            DEBUG_PRINTLN (", content=<<<");
-            DEBUG_PRINTLN (data);
+            DEBUG_PRINT (", content=<<<");
+            DEBUG_PRINT (data);
             DEBUG_PRINTLN ("<<<");
         }
         if (diagnose) {
@@ -127,8 +127,8 @@ class Program : public Component, public Diagnosticable {
             doDeliver (diag);
             DEBUG_PRINT ("Program::process: diag, length=");
             DEBUG_PRINT (diag.length ());
-            DEBUG_PRINTLN (", content=<<<");
-            DEBUG_PRINTLN (diag);
+            DEBUG_PRINT (", content=<<<");
+            DEBUG_PRINT (diag);
             DEBUG_PRINTLN ("<<<");
         }
         activations ++;
@@ -139,8 +139,8 @@ public:
         fanControllingAlgorithm (10.0f, 0.1f, 1.0f), fanSmoothingAlgorithm (0.1f),
         temperatureInterface (config.temperature), temperatureManagerBatterypack (config.temperature, temperatureInterface), temperatureManagerEnvironment (config.temperature, temperatureInterface),
         fanInterface (config.fan), fanManager (config.fan, fanInterface, temperatureManagerBatterypack, fanControllingAlgorithm, fanSmoothingAlgorithm),
-        network (config.network), nettime (config.nettime),
-        deliver (config.deliver), publish (config.publish), storage (config.storage),
+        network (config.network), nettime (config.nettime, network),
+        deliver (config.deliver), publish (config.publish, network), storage (config.storage),
         alarms (config.alarm, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &publish, &storage }),
         diagnostics (config.diagnostic, { &temperatureInterface, &fanInterface, &network, &nettime, &deliver, &publish, &storage, &alarms, this }), operational (*this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),

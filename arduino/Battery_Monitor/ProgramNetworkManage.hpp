@@ -7,12 +7,14 @@ static void __ConnectManager_WiFiEventHandler (WiFiEvent_t event);
 class ConnectManager : public Component, public Diagnosticable, private Singleton <ConnectManager>  {
     const Config::ConnectConfig& config;
     ActivationTracker _connected, _disconnected;
+    bool _available = false;
 
 public:
     ConnectManager (const Config::ConnectConfig& cfg) : Singleton <ConnectManager> (this), config (cfg) {}
     ~ConnectManager () { WiFi.removeEvent (__ConnectManager_WiFiEventHandler); }
     void begin () override {
         WiFi.onEvent (__ConnectManager_WiFiEventHandler, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED);
+        WiFi.onEvent (__ConnectManager_WiFiEventHandler, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP);
         WiFi.onEvent (__ConnectManager_WiFiEventHandler, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
         WiFi.setHostname (config.client.c_str ());
         WiFi.setAutoReconnect (true);
@@ -27,17 +29,23 @@ public:
         DEBUG_PRINT (", host=");
         DEBUG_PRINTLN (config.client);
     }
+    bool isAvailable () {
+        return _available;
+    }
 
 protected:
     friend void __ConnectManager_WiFiEventHandler (WiFiEvent_t event);
     void events (const WiFiEvent_t event) {
         if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED) {
             _connected ++;
-            DEBUG_PRINT ("ConnectManager::events: WIFI_CONNECTED, localIP=");
-            DEBUG_PRINT (WiFi.localIP ());
-            DEBUG_PRINT (", rssi=");
+            DEBUG_PRINT ("ConnectManager::events: WIFI_CONNECTED, rssi=");
             DEBUG_PRINTLN (WiFi.RSSI ());
+        } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP) {
+            _available = true;
+            DEBUG_PRINT ("ConnectManager::events: WIFI_ALLOCATED, localIP=");
+            DEBUG_PRINTLN (WiFi.localIP ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+            _available = false;
             _disconnected ++;
             DEBUG_PRINTLN ("ConnectManager::events: WIFI_DISCONNECTED");
         }
@@ -68,6 +76,7 @@ RTC_DATA_ATTR struct timeval _persistentTime = { .tv_sec = 0, .tv_usec = 0 };
 
 class NettimeManager : public Component, public Alarmable, public Diagnosticable {
     const Config::NettimeConfig& config;
+    ConnectManager &_network;
     NetworkTimeFetcher _fetcher;
     TimeDriftCalculator _drifter;
     ActivationTracker _activations;
@@ -76,7 +85,7 @@ class NettimeManager : public Component, public Alarmable, public Diagnosticable
     time_t _previousTime = 0;
 
 public:
-    NettimeManager (const Config::NettimeConfig& cfg) : config (cfg), _fetcher (cfg.useragent, cfg.server), _drifter (_persistentDriftMs) {
+    NettimeManager (const Config::NettimeConfig& cfg, ConnectManager &network) : config (cfg), _network (network), _fetcher (cfg.useragent, cfg.server), _drifter (_persistentDriftMs) {
       if (_persistentTime.tv_sec > 0)
           settimeofday (&_persistentTime, nullptr);
       DEBUG_PRINT ("NettimeManager::constructor: persistentTime=");
@@ -88,8 +97,8 @@ public:
     }
     void process () override {
         interval_t currentTime = millis ();
-        if (WiFi.isConnected ()) {
-          if (currentTime - _previousTimeUpdate >= config.intervalUpdate) {
+        if (_network.isAvailable ()) {
+          if (!_previousTimeUpdate || (currentTime - _previousTimeUpdate >= config.intervalUpdate)) {
               const time_t fetchedTime = _fetcher.fetch ();
               if (fetchedTime > 0) {
                   _activations ++;
