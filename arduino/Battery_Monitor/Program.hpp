@@ -93,7 +93,7 @@ class Program : public Component, public Diagnosticable {
         };
         if (publish.connected ()) {
             if (storage.size () > 0) {
-                DEBUG_PRINTLN ("Program::doCapture: publish.connected () && storage.size () > 0");
+                DEBUG_PRINTF ("Program::doCapture: publish.connected () && storage.size () > 0\n");
                 StorageLineHandler handler (publish);
                 if (storage.retrieve (handler))
                     storage.erase ();
@@ -106,30 +106,17 @@ class Program : public Component, public Diagnosticable {
     Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
     void process () override {
         const bool deliver = intervalDeliver, capture = intervalDeliver, diagnose = intervalDiagnose;
-        DEBUG_PRINT ("Program::process: deliver=");
-        DEBUG_PRINT (deliver);
-        DEBUG_PRINT (", capture=");
-        DEBUG_PRINT (capture);
-        DEBUG_PRINT (", diagnose=");
-        DEBUG_PRINTLN (diagnose);
+        DEBUG_PRINTF ("\nProgram::process: deliver=%d, capture=%d, diagnose=%d\n", deliver, capture, diagnose);
         if (deliver || capture) {
             const String data = doCollect ("data", [this] (JsonDocument& doc) { operational.collect (doc); });
             if (deliver) doDeliver (data);
             if (capture) doCapture (data);
-            DEBUG_PRINT ("Program::process: data, length=");
-            DEBUG_PRINT (data.length ());
-            DEBUG_PRINT (", content=<<<");
-            DEBUG_PRINT (data);
-            DEBUG_PRINTLN ("<<<");
+            DEBUG_PRINTF ("Program::process: data, length=%d, content=<<<%s>>>\n", data.length (), data.c_str ());
         }
         if (diagnose) {
             const String diag = doCollect ("diag", [this] (JsonDocument& doc) { diagnostics.collect (doc); });
             doDeliver (diag);
-            DEBUG_PRINT ("Program::process: diag, length=");
-            DEBUG_PRINT (diag.length ());
-            DEBUG_PRINT (", content=<<<");
-            DEBUG_PRINT (diag);
-            DEBUG_PRINTLN ("<<<");
+            DEBUG_PRINTF ("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
         }
         activations ++;
     }
@@ -146,14 +133,7 @@ public:
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
         components ({ &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager,
             &alarms, &network, &nettime, &deliver, &publish, &storage, &diagnostics, this }) {
-        DEBUG_PRINT ("Program::constructor: intervals - process=");
-        DEBUG_PRINT (config.intervalProcess);
-        DEBUG_PRINT (", deliver=");
-        DEBUG_PRINT (config.intervalDeliver);
-        DEBUG_PRINT (", capture=");
-        DEBUG_PRINT (config.intervalCapture);
-        DEBUG_PRINT (", diagnose=");
-        DEBUG_PRINTLN (config.intervalDiagnose);
+        DEBUG_PRINTF ("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
 
     Component::List components;
@@ -164,8 +144,7 @@ public:
 protected:
     void collectDiagnostics (JsonObject &obj) const override {
         JsonObject program = obj ["program"].to <JsonObject> ();
-        extern const String build_info; 
-        program ["build"] = build_info;
+//        program ["build"] = build_info;
         program ["uptime"] = uptime.seconds ();
         activations.serialize (program ["iterations"].to <JsonObject> ());
     }

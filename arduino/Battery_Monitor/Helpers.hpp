@@ -29,15 +29,17 @@ public:
             }
         }
         client.end ();
-        DEBUG_PRINT ("NetworkTimeFetcher::fetch: server=");
-        DEBUG_PRINT (_server);
-        DEBUG_PRINT (", header=[");
-        DEBUG_PRINT (header);
-        DEBUG_PRINT ("], time=");
-        DEBUG_PRINTLN (time);
+        DEBUG_PRINTF ("NetworkTimeFetcher::fetch: server='%s', header=[%s], time=%lu\n", _server.c_str (), header.c_str (), (unsigned long) time);
         return time;
     }
 };
+
+/* perhaps use SNTP
+sntp_setoperatingmode(SNTP_OPMODE_POLL);
+sntp_setservername(0, "pool.ntp.org");
+sntp_init();
+https://github.com/espressif/esp-idf/blob/v4.3/examples/protocols/sntp/main/sntp_example_main.c
+*/
 
 // -----------------------------------------------------------------------------------------------
 
@@ -56,8 +58,7 @@ public:
         driftMs = (_driftMs * 3 + driftMs) / 4; // 75% old value, 25% new value
         if (driftMs > MAX_DRIFT_MS || driftMs < -MAX_DRIFT_MS) _highDrift = true;
         _driftMs = std::clamp (driftMs, -MAX_DRIFT_MS, MAX_DRIFT_MS);
-        DEBUG_PRINT ("TimeDriftCalculator::updateDrift: driftMs=");
-        DEBUG_PRINTLN (_driftMs);
+        DEBUG_PRINTF ("TimeDriftCalculator::updateDrift: driftMs=%ld\n", _driftMs);
         return _driftMs;
     }
     long applyDrift (struct timeval &currentTime, const interval_t periodMs) {
@@ -71,8 +72,7 @@ public:
             currentTime.tv_sec -= 1 + (-currentTime.tv_usec / 1000000);
             currentTime.tv_usec = 1000000 - (-currentTime.tv_usec % 1000000);
         }
-        DEBUG_PRINT ("TimeDriftCalculator::applyDrift: adjustMs=");
-        DEBUG_PRINTLN (adjustMs);
+        DEBUG_PRINTF ("TimeDriftCalculator::applyDrift: adjustMs=%ld\n", adjustMs);
         return adjustMs;
     }
     bool highDrift () const {
@@ -92,6 +92,25 @@ public:
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
+static const char* __ble_disconnect_reason (int reason) {
+    switch (reason) {
+      case ESP_GATT_CONN_UNKNOWN: return "UNKNOWN";
+      case ESP_GATT_CONN_L2C_FAILURE: return "L2C_FAILURE";
+      case ESP_GATT_CONN_TIMEOUT: return "TIMEOUT";
+      case ESP_GATT_CONN_TERMINATE_PEER_USER: return "PEER_USER";
+      case ESP_GATT_CONN_TERMINATE_LOCAL_HOST: return "LOCAL_HOST";
+      case ESP_GATT_CONN_FAIL_ESTABLISH: return "FAIL_ESTABLISH";
+      case ESP_GATT_CONN_LMP_TIMEOUT: return "LMP_TIMEOUT";
+      case ESP_GATT_CONN_CONN_CANCEL: return "CANCELLED";
+      case ESP_GATT_CONN_NONE: return "NONE";
+      default: return "UNDEFINED";
+    }
+}
+static const char* __ble_address_to_string (const uint8_t bleaddr []) {
+    static char macstr [12 + 5 + 1] = { BYTE_TO_HEX (bleaddr [0]), ':', BYTE_TO_HEX (bleaddr [1]), ':', BYTE_TO_HEX (bleaddr [2]), ':', BYTE_TO_HEX (bleaddr [3]), ':', BYTE_TO_HEX (bleaddr [4]), ':', BYTE_TO_HEX (bleaddr [5]), '\0' };
+    return macstr;
+}
+
 class BluetoothNotifier : protected BLEServerCallbacks {
 
 public:
@@ -107,13 +126,13 @@ private:
     bool _connected = false;
 
 protected:
-    void onConnect (BLEServer *) override { 
+    void onConnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override { 
         _connected = true;
-        DEBUG_PRINTLN ("BluetoothNotifier::onConnect");
+        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CONNECTED, conn_id=%d, role=%s, address=%s\n", param->connect.conn_id, param->connect.link_role == 0 ? "master" : "slave", __ble_address_to_string (param->connect.remote_bda));
     }
-    void onDisconnect (BLEServer *) override {
+    void onDisconnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override {
         _connected = false;
-        DEBUG_PRINTLN ("BluetoothNotifier::onDisconnect");
+        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_DISCONNECTED. conn_id=%d, reason=%s, address=%s\n", param->disconnect.conn_id, __ble_disconnect_reason (param->disconnect.reason), __ble_address_to_string (param->disconnect.remote_bda));
     }
 
 public:
@@ -135,13 +154,12 @@ public:
         advertising->start ();
         BLESecurity *security = new BLESecurity ();
         security->setStaticPIN (config.pin); 
-        DEBUG_PRINTLN ("BluetoothNotifier::advertise");
+        DEBUG_PRINTF ("BluetoothNotifier::advertise\n");
     }
     void notify (const String& data) {
         _characteristic->setValue (data.c_str ());
         _characteristic->notify ();
-        DEBUG_PRINT ("BluetoothNotifier::notify: length=");
-        DEBUG_PRINTLN (data.length ());
+        DEBUG_PRINTF ("BluetoothNotifier::notify: length=%u\n", data.length ());
     }
     bool connected (void) const {
         return _connected;
@@ -178,18 +196,7 @@ private:
 
     bool connect () {
         const bool result = _mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ());
-        DEBUG_PRINT ("MQTTPublisher::connect: host=");
-        DEBUG_PRINT (config.host);
-        DEBUG_PRINT (", port=");
-        DEBUG_PRINT (config.port);
-        DEBUG_PRINT (", client=");
-        DEBUG_PRINT (config.client);
-        DEBUG_PRINT (", user=");
-        DEBUG_PRINT (config.user);
-        DEBUG_PRINT (", pass=");
-        DEBUG_PRINT (config.pass);
-        DEBUG_PRINT (", result=");
-        DEBUG_PRINTLN (result);
+        DEBUG_PRINTF ("MQTTPublisher::connect: host='%s', port=%u, client='%s', user='%s', pass='%s', result=%d\n", config.host.c_str (), config.port, config.client.c_str (), config.user.c_str (), config.pass.c_str (), result);
         return result;
     }
 public:
@@ -202,10 +209,7 @@ public:
             if (!connect ())
                 return false;
         const bool result = _mqttClient.publish (topic.c_str (), data.c_str ());
-        DEBUG_PRINT ("MQTTPublisher::publish: length=");
-        DEBUG_PRINT (data.length ());
-        DEBUG_PRINT (", result=");
-        DEBUG_PRINTLN (result);
+        DEBUG_PRINTF ("MQTTPublisher::publish: length=%u, result=%d\n", data.length (), result);
         return result;
     }
     void process () {
@@ -242,7 +246,7 @@ public:
     SPIFFSFile (const String& filename, const size_t maximum): _filename (filename), _maximum (maximum) {}
     bool begin () {
         if (!SPIFFS.begin (true)) {
-            DEBUG_PRINTLN ("SPIFFSFile::begin: failed on SPIFFS.begin ()");
+            DEBUG_PRINTF ("SPIFFSFile::begin: failed on SPIFFS.begin ()\n");
             return false;
         }
         File file = SPIFFS.open (_filename, FILE_READ);
@@ -250,17 +254,13 @@ public:
             _size = file.size ();
             file.close ();
         }
-        DEBUG_PRINT ("SPIFFSFile::begin: size=");
-        DEBUG_PRINTLN (_size);
+        DEBUG_PRINTF ("SPIFFSFile::begin: size=%d\n", _size);
         return true;
     }
     //
     size_t size () const { return _size; }
     bool append (const String& data) {
-        DEBUG_PRINT ("SPIFFSFile::append: size=");
-        DEBUG_PRINT (_size);
-        DEBUG_PRINT (", length=");
-        DEBUG_PRINTLN (data.length ());
+        DEBUG_PRINTF ("SPIFFSFile::append: size=%d, length=%d\n", _size, data.length ());
         if (_size + data.length () > _maximum)
             erase ();
         File file = SPIFFS.open (_filename, FILE_APPEND);
@@ -273,8 +273,7 @@ public:
         return false;
     }
     bool read (LineCallback& callback) const {
-        DEBUG_PRINT ("SPIFFSFile::read: size=");
-        DEBUG_PRINTLN (_size);
+        DEBUG_PRINTF ("SPIFFSFile::read: size=%d\n", _size);
         File file = SPIFFS.open (_filename, FILE_READ);
         if (file) {
             while (file.available ()) {
@@ -288,8 +287,7 @@ public:
         return true;
     }
     void erase () {
-        DEBUG_PRINT ("SPIFFSFile::erase: size=");
-        DEBUG_PRINTLN (_size);
+        DEBUG_PRINTF ("SPIFFSFile::erase: size=%d\n", _size);
         SPIFFS.remove (_filename);
         _size = 0;
     }

@@ -20,16 +20,9 @@ public:
         WiFi.setAutoReconnect (true);
         WiFi.mode (WIFI_STA);
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
-        DEBUG_PRINT ("ConnectManager::begin: ssid=");
-        DEBUG_PRINT (config.ssid);
-        DEBUG_PRINT (", pass=");
-        DEBUG_PRINT (config.pass);
-        DEBUG_PRINT (", mac=");
-        DEBUG_PRINT (mac_address ());
-        DEBUG_PRINT (", host=");
-        DEBUG_PRINTLN (config.client);
+        DEBUG_PRINTF ("ConnectManager::begin: ssid='%s', pass='%s', mac='%s', host='%s'\n", config.ssid.c_str (), config.pass.c_str (), mac_address ().c_str (), config.client.c_str ());
     }
-    bool isAvailable () {
+    bool isAvailable () const {
         return _available;
     }
 
@@ -38,16 +31,14 @@ protected:
     void events (const WiFiEvent_t event) {
         if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED) {
             _connected ++;
-            DEBUG_PRINT ("ConnectManager::events: WIFI_CONNECTED, rssi=");
-            DEBUG_PRINTLN (WiFi.RSSI ());
+            DEBUG_PRINTF ("ConnectManager::events: WIFI_CONNECTED, rssi=%d\n", WiFi.RSSI ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP) {
             _available = true;
-            DEBUG_PRINT ("ConnectManager::events: WIFI_ALLOCATED, localIP=");
-            DEBUG_PRINTLN (WiFi.localIP ());
+            DEBUG_PRINTF ("ConnectManager::events: WIFI_ALLOCATED, localIP='%s'\n", WiFi.localIP ().toString ().c_str ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
             _available = false;
             _disconnected ++;
-            DEBUG_PRINTLN ("ConnectManager::events: WIFI_DISCONNECTED");
+            DEBUG_PRINTF ("ConnectManager::events: WIFI_DISCONNECTED\n");
         }
     }
 
@@ -71,29 +62,25 @@ static void __ConnectManager_WiFiEventHandler (WiFiEvent_t event) {
 
 // -----------------------------------------------------------------------------------------------
 
-RTC_DATA_ATTR long _persistentDriftMs = 0;
-RTC_DATA_ATTR struct timeval _persistentTime = { .tv_sec = 0, .tv_usec = 0 };
-
 class NettimeManager : public Component, public Alarmable, public Diagnosticable {
     const Config::NettimeConfig& config;
     ConnectManager &_network;
     NetworkTimeFetcher _fetcher;
+    PersistentValue <long> _persistentDrift;
     TimeDriftCalculator _drifter;
     ActivationTracker _activations;
     counter_t _failures = 0;
     interval_t _previousTimeUpdate = 0, _previousTimeAdjust = 0;
     time_t _previousTime = 0;
+    PersistentValue <uint32_t> _persistentTime;
 
 public:
-    NettimeManager (const Config::NettimeConfig& cfg, ConnectManager &network) : config (cfg), _network (network), _fetcher (cfg.useragent, cfg.server), _drifter (_persistentDriftMs) {
-      if (_persistentTime.tv_sec > 0)
-          settimeofday (&_persistentTime, nullptr);
-      DEBUG_PRINT ("NettimeManager::constructor: persistentTime=");
-      DEBUG_PRINT (_persistentTime.tv_sec); DEBUG_PRINT ("/"); DEBUG_PRINT (_persistentTime.tv_usec);
-      DEBUG_PRINT (", persistentDrift=");
-      DEBUG_PRINT (_persistentDriftMs);
-      DEBUG_PRINT (", time=");
-      DEBUG_PRINTLN (getTimeString ());
+    NettimeManager (const Config::NettimeConfig& cfg, ConnectManager &network) : config (cfg), _network (network), _fetcher (cfg.useragent, cfg.server), _persistentDrift ("nettime", "drift", 0), _drifter (_persistentDrift), _persistentTime ("nettime", "time", 0) {
+      if (_persistentTime > 0UL) {
+          struct timeval tv = { .tv_sec = _persistentTime, .tv_usec = 0 };
+          settimeofday (&tv, nullptr);
+      }
+      DEBUG_PRINTF ("NettimeManager::constructor: persistentTime=%lu, persistentDrift=%ld, time='%s'\n", (unsigned long) _persistentTime, (long) _persistentDrift, getTimeString ().c_str ());
     }
     void process () override {
         interval_t currentTime = millis ();
@@ -102,22 +89,25 @@ public:
               const time_t fetchedTime = _fetcher.fetch ();
               if (fetchedTime > 0) {
                   _activations ++;
-                  _persistentTime.tv_sec = fetchedTime; _persistentTime.tv_usec = 0;
-                  settimeofday (&_persistentTime, nullptr);
+                  struct timeval tv = { .tv_sec = fetchedTime, .tv_usec = 0 };
+                  settimeofday (&tv, nullptr);
                   if (_previousTime > 0)
-                      _persistentDriftMs = _drifter.updateDrift (fetchedTime - _previousTime, currentTime - _previousTimeUpdate);
+                      _persistentDrift = _drifter.updateDrift (fetchedTime - _previousTime, currentTime - _previousTimeUpdate);
                   _previousTime = fetchedTime;
                   _previousTimeUpdate = currentTime;
+                  _persistentTime = (uint32_t) fetchedTime;
                   _failures = 0;
-                  DEBUG_PRINT ("NettimeManager::process: time=");
-                  DEBUG_PRINTLN (getTimeString ());
+                  DEBUG_PRINTF ("NettimeManager::process: time='%s'\n", getTimeString ().c_str ());
               } else _failures ++;
           }
         }
         if (currentTime - _previousTimeAdjust >= config.intervalAdjust) {
-            gettimeofday (&_persistentTime, nullptr);
-            if (_drifter.applyDrift (_persistentTime, currentTime - _previousTimeAdjust) > 0)
-                settimeofday (&_persistentTime, nullptr);
+            struct timeval tv;
+            gettimeofday (&tv, nullptr);
+            if (_drifter.applyDrift (tv, currentTime - _previousTimeAdjust) > 0) {
+                settimeofday (&tv, nullptr);
+                _persistentTime = tv.tv_sec;
+            }
             _previousTimeAdjust = currentTime;
         }
     }

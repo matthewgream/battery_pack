@@ -22,12 +22,11 @@ class TemperatureManagerBatterypack: public TemperatureManager, public Alarmable
 public:
     TemperatureManagerBatterypack (const Config::TemperatureInterfaceConfig& cfg, TemperatureInterface& temperature) : TemperatureManager (cfg, temperature) {};
     void process () override {
-        DEBUG_PRINT ("TemperatureManagerBatterypack::process: ");
         float sum = 0.0;
         _min = 1000.0;
         _max = -1000.0;
         int cnt = 0;
-        DEBUG_PRINT ("temps=[");
+        DEBUG_PRINTF ("TemperatureManagerBatterypack::process: temps=[");
         for (int num = 0; num < config.PROBE_NUMBER; num ++) {
             if (num != config.PROBE_ENVIRONMENT) {
                 float val = _temperature.get (num);
@@ -36,21 +35,11 @@ public:
                 sum += tmp;
                 if (tmp < _min) _min = tmp;
                 if (tmp > _max) _max = tmp;
-                DEBUG_PRINT (val);
-                DEBUG_PRINT ("/");
-                DEBUG_PRINT (tmp);
-                if (num + 1 != config.PROBE_NUMBER) {
-                    DEBUG_PRINT (", ");
-                }
+                DEBUG_PRINTF ("%.2f/%.2f%s", val, tmp, (num + 1 != config.PROBE_NUMBER) ? ", " : "");
             }
         }
         _avg = sum / (1.0 * cnt);
-        DEBUG_PRINT ("], avg=");
-        DEBUG_PRINT (_avg);
-        DEBUG_PRINT (", min=");
-        DEBUG_PRINT (_min);
-        DEBUG_PRINT (", max=");
-        DEBUG_PRINTLN (_max);
+        DEBUG_PRINTF ("], avg=%.2f, min=%.2f, max=%.2f\n", _avg, _min, _max);
     }
     float min () const { return _min; }
     float max () const { return _max; }
@@ -75,10 +64,8 @@ class TemperatureManagerEnvironment : public TemperatureManager, public Alarmabl
 public:
     TemperatureManagerEnvironment (const Config::TemperatureInterfaceConfig& cfg, TemperatureInterface& temperature) : TemperatureManager (cfg, temperature) {};
     void process () override {
-        DEBUG_PRINT ("TemperatureManagerEnvironment::process: ");
         _value = _filter.update (_temperature.get (config.PROBE_ENVIRONMENT));
-        DEBUG_PRINT ("temp=");
-        DEBUG_PRINTLN (_value);
+        DEBUG_PRINTF ("TemperatureManagerEnvironment::process: temp=%.2f\n", _value);
     }
     float getTemperature () const { return _value; }
 
@@ -101,22 +88,12 @@ class FanManager : public Component {
 public:
     FanManager (const Config::FanInterfaceConfig& cfg, FanInterface& fan, const TemperatureManagerBatterypack& temperatures, PidController& controller, AlphaSmoothing& smoother) : config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _temperatures (temperatures) {}
     void process () override {
-        DEBUG_PRINT ("FanManager::process: ");
         const float setpoint = _temperatures.setpoint (), current = _temperatures.current ();
         const float speedCalculated = _controllerAlgorithm.apply (setpoint, current);
         const float speedConstrained = std::clamp (map  <float> (speedCalculated, -100.0, 100.0, (float) config.MIN_SPEED, (float) config.MAX_SPEED), (float) config.MIN_SPEED, (float) config.MAX_SPEED);
         const float speedSmoothed = _smootherAlgorithm.apply (speedConstrained);
         _fan.setSpeed (speedSmoothed);
-        DEBUG_PRINT ("setpoint=");
-        DEBUG_PRINT (setpoint);
-        DEBUG_PRINT (", current=");
-        DEBUG_PRINT (current);
-        DEBUG_PRINT (", calculated=");
-        DEBUG_PRINT (speedCalculated);
-        DEBUG_PRINT (", constrained=");
-        DEBUG_PRINT (speedConstrained);
-        DEBUG_PRINT (", smoothed=");
-        DEBUG_PRINTLN (speedSmoothed);
+        DEBUG_PRINTF ("FanManager::process: setpoint=%.2f, current=%.2f, calculated=%.2f, constrained=%.2f, smoothed=%.2f\n", setpoint, current, speedCalculated, speedConstrained, speedSmoothed);
     }
 };
 

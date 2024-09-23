@@ -4,8 +4,6 @@
 
 #include "Program.hpp"
 
-static Program program;
-
 // -----------------------------------------------------------------------------------------------
 
 static constexpr const char __build_name [] = "battery monitor";
@@ -22,23 +20,20 @@ static constexpr const char __build_time [] = {
   '\0'
 };
 
-const String build_info (String (__build_name) + String (" V") + String (__build_vers) + String ("-") + String (__build_time)); 
-
 // -----------------------------------------------------------------------------------------------
 
+Program *program;
+
 void setup () {
-
     DEBUG_START ();
-    DEBUG_PRINTLN ();
-    DEBUG_PRINTLN ("*** " + build_info + " ***");
-    DEBUG_PRINTLN ();
-
-    exception_catcher ([&] () { program.setup (); });
+    DEBUG_PRINTF ("\n*** %s V%s-%s ***\n\n", __build_name, __build_vers, __build_time);
+    program = new Program ();
+    exception_catcher ([&] () { program->setup (); });
 }
 
 void loop () {
-    exception_catcher ([&] () { program.loop (); });
-    program.sleep ();
+    exception_catcher ([&] () { program->loop (); });
+    program->sleep ();
 }
 
 // -----------------------------------------------------------------------------------------------
