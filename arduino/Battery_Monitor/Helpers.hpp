@@ -16,7 +16,7 @@ public:
         HTTPClient client;
         String header = "";
         time_t time = 0;
-        client.setUserAgent (_useragent);        
+        client.setUserAgent (_useragent);
         client.begin (_server);
         const char *headerList [] = { "Date" };
         client.collectHeaders (headerList, sizeof (headerList) / sizeof (headerList [0]));
@@ -29,12 +29,12 @@ public:
             }
         }
         client.end ();
-        DEBUG_PRINTF ("NetworkTimeFetcher::fetch: server='%s', header=[%s], time=%lu\n", _server.c_str (), header.c_str (), (unsigned long) time);
+        DEBUG_PRINTF ("NetworkTimeFetcher::fetch: server=%s, header=[%s], time=%lu\n", _server.c_str (), header.c_str (), (unsigned long) time);
         return time;
     }
 };
 
-/* perhaps use SNTP
+/* perhaps just rely upon SNTP
 sntp_setoperatingmode(SNTP_OPMODE_POLL);
 sntp_setservername(0, "pool.ntp.org");
 sntp_init();
@@ -92,7 +92,7 @@ public:
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
-static const char* __ble_disconnect_reason (int reason) {
+static String __ble_disconnect_reason (const esp_gatt_conn_reason_t reason) {
     switch (reason) {
       case ESP_GATT_CONN_UNKNOWN: return "UNKNOWN";
       case ESP_GATT_CONN_L2C_FAILURE: return "L2C_FAILURE";
@@ -106,9 +106,14 @@ static const char* __ble_disconnect_reason (int reason) {
       default: return "UNDEFINED";
     }
 }
-static const char* __ble_address_to_string (const uint8_t bleaddr []) {
-    static char macstr [12 + 5 + 1] = { BYTE_TO_HEX (bleaddr [0]), ':', BYTE_TO_HEX (bleaddr [1]), ':', BYTE_TO_HEX (bleaddr [2]), ':', BYTE_TO_HEX (bleaddr [3]), ':', BYTE_TO_HEX (bleaddr [4]), ':', BYTE_TO_HEX (bleaddr [5]), '\0' };
-    return macstr;
+
+static String __ble_address_to_string (const uint8_t bleaddr []) {
+#define __BLE_MACBYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
+#define __BLE_FORMAT_ADDRESS(addr) __BLE_MACBYTETOSTRING ((addr) [0]) + ":" + __BLE_MACBYTETOSTRING ((addr) [1]) + ":" + __BLE_MACBYTETOSTRING ((addr) [2]) + ":" + __BLE_MACBYTETOSTRING ((addr) [3]) + ":" + __BLE_MACBYTETOSTRING ((addr) [4]) + ":" + __BLE_MACBYTETOSTRING ((addr) [5])
+    return __BLE_FORMAT_ADDRESS (bleaddr);
+}
+static String __ble_linkrole_to_string (const int linkrole) {
+    return String (linkrole == 0 ? "master" : "slave");
 }
 
 class BluetoothNotifier : protected BLEServerCallbacks {
@@ -128,11 +133,13 @@ private:
 protected:
     void onConnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override { 
         _connected = true;
-        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CONNECTED, conn_id=%d, role=%s, address=%s\n", param->connect.conn_id, param->connect.link_role == 0 ? "master" : "slave", __ble_address_to_string (param->connect.remote_bda));
+        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CONNECTED, %s (conn_id=%d, role=%s)\n",
+            __ble_address_to_string (param->connect.remote_bda).c_str (), param->connect.conn_id, __ble_linkrole_to_string (param->connect.link_role).c_str ());
     }
     void onDisconnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override {
         _connected = false;
-        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_DISCONNECTED. conn_id=%d, reason=%s, address=%s\n", param->disconnect.conn_id, __ble_disconnect_reason (param->disconnect.reason), __ble_address_to_string (param->disconnect.remote_bda));
+        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_DISCONNECTED, %s (conn_id=%d, reason=%s)\n",
+            __ble_address_to_string (param->disconnect.remote_bda).c_str (), param->disconnect.conn_id, __ble_disconnect_reason ((esp_gatt_conn_reason_t) param->disconnect.reason).c_str ());
     }
 
 public:
@@ -196,7 +203,7 @@ private:
 
     bool connect () {
         const bool result = _mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ());
-        DEBUG_PRINTF ("MQTTPublisher::connect: host='%s', port=%u, client='%s', user='%s', pass='%s', result=%d\n", config.host.c_str (), config.port, config.client.c_str (), config.user.c_str (), config.pass.c_str (), result);
+        DEBUG_PRINTF ("MQTTPublisher::connect: host=%s, port=%u, client=%s, user=%s, pass=%s, result=%d\n", config.host.c_str (), config.port, config.client.c_str (), config.user.c_str (), config.pass.c_str (), result);
         return result;
     }
 public:
@@ -222,7 +229,7 @@ public:
     void serialize (JsonObject &obj) const {
         PubSubClient& mqttClient = const_cast <MQTTPublisher *> (this)->_mqttClient;
         JsonObject mqtt = obj ["mqtt"].to <JsonObject> ();
-        if ((mqtt ["connected"] = (WiFi.isConnected () && mqttClient.connected ()))) {
+        if ((mqtt ["connected"] = mqttClient.connected ())) {
             //
         }
         mqtt ["state"] = mqttClient.state ();    
@@ -260,7 +267,7 @@ public:
     //
     size_t size () const { return _size; }
     bool append (const String& data) {
-        DEBUG_PRINTF ("SPIFFSFile::append: size=%d, length=%d\n", _size, data.length ());
+        DEBUG_PRINTF ("SPIFFSFile::append: size=%d, length=%u\n", _size, data.length ());
         if (_size + data.length () > _maximum)
             erase ();
         File file = SPIFFS.open (_filename, FILE_APPEND);
