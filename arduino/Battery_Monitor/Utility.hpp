@@ -24,7 +24,7 @@
 
 #define DEFAULT_PERSISTENT_PARTITION "nvs"
 
-class _PersistentData {
+class PersistentData {
 public:
     static int _initialised;
     static bool _initialise () { return _initialised || (++ _initialised && nvs_flash_init () == ESP_OK && nvs_flash_init_partition (DEFAULT_PERSISTENT_PARTITION) == ESP_OK); }
@@ -32,22 +32,22 @@ private:
     nvs_handle_t _handle;
     const bool _okay = false;
 public:
-    _PersistentData (const char *space): _okay (_initialise () && nvs_open_from_partition (DEFAULT_PERSISTENT_PARTITION, space, NVS_READWRITE, &_handle) == ESP_OK) {}
-    ~_PersistentData () { if (_okay) nvs_close (_handle); }
+    PersistentData (const char *space): _okay (_initialise () && nvs_open_from_partition (DEFAULT_PERSISTENT_PARTITION, space, NVS_READWRITE, &_handle) == ESP_OK) {}
+    ~PersistentData () { if (_okay) nvs_close (_handle); }
     inline bool get (const char *name, uint32_t *value) const { return (_okay && nvs_get_u32 (_handle, name, value) == ESP_OK); }
     inline bool set (const char *name, uint32_t value) const { return  (_okay && nvs_set_u32 (_handle, name, value) == ESP_OK); }
     inline bool get (const char *name, int32_t *value) const { return (_okay && nvs_get_i32 (_handle, name, value) == ESP_OK); }
     inline bool set (const char *name, int32_t value) const { return  (_okay && nvs_set_i32 (_handle, name, value) == ESP_OK); }
 
 };
-int _PersistentData::_initialised = 0;
+int PersistentData::_initialised = 0;
 template <typename T>
 class PersistentValue {
-    _PersistentData _data;
+    PersistentData &_data;
     const String _name;
     const T _value_default;
 public:
-    PersistentValue (const char *space, const char *name, const T value_default): _data (space), _name (name), _value_default (value_default) {}
+    PersistentValue (PersistentData& data, const char *name, const T value_default): _data (data), _name (name), _value_default (value_default) {}
     inline operator T () const { T value; return _data.get (_name.c_str (), &value) ? value : _value_default; }
     inline bool operator= (const T value) { return _data.set (_name.c_str (), value); }
     inline bool operator+= (const T value2) { T value = _value_default; _data.get (_name.c_str (), &value); value += value2; return _data.set (_name.c_str (), value); }

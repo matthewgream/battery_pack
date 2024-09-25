@@ -52,20 +52,18 @@ class FanInterface : public Component, public Diagnosticable {
     static constexpr uint8_t PWM_MINVALUE = 0, PWM_MAXVALUE = ((1 << PWM_RESOLUTION) - 1);
     const Config::FanInterfaceConfig& config;
     uint8_t _speed = PWM_MINVALUE, _speedMin = PWM_MAXVALUE, _speedMax = PWM_MINVALUE;
+    OpenSmart_QuadMotorDriver _driver;
     ActivationTracker _activations;
 
 public:
-    FanInterface (const Config::FanInterfaceConfig& cfg) : config (cfg) {}
+    FanInterface (const Config::FanInterfaceConfig& cfg) : config (cfg), _driver (config.I2C, { config.PIN_PWMA, config.PIN_PWMB, config.PIN_PWMC, config.PIN_PWMD}) {}
     void begin () override {
-        pinMode (config.PIN_PWM, OUTPUT);
-        analogWrite (config.PIN_PWM, PWM_MINVALUE);
+        _driver.setDirection (OpenSmart_QuadMotorDriver::MOTOR_CLOCKWISE); // all 4 fans, for now
     }
     void setSpeed (const uint8_t speed) {
         const uint8_t speedNew = std::clamp (speed, PWM_MINVALUE, PWM_MAXVALUE);
         if (speedNew > config.MIN_SPEED && _speed <= config.MIN_SPEED) _activations ++;
-        if (speedNew < _speedMin) _speedMin = speedNew;
-        if (speedNew > _speedMax) _speedMax = speedNew;
-        analogWrite (config.PIN_PWM, _speed = speedNew);
+        _driver.setSpeed (_speed = speed); // all 4 fans, for now
     }
     uint8_t getSpeed () const {
         return _speed;

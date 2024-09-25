@@ -58,7 +58,7 @@ struct Config {
         const float MINIMAL = -20.0, WARNING = 40.0, CRITICAL = 50.0;
     } temperature;
     struct FanInterfaceConfig {
-        const int PIN_PWM = 7;
+        const int PIN_PWMA = 7, PIN_PWMB = 8, PIN_PWMC = 9, PIN_PWMD = 10, I2C = OpenSmart_QuadMotorDriver::MOTOR_CONTROL_I2CADDRESS;
         const uint8_t MIN_SPEED = 85, MAX_SPEED = 255;
     } fan;
 

@@ -333,6 +333,69 @@ public:
     }
 };
 
+
+// -----------------------------------------------------------------------------------------------
+
+#include <Wire.h>
+#include <array>
+
+class OpenSmart_QuadMotorDriver {
+public:
+static constexpr int MotorCount = 4;
+enum MotorID {
+    MOTOR_A = 0,
+    MOTOR_B = 1,
+    MOTOR_C = 2,
+    MOTOR_D = 3
+};
+enum MotorDirection {
+    MOTOR_CLOCKWISE = 0,
+    MOTOR_ANTICLOCKWISE = 1
+};
+enum MotorConfig {
+    MOTOR_CONTROL_I2CADDRESS = 0x20
+};
+typedef std::array <int, MotorCount> MotorSpeedPins;
+private:
+    enum MotorControl {
+        MOTOR_CONTROL_OFF = 0x00,
+        MOTOR_CONTROL_ANTICLOCKWISE = 0x01,
+        MOTOR_CONTROL_CLOCKWISE = 0x02
+    };
+    static constexpr uint8_t encode_controlvalue (int motorID, uint8_t directions, uint8_t value) {
+        return (directions & (~(0x03 << (2 * motorID)))) | (value << (2 * motorID));
+    }
+    
+    uint8_t _i2c;
+    MotorSpeedPins _pwms;
+    uint8_t _directions;
+
+    void directions_update (int motorID, uint8_t value) {
+        for (int id = 0; id < MotorCount; id ++)
+            if (motorID == -1 || motorID == id)
+                _directions = encode_controlvalue (_directions, id, value);
+        Wire.beginTransmission (_i2c);
+        Wire.write (_directions);
+        Wire.endTransmission ();
+    }
+    void speed_update (int motorID, uint8_t value) {
+        for (int id = 0; id < MotorCount; id ++)
+            if (motorID == -1 || motorID == id)
+                analogWrite (_pwms [id], value);
+    }
+
+public:
+    OpenSmart_QuadMotorDriver (const uint8_t i2c, const MotorSpeedPins& pwms) : _i2c (i2c), _pwms (pwms), _directions (0x00) {
+        for (uint8_t pin : _pwms)
+            pinMode (pin, OUTPUT), digitalWrite (pin, LOW);
+        Wire.begin ();
+        stop ();
+    }
+    void setSpeed (int speed, int motorID = -1) { speed_update (motorID, (speed > 255) ? (uint8_t) 255 : static_cast <uint8_t> (speed)); }
+    void setDirection (int direction, int motorID = -1) { directions_update (motorID, (direction == MOTOR_CLOCKWISE) ? MOTOR_CONTROL_CLOCKWISE : MOTOR_CONTROL_ANTICLOCKWISE); }
+    void stop (int motorID = -1) { directions_update (motorID, MOTOR_CONTROL_OFF); }
+};
+
 // -----------------------------------------------------------------------------------------------
 
 #endif

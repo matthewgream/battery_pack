@@ -128,6 +128,7 @@ class NettimeManager : public Component, public Alarmable, public Diagnosticable
     const Config::NettimeConfig& config;
     ConnectManager &_network;
     NetworkTimeFetcher _fetcher;
+    PersistentData _persistentData;
     PersistentValue <long> _persistentDrift;
     TimeDriftCalculator _drifter;
     ActivationTracker _activations;
@@ -137,7 +138,7 @@ class NettimeManager : public Component, public Alarmable, public Diagnosticable
     PersistentValue <uint32_t> _persistentTime;
 
 public:
-    NettimeManager (const Config::NettimeConfig& cfg, ConnectManager &network) : config (cfg), _network (network), _fetcher (cfg.useragent, cfg.server), _persistentDrift ("nettime", "drift", 0), _drifter (_persistentDrift), _persistentTime ("nettime", "time", 0) {
+    NettimeManager (const Config::NettimeConfig& cfg, ConnectManager &network) : config (cfg), _network (network), _fetcher (cfg.useragent, cfg.server), _persistentData ("nettime"), _persistentDrift (_persistentData, "drift", 0), _drifter (_persistentDrift), _persistentTime (_persistentData, "time", 0) {
       if (_persistentTime > 0UL) {
           struct timeval tv = { .tv_sec = _persistentTime, .tv_usec = 0 };
           settimeofday (&tv, nullptr);
