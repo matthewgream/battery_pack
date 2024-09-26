@@ -90,7 +90,8 @@ class AlarmManager : public Component, public Diagnosticable {
 public:
     AlarmManager (const Config::AlarmConfig& cfg, const Alarmable::List alarmables) : config (cfg), _alarmables (alarmables) {}
     void begin () override {
-        pinMode (config.PIN_ALARM, OUTPUT);
+        if (config.PIN_ALARM > 0)
+            pinMode (config.PIN_ALARM, OUTPUT);
     }
     void process () override {
         AlarmSet alarms;
@@ -102,7 +103,8 @@ public:
                     _activations [number] ++;
                 else if (!alarms.isAny (number) && _alarms.isAny (number))
                     _deactivations [number] ++;
-            digitalWrite (config.PIN_ALARM, alarms.isNone () ? LOW : HIGH);
+            if (config.PIN_ALARM > 0)
+                digitalWrite (config.PIN_ALARM, alarms.isNone () ? LOW : HIGH);
             DEBUG_PRINTF ("AlarmManager::process: alarms: %s <-- %s\n", alarms.toStringBitmap ().c_str (), _alarms.toStringBitmap ().c_str ());
             _alarms = alarms;
         }

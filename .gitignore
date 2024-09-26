@@ -2,3 +2,10 @@ third_party
 build
 secrets.txt
 Secrets.hpp
+android/Battery_Monitor/.idea/codeStyles/codeStyleConfig.xml
+android/Battery_Monitor/.idea/codeStyles/Project.xml
+android/Battery_Monitor/.idea/misc.xml
+android/Battery_Monitor/.idea/misc.xml
+android/Battery_Monitor/.idea/vcs.xml
+android/Battery_Monitor/gradle/libs.versions.toml
+android/Battery_Monitor/gradle/libs.versions.toml

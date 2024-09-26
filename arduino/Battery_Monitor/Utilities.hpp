@@ -1,7 +1,4 @@
 
-#ifndef __UTILITY_HPP__
-#define __UTILITY_HPP__
-
 // -----------------------------------------------------------------------------------------------
 
 #include <Arduino.h>
@@ -27,7 +24,7 @@
 class PersistentData {
 public:
     static int _initialised;
-    static bool _initialise () { return _initialised || (++ _initialised && nvs_flash_init () == ESP_OK && nvs_flash_init_partition (DEFAULT_PERSISTENT_PARTITION) == ESP_OK); }
+    static bool _initialise () { return _initialised || (++ _initialised && nvs_flash_init_partition (DEFAULT_PERSISTENT_PARTITION) == ESP_OK); }
 private:
     nvs_handle_t _handle;
     const bool _okay = false;
@@ -38,6 +35,20 @@ public:
     inline bool set (const char *name, uint32_t value) const { return  (_okay && nvs_set_u32 (_handle, name, value) == ESP_OK); }
     inline bool get (const char *name, int32_t *value) const { return (_okay && nvs_get_i32 (_handle, name, value) == ESP_OK); }
     inline bool set (const char *name, int32_t value) const { return  (_okay && nvs_set_i32 (_handle, name, value) == ESP_OK); }
+    inline bool get (const char *name, String *value) const {
+        size_t size;
+        if (_okay && nvs_get_str (_handle, name, NULL, &size) == ESP_OK) {
+            char *str = (char *) malloc (size);
+            if (nvs_get_str (_handle, name, str, &size) == ESP_OK) {
+                (*value) = str;
+                free (str);
+                return true;
+            }
+            free (str);
+        }
+        return false;
+    }
+    inline bool set (const char *name, const String &value) const { return  (_okay && nvs_set_str (_handle, name, value.c_str ()) == ESP_OK); }
 
 };
 int PersistentData::_initialised = 0;
@@ -274,5 +285,3 @@ public:
 };
 
 // -----------------------------------------------------------------------------------------------
-
-#endif

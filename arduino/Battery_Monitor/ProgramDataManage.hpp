@@ -12,10 +12,8 @@ public:
         _blue.advertise ();
     }
     void deliver (const String& data) {
-        if (_blue.connected ()) {
-            _activations ++;
-            _blue.notify (data);
-        }
+        if (_blue.connected ())
+            _activations ++, _blue.notify (data);
     }
 
 protected:
@@ -47,8 +45,7 @@ public:
     bool publish (const String& data) {
         if (_network.isAvailable ()) {
           if (_mqtt.connected () && _mqtt.publish (config.mqtt.topic, data)) {
-              _activations ++;
-              _failures = 0;
+              _activations ++, _failures = 0;
               return true;
           } else _failures ++;
         }
@@ -85,10 +82,9 @@ public:
         return _file.size ();
     }
     void append (const String& data) {
-        if (_file.append (data)) {
-            _activations ++;
-            _failures = 0;
-        } else _failures ++;
+        if (_file.append (data))
+            _activations ++, _failures = 0;
+        else _failures ++;
     }
     bool retrieve (LineCallback& callback) const {
         return _file.read (callback);

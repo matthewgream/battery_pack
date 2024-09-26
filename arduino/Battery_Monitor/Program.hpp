@@ -21,8 +21,8 @@
 #include <array>
 #include <vector>
 
-#include "Utility.hpp"
-#include "Helpers.hpp"
+#include "Utilities.hpp"
+#include "Components.hpp"
 #include "Config.hpp"
 
 // -----------------------------------------------------------------------------------------------

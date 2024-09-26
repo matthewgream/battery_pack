@@ -1,14 +1,11 @@
 
-#ifndef __CONFIG_HPP__
-#define __CONFIG_HPP__
-
 // -----------------------------------------------------------------------------------------------
 
 #include "Secrets.hpp"
 
 #define DEFAULT_SERIAL_BAUD 115200
 
-#define DEFAULT_NAME "BatteryManager"
+#define DEFAULT_NAME "BatteryMonitor"
 
 #define DEFAULT_WIFI_CLIENT DEFAULT_NAME
 // #define DEFAULT_WIFI_SSID "wifi_ssid" // Secrets.hpp
@@ -58,7 +55,7 @@ struct Config {
         const float MINIMAL = -20.0, WARNING = 40.0, CRITICAL = 50.0;
     } temperature;
     struct FanInterfaceConfig {
-        const int PIN_PWMA = 7, PIN_PWMB = 8, PIN_PWMC = 9, PIN_PWMD = 10, I2C = OpenSmart_QuadMotorDriver::MOTOR_CONTROL_I2CADDRESS;
+        const int PIN_PWMA = 7, PIN_PWMB = 8, PIN_PWMC = 9, PIN_PWMD = 10, I2C = OpenSmart_QuadMotorDriver::I2cAddress;
         const uint8_t MIN_SPEED = 85, MAX_SPEED = 255;
     } fan;
 
@@ -84,7 +81,7 @@ struct Config {
     } storage;
 
     struct AlarmConfig {
-        const int PIN_ALARM = 8;
+        const int PIN_ALARM = -1;
     } alarm;
     struct DiagnosticConfig {
     } diagnostic;
@@ -93,5 +90,3 @@ struct Config {
 };
 
 // -----------------------------------------------------------------------------------------------
-
-#endif
