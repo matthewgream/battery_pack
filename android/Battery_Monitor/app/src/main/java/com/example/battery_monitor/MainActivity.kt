@@ -12,7 +12,7 @@ import android.util.TypedValue
 
 class MainActivity : Activity () {
 
-    private val bluetoothPermissionsList = arrayOf (android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
+    private val bluetoothPermissionsList = arrayOf (android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.BLUETOOTH, android.Manifest.permission.BLUETOOTH_ADMIN, android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
     private val bluetoothPermissionsCode = 1
     private var bluetoothPermissionsOkay = false;
     private val bluetoothManager: BluetoothManager by lazy {
@@ -122,7 +122,7 @@ class MainActivity : Activity () {
         val alarmsTextView: TextView = findViewById (R.id.alarmsTextView)
 
         runOnUiThread {
-            timeTextView.text = formatTime (json.getLong ("time"))
+            timeTextView.text = json.getString ("time")
             val environment = json.getJSONObject ("temperatures").getDouble ("environment");
             envTempTextView.text = "$environment°C"
 

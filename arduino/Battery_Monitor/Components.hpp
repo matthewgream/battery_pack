@@ -160,10 +160,22 @@ public:
         security->setStaticPIN (config.pin); 
         DEBUG_PRINTF ("BluetoothNotifier::advertise\n");
     }
+    // json only
     void notify (const String& data) {
-        _characteristic->setValue (data.c_str ());
-        _characteristic->notify ();
-        DEBUG_PRINTF ("BluetoothNotifier::notify: length=%u\n", data.length ());
+        const int _ble_mtu = 512;
+        if (data.length () < _ble_mtu) {
+            _characteristic->setValue (data.c_str ());
+            _characteristic->notify ();
+            DEBUG_PRINTF ("BluetoothNotifier::notify: length=%u\n", data.length ());
+        } else {
+            JsonSplitter splitter (_ble_mtu, { "type", "time" });
+            splitter.splitJson (data, [&] (const String& part, const int elements) {
+                _characteristic->setValue (part.c_str ());
+                _characteristic->notify ();
+                DEBUG_PRINTF ("BluetoothNotifier::notify: length=%u, part=%u, elements=%d\n", data.length (), part.length (), elements);
+                delay (20);
+            });
+        }
     }
     bool connected (void) const {
         return _connected;

@@ -113,14 +113,14 @@ public:
 
 protected:
     void collectDiagnostics (JsonObject &obj) const override {
-        JsonObject alarm = obj ["alarm"].to <JsonObject> ();
-        JsonArray alarms = alarm ["alarms"].to <JsonArray> ();
+        JsonArray alarms = obj ["alarms"].to <JsonArray> ();
         for (int number = 0; number < _alarms.size (); number ++) {
-            JsonObject entry = alarms.add <JsonObject> ();
-            entry ["name"] = _alarms.name (number);
-            entry ["active"] = _alarms.isAny (number);
-            _activations [number].serialize (entry ["activated"].to <JsonObject> ());
-            _deactivations [number].serialize (entry ["deactivated"].to <JsonObject> ());
+            JsonObject alarm = alarms.add <JsonObject> ();
+            alarm ["name"] = _alarms.name (number);
+            alarm ["active"] = _alarms.isAny (number);
+            alarm ["count"] = _activations [number].number ();
+            alarm ["activated"] = _activations [number].seconds ();
+            alarm ["deactivated"] = _deactivations [number].seconds ();
         }
     }
 };

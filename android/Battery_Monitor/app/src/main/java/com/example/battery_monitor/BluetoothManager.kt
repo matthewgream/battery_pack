@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
@@ -35,7 +36,7 @@ class BluetoothManager (
     private var reconnectAttempts = 0
     private val MAX_RECONNECT_ATTEMPTS = 5
     private val RECONNECT_INTERVAL = 5000L // 5 seconds
-    private val SCAN_PERIOD = 10000L // 10 seconds
+    private val SCAN_PERIOD = 30000L // 30 seconds
 
     init {
         val bluetoothManager = context.getSystemService (Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -43,6 +44,23 @@ class BluetoothManager (
     }
 
     //
+
+    private fun enableNotifications(characteristic: BluetoothGattCharacteristic) {
+        val cccdUuid = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
+        if ((characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0) {
+            val descriptor = characteristic.getDescriptor(cccdUuid)
+            if (descriptor != null) {
+                bluetoothGatt?.setCharacteristicNotification(characteristic, true)
+                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                bluetoothGatt?.writeDescriptor(descriptor)
+            } else {
+                Log.e("Bluetooth", "CCC descriptor not found for ${characteristic.uuid}")
+            }
+        } else {
+            Log.e("Bluetooth", "Characteristic ${characteristic.uuid} doesn't support notifications")
+        }
+    }
 
     fun isAvailable (): Boolean {
         return bluetoothAdapter.isEnabled
@@ -72,8 +90,8 @@ class BluetoothManager (
     private val scanCallback = object : ScanCallback () {
         override fun onScanResult (callbackType: Int, result: ScanResult) {
             val device = result.device
-            Log.d ("Bluetooth", "Scan located, device ${device.name} / ${device.address}")
             if (device.name == DEVICE_NAME) {
+                Log.d ("Bluetooth", "Scan located, device ${device.name} / ${device.address}")
                 scanStop ()
                 deviceConnect (device)
             }
@@ -89,6 +107,7 @@ class BluetoothManager (
                     Log.d ("Bluetooth", "Device connected, to GATT server")
                     isConnected = true
                     reconnectAttempts = 0
+                    gatt.requestMtu(512)
                     gatt.discoverServices ()
                     statusCallback (true)
                 }
@@ -104,14 +123,25 @@ class BluetoothManager (
             Log.d ("Bluetooth", "Device discovery, with status $status")
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 val characteristic = gatt.getService (SERVICE_UUID)?.getCharacteristic (CHARACTERISTIC_UUID)
-                if (characteristic != null)
-                    gatt.setCharacteristicNotification (characteristic, true)
+                if (characteristic != null) {
+                    enableNotifications(characteristic)
+//                    gatt.setCharacteristicNotification(characteristic, true)
+                } else {
+                    Log.e("Bluetooth", "Characteristic not found")
+
+                }
             }
         }
-        override fun onCharacteristicChanged (gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
-            Log.d ("Bluetooth", "Device received data, of size ${value.size}")
-            dataCallback (String (value))
+        override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
+            Log.d("Bluetooth", "Characteristic changed: ${characteristic.uuid}")
+            Log.d("Bluetooth", "Received data: ${String (value)}")
+            // Process your data here
+            dataCallback(String(value))
         }
+//        override fun onCharacteristicChanged (gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
+  //          Log.d ("Bluetooth", "Device received data, of size ${value.size}")
+    //        dataCallback (String (value))
+      //  }
     }
     private fun deviceConnect (device: BluetoothDevice) {
         Log.d ("Bluetooth", "Device connect, to ${device.name} / ${device.address}")

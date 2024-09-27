@@ -32,9 +32,9 @@ public:
     PersistentData (const char *space): _okay (_initialise () && nvs_open_from_partition (DEFAULT_PERSISTENT_PARTITION, space, NVS_READWRITE, &_handle) == ESP_OK) {}
     ~PersistentData () { if (_okay) nvs_close (_handle); }
     inline bool get (const char *name, uint32_t *value) const { return (_okay && nvs_get_u32 (_handle, name, value) == ESP_OK); }
-    inline bool set (const char *name, uint32_t value) const { return  (_okay && nvs_set_u32 (_handle, name, value) == ESP_OK); }
+    inline bool set (const char *name, uint32_t value) { return  (_okay && nvs_set_u32 (_handle, name, value) == ESP_OK); }
     inline bool get (const char *name, int32_t *value) const { return (_okay && nvs_get_i32 (_handle, name, value) == ESP_OK); }
-    inline bool set (const char *name, int32_t value) const { return  (_okay && nvs_set_i32 (_handle, name, value) == ESP_OK); }
+    inline bool set (const char *name, int32_t value) { return  (_okay && nvs_set_i32 (_handle, name, value) == ESP_OK); }
     inline bool get (const char *name, String *value) const {
         size_t size;
         if (_okay && nvs_get_str (_handle, name, NULL, &size) == ESP_OK) {
@@ -48,7 +48,7 @@ public:
         }
         return false;
     }
-    inline bool set (const char *name, const String &value) const { return  (_okay && nvs_set_str (_handle, name, value.c_str ()) == ESP_OK); }
+    inline bool set (const char *name, const String &value) { return  (_okay && nvs_set_str (_handle, name, value.c_str ()) == ESP_OK); }
 
 };
 int PersistentData::_initialised = 0;
@@ -62,8 +62,8 @@ public:
     inline operator T () const { T value; return _data.get (_name.c_str (), &value) ? value : _value_default; }
     inline bool operator= (const T value) { return _data.set (_name.c_str (), value); }
     inline bool operator+= (const T value2) { T value = _value_default; _data.get (_name.c_str (), &value); value += value2; return _data.set (_name.c_str (), value); }
-    inline bool operator>= (const T value2) { T value = _value_default; _data.get (_name.c_str (), &value); return value >= value2; }
-    inline bool operator> (const T value2) { T value = _value_default; _data.get (_name.c_str (), &value); return value > value2; }
+    inline bool operator>= (const T value2) const { T value = _value_default; _data.get (_name.c_str (), &value); return value >= value2; }
+    inline bool operator> (const T value2) const { T value = _value_default; _data.get (_name.c_str (), &value); return value > value2; }
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -101,21 +101,20 @@ public:
 
 class PidController {
     const float _Kp, _Ki, _Kd;
-    float _p, _i = 0.0f, _d;
-    float _lastError = 0.0f;
-    interval_t _lastTime = 0;
+    float _p, _i = 0.0f, _d, _e = 0.0f;
+    interval_t _t = 0;
 
 public:
     PidController (const float kp, const float ki, const float kd) : _Kp (kp), _Ki (ki), _Kd (kd) {}
     float apply (const float setpoint, const float current) {
-        const interval_t time = millis ();
-        const float delta = (time - _lastTime) / 1000.0f;
-        const float error = setpoint - current;
-        _p = _Kp * error;
-        _i = std::clamp (_i + (_Ki * error * delta), -100.0f, 100.0f);
-        _d = _Kd * (delta > 0.0f ? (error - _lastError) / delta : 0.0f);
-        _lastTime = time;
-        _lastError = error;
+        const interval_t t = millis ();
+        const float d = (t - _t) / 1000.0f;
+        const float e = setpoint - current;
+        _p = _Kp * e;
+        _i = std::clamp (_i + (_Ki * e * d), -100.0f, 100.0f);
+        _d = _Kd * (d > 0.0f ? (e - _e) / d : 0.0f);
+        _t = t;
+        _e = e;
         return _p + _i + _d;
     }
 };
@@ -248,6 +247,118 @@ public:
     }
 };
 
+// -----------------------------------------------------------------------------------------------
+
+#include <vector>
+
+    inline int findValueKey (const String& json, const String& key) {
+        return json.indexOf ("\"" + key + "\":");
+    }
+    inline int findValueStart (const String& json, const int keyPos) {
+        int valueStart = json.indexOf (":", keyPos) + 1;
+        while (isSpace (json.charAt (valueStart))) valueStart ++;
+        return valueStart;
+    }
+    inline int findValueEnd (const String& json, const int valueStart) {
+        int valueEnd;
+        if (json.charAt (valueStart) == '"') {
+            valueEnd = json.indexOf ("\"", valueStart + 1);
+            while (valueEnd > 0 && json.charAt (valueEnd - 1) == '\\')
+                valueEnd = json.indexOf ("\"", valueEnd + 1);
+            if (valueEnd >= 0)
+                valueEnd ++;
+        } else {
+            valueEnd = json.indexOf (",", valueStart);
+            if (valueEnd == -1)
+                valueEnd = json.indexOf ("}", valueStart);
+        }
+        return valueEnd;
+    }
+    inline String findValue (const String& json, const String& key) {
+        const int keyPos = findValueKey (json, key);
+        if (keyPos >= 0) {
+            const int valueStart = findValueStart (json, keyPos), valueEnd = findValueEnd (json, valueStart);
+            if (valueEnd >= 0)
+                return json.substring (valueStart, valueEnd);
+        }
+        return "";
+    }
+    inline int findNextElement (const String& json, int startPos) {
+        int braceCount = 0;
+        bool inQuotes = false;
+        for (int i = startPos; i < json.length (); i ++) {
+            const char c = json.charAt (i);
+            if (c == '"' && (i == startPos || json.charAt (i - 1) != '\\'))
+                inQuotes = !inQuotes;
+            else if (!inQuotes) {
+                if (c == '{' || c == '[')
+                    braceCount ++;
+                else if (c == '}' || c == ']') {
+                    braceCount --;
+                    if (braceCount == 0)
+                        return i + 1;
+                }
+            }
+        }
+        return -1;
+    }
+
+class JsonSplitter {
+private:
+    const int splitLength;
+    const std::vector <String> commonElements;
+
+public:
+    JsonSplitter (const int splitLength, const std::vector<String> &commonElements) : splitLength (splitLength), commonElements (commonElements) {}
+
+    void splitJson (const String& json, const std::function<void (const String&, const int)> packetCallback) {
+
+        String commonStart = "{";
+        for (const auto& commonElement : commonElements) {
+            String value = findValue (json, commonElement);
+            if (value.length () > 0) {
+                if (commonStart.length () > 1) commonStart += ",";
+                commonStart += "\"" + commonElement + "\":" + value;
+            }
+        }
+
+        String currentPart = commonStart;
+        int currentSize = commonStart.length ();
+        int currentCount = 0;
+
+        for (int pos = 1, nextPos = 0; pos < json.length () && (nextPos = findNextElement (json, pos)) != -1; pos = nextPos) {
+            const String element = json.substring (pos, nextPos);
+
+            bool isCommonElement = false;
+            for (const auto& commonElement : commonElements) {
+                if (element.startsWith ("\"" + commonElement + "\":")) {
+                    isCommonElement = true;
+                    break;
+                }
+            }
+            if (isCommonElement)
+                continue;
+
+            currentCount ++;
+            if (currentSize + element.length () + 1 <= splitLength) {  // +1 for the comma
+                if (currentSize > commonStart.length ()) currentPart += ",";
+                currentPart += element;
+                currentSize += element.length () + 1;
+            } else {
+                if (currentSize > commonStart.length ())            
+                    packetCallback (currentPart + "}", elements);
+                currentPart = commonStart + "," + element;
+                currentSize = commonStart.length () + 1 + element.length ();
+                currentCount = 0;
+            }
+  
+            DEBUG_PRINTF ("element (%d) --> %s\n", element.length () - (element [0] == ',' ? 1 : 0), &element [element [0] == ',' ? 1 : 0]);
+        }
+
+        if (currentSize > commonStart.length ())
+            packetCallback (currentPart + "}", elements);
+    }
+};
 // -----------------------------------------------------------------------------------------------
 
 #include <type_traits>

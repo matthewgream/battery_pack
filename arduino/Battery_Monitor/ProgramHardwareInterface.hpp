@@ -32,10 +32,9 @@ public:
 
 protected:
     void collectDiagnostics (JsonObject &obj) const override {
-        JsonObject temperature = obj ["temperature"].to <JsonObject> ();
-        JsonArray values = temperature ["values"].to <JsonArray> ();
+        JsonArray temps = obj ["temps"].to <JsonArray> ();
         for (int channel = 0; channel < MuxInterface_CD74HC4067::CHANNELS; channel ++) {
-            JsonObject entry = values.add <JsonObject> ();
+            JsonObject entry = temps.add <JsonObject> ();
             const ValueSet &valueSet = _muxValues [channel]; 
             entry ["channel"] = channel;
             entry ["now"] = valueSet.v_now;
@@ -72,10 +71,9 @@ public:
 protected:
     void collectDiagnostics (JsonObject &obj) const override {
         JsonObject fan = obj ["fan"].to <JsonObject> ();
-        JsonObject values = fan ["values"].to <JsonObject> ();
-        values ["now"] = _speed;
-        values ["min"] = _speedMin;
-        values ["max"] = _speedMax;
+        fan ["now"] = _speed;
+        fan ["min"] = _speedMin;
+        fan ["max"] = _speedMax;
         _activations.serialize (fan ["activated"].to <JsonObject> ());
         // % duty
     }

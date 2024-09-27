@@ -108,17 +108,25 @@ class Program : public Component, public Diagnosticable {
         const bool deliver = intervalDeliver, capture = intervalDeliver, diagnose = intervalDiagnose;
         DEBUG_PRINTF ("\nProgram::process: deliver=%d, capture=%d, diagnose=%d\n", deliver, capture, diagnose);
         if (deliver || capture) {
-            const String data = doCollect ("data", [this] (JsonDocument& doc) { operational.collect (doc); });
+            const String data = doCollect ("data", [&] (JsonDocument& doc) { operational.collect (doc); });
             if (deliver) doDeliver (data);
             if (capture) doCapture (data);
             DEBUG_PRINTF ("Program::process: data, length=%d, content=<<<%s>>>\n", data.length (), data.c_str ());
         }
         if (diagnose) {
-            const String diag = doCollect ("diag", [this] (JsonDocument& doc) { diagnostics.collect (doc); });
+            const String diag = doCollect ("diag", [&] (JsonDocument& doc) { diagnostics.collect (doc); });
             doDeliver (diag);
             DEBUG_PRINTF ("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
         }
         activations ++;
+        
+        const String diag = doCollect ("diag", [&] (JsonDocument& doc) { diagnostics.collect (doc); });
+        DEBUG_PRINTF ("Program::_debug_: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
+        JsonSplitter splitter (512, { "type", "time" });
+        splitter.splitJson (diag, [&] (const String& part, const int elements) {
+            DEBUG_PRINTF ("Program::_debug_: length=%u, part=%u, elements=%d\n", diag.length (), part.length (), elements);
+        });
+
     }
 
 public:
