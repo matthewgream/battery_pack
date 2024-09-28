@@ -19,7 +19,7 @@ protected:
 
 public:
     typedef std::vector <Diagnosticable*> List;
-    virtual void collectDiagnostics (JsonObject &obj) const = 0;
+    virtual void collectDiagnostics (JsonDocument &) const = 0;
 };
 
 class DiagnosticManager : public Component {
@@ -29,9 +29,8 @@ class DiagnosticManager : public Component {
 public:
     DiagnosticManager (const Config::DiagnosticConfig& cfg, const Diagnosticable::List diagnosticables) : config (cfg), _diagnosticables (diagnosticables) {}
     void collect (JsonDocument &doc) const {
-        JsonObject obj = doc.to <JsonObject> ();
         for (const auto& diagnosticable : _diagnosticables)
-            diagnosticable->collectDiagnostics (obj);
+            diagnosticable->collectDiagnostics (doc);
     }
 };
 
@@ -66,6 +65,12 @@ public:
         String s; 
         for (int number = 0; number < _ALARM_COUNT; number ++)
             s += (_alarmSet & _ALARM_NUMB (number)) ? '1' : '0';
+        return s;
+    }
+    String toStringNames () const {
+        String s; 
+        for (int number = 0; number < _ALARM_COUNT; number ++)
+            s += (_alarmSet & _ALARM_NUMB (number)) ? (String (s.isEmpty () ? "" : ",") + String (_ALARM_NAME (number))) : "";
         return s;
     }
 };
@@ -109,18 +114,19 @@ public:
             _alarms = alarms;
         }
     }
-    String getAlarms () const { return _alarms.toStringBitmap (); }
+    String getAlarmsAsBitmap () const { return _alarms.toStringBitmap (); }
+    String getAlarmsAsString () const { return _alarms.toStringNames (); }
 
 protected:
-    void collectDiagnostics (JsonObject &obj) const override {
+    void collectDiagnostics (JsonDocument &obj) const override { // XXX too large
         JsonArray alarms = obj ["alarms"].to <JsonArray> ();
         for (int number = 0; number < _alarms.size (); number ++) {
             JsonObject alarm = alarms.add <JsonObject> ();
-            alarm ["name"] = _alarms.name (number);
-            alarm ["active"] = _alarms.isAny (number);
-            alarm ["count"] = _activations [number].number ();
-            alarm ["activated"] = _activations [number].seconds ();
-            alarm ["deactivated"] = _deactivations [number].seconds ();
+            alarm ["@"] = _alarms.name (number);
+            alarm ["="] = _alarms.isAny (number) ? 1 : 0;
+            alarm ["#"] = _activations [number].number ();
+            alarm ["+"] = _activations [number].seconds ();
+            alarm ["-"] = _deactivations [number].seconds ();
         }
     }
 };

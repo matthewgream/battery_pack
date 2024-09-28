@@ -81,7 +81,7 @@ struct Config {
     } storage;
 
     struct AlarmConfig {
-        const int PIN_ALARM = -1;
+        const int PIN_ALARM = 0;
     } alarm;
     struct DiagnosticConfig {
     } diagnostic;

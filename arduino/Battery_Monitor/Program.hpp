@@ -73,8 +73,7 @@ class Program : public Component, public Diagnosticable {
 
     //
 
-    template <typename Func>
-    String doCollect (const String& name, Func func) const {
+    String doCollect (const String& name, const std::function<void (JsonDocument& doc)> func) const {
         JsonCollector collector (name, nettime);
         func (collector.document ());
         return collector;
@@ -120,12 +119,13 @@ class Program : public Component, public Diagnosticable {
         }
         activations ++;
         
-        const String diag = doCollect ("diag", [&] (JsonDocument& doc) { diagnostics.collect (doc); });
-        DEBUG_PRINTF ("Program::_debug_: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
-        JsonSplitter splitter (512, { "type", "time" });
-        splitter.splitJson (diag, [&] (const String& part, const int elements) {
-            DEBUG_PRINTF ("Program::_debug_: length=%u, part=%u, elements=%d\n", diag.length (), part.length (), elements);
-        });
+        // const String x = doCollect ("diag", [&] (JsonDocument& doc) { diagnostics.collect (doc); });
+        // DEBUG_PRINTF ("Program::_debug_: diag, length=%d, content=<<<%s>>>\n", x.length (), x.c_str ());
+        // JsonSplitter splitter (512, { "type", "time" });
+        // splitter.splitJson (x, [&] (const String& part, const int elements) {
+        //     DEBUG_PRINTF ("Program::_debug_: length=%u, part=%u, elements=%d\n", x.length (), part.length (), elements);
+        //     DEBUG_PRINTF ("--> %s\n", part.c_str ());
+        // }); 
 
     }
 
@@ -150,7 +150,7 @@ public:
     void sleep () { delay (config.intervalProcess); }
 
 protected:
-    void collectDiagnostics (JsonObject &obj) const override {
+    void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject program = obj ["program"].to <JsonObject> ();
 //        program ["build"] = build_info;
         program ["uptime"] = uptime.seconds ();
@@ -161,18 +161,17 @@ protected:
 // -----------------------------------------------------------------------------------------------
 
 void OperationalManager::collect (JsonDocument &doc) const {
-    JsonObject temperatures = doc ["temperatures"].to <JsonObject> ();
-    temperatures ["environment"] = _program.temperatureManagerEnvironment.getTemperature ();
-    JsonObject batterypack = temperatures ["batterypack"].to <JsonObject> ();
-    batterypack ["avg"] = _program.temperatureManagerBatterypack.avg ();
-    batterypack ["min"] = _program.temperatureManagerBatterypack.min ();
-    batterypack ["max"] = _program.temperatureManagerBatterypack.max ();
-    JsonArray values = batterypack ["values"].to <JsonArray> ();
-    for (const auto& temperature : _program.temperatureManagerBatterypack.getTemperatures ())
-        values.add (temperature);
-    JsonObject fan = doc ["fan"].to <JsonObject> ();
-    fan ["fanspeed"] = _program.fanInterface.getSpeed ();
-    doc ["alarms"] = _program.alarms.getAlarms ();
+    JsonObject tmp = doc ["tmp"].to <JsonObject> ();
+    tmp ["env"] = _program.temperatureManagerEnvironment.getTemperature ();
+    JsonObject bat = tmp ["bat"].to <JsonObject> ();
+    bat ["avg"] = _program.temperatureManagerBatterypack.avg ();
+    bat ["min"] = _program.temperatureManagerBatterypack.min ();
+    bat ["max"] = _program.temperatureManagerBatterypack.max ();
+    JsonArray val = bat ["val"].to <JsonArray> ();
+    for (const auto& v : _program.temperatureManagerBatterypack.getTemperatures ())
+        val.add (v);
+    doc ["fan"] = _program.fanInterface.getSpeed ();
+    doc ["alm"] = _program.alarms.getAlarmsAsString ();
 }
 
 // -----------------------------------------------------------------------------------------------

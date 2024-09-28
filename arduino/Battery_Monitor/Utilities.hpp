@@ -184,13 +184,35 @@ public:
         _number ++;
         return *this;
     }
-    void serialize (JsonObject &obj) const {
+    virtual void serialize (JsonObject &obj) const {
         obj ["last"] = _seconds;
-        obj ["number"] = _number;
+        obj ["count"] = _number;
     }
-    void serialize (JsonObject &&obj) const { // XXX not 100% sure about this
+    virtual void serialize (JsonObject &&obj) const { // weird C++ stuff
         obj ["last"] = _seconds;
-        obj ["number"] = _number;
+        obj ["count"] = _number;
+    }
+};
+
+class ActivationTrackerWithDetail: public ActivationTracker {
+    String _detail;
+
+public:
+    ActivationTrackerWithDetail () {}
+    ActivationTrackerWithDetail& operator += (const String& detail) {
+        ActivationTracker::operator++ (1);
+        _detail = detail;
+        return *this;
+    }
+    void serialize (JsonObject &obj) const override {
+        ActivationTracker::serialize (obj);
+        if (!_detail.isEmpty ())
+            obj ["detail"] = _detail.c_str ();
+    }
+    void serialize (JsonObject &&obj) const override { // weird C++ stuff
+        ActivationTracker::serialize (obj);
+        if (!_detail.isEmpty ())
+            obj ["detail"] = _detail.c_str ();
     }
 };
 
@@ -249,8 +271,7 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
-#include <vector>
-
+namespace JsonFunctions {
     inline int findValueKey (const String& json, const String& key) {
         return json.indexOf ("\"" + key + "\":");
     }
@@ -274,34 +295,49 @@ public:
         }
         return valueEnd;
     }
-    inline String findValue (const String& json, const String& key) {
+    inline int findValue (const String& json, const String& key, String& value) {
         const int keyPos = findValueKey (json, key);
         if (keyPos >= 0) {
             const int valueStart = findValueStart (json, keyPos), valueEnd = findValueEnd (json, valueStart);
-            if (valueEnd >= 0)
-                return json.substring (valueStart, valueEnd);
+            if (valueEnd >= 0) {
+                value = json.substring (valueStart, valueEnd);
+                return value.length ();
+            }
         }
-        return "";
+        return -1;
     }
-    inline int findNextElement (const String& json, int startPos) {
+    inline int findNextElement (const String& json, const int startPos, String& element) {
         int braceCount = 0;
         bool inQuotes = false;
-        for (int i = startPos; i < json.length (); i ++) {
+        for (int i = startPos, j = startPos; i < json.length (); i ++) {
             const char c = json.charAt (i);
             if (c == '"' && (i == startPos || json.charAt (i - 1) != '\\'))
                 inQuotes = !inQuotes;
             else if (!inQuotes) {
-                if (c == '{' || c == '[')
+                if (c == '{' || c == '[') {
                     braceCount ++;
-                else if (c == '}' || c == ']') {
+                } else if (c == '}' || c == ']') {
                     braceCount --;
-                    if (braceCount == 0)
+                    if (braceCount == 0) {
+                        element = json.substring (j, i + 1);
                         return i + 1;
+                    }
+                } else if (c == ',') {
+                    if (i == j) j ++;
+                    if (i != startPos && braceCount == 0) {
+                        element = json.substring (j, i + 1);
+                        return i + 1;
+                    }
                 }
             }
         }
         return -1;
     }
+}
+
+// -----------------------------------------------------------------------------------------------
+
+#include <vector>
 
 class JsonSplitter {
 private:
@@ -311,54 +347,37 @@ private:
 public:
     JsonSplitter (const int splitLength, const std::vector<String> &commonElements) : splitLength (splitLength), commonElements (commonElements) {}
 
-    void splitJson (const String& json, const std::function<void (const String&, const int)> packetCallback) {
-
-        String commonStart = "{";
+    void splitJson (const String& json, const std::function<void (const String&, const int)> callback) {
+        String common;
         for (const auto& commonElement : commonElements) {
-            String value = findValue (json, commonElement);
-            if (value.length () > 0) {
-                if (commonStart.length () > 1) commonStart += ",";
-                commonStart += "\"" + commonElement + "\":" + value;
+            String value; 
+            if (JsonFunctions::findValue (json, commonElement, value) >= 0) {
+                if (!common.isEmpty ()) common += ",";
+                common += "\"" + commonElement + "\":" + value;
             }
         }
-
-        String currentPart = commonStart;
-        int currentSize = commonStart.length ();
-        int currentCount = 0;
-
-        for (int pos = 1, nextPos = 0; pos < json.length () && (nextPos = findNextElement (json, pos)) != -1; pos = nextPos) {
-            const String element = json.substring (pos, nextPos);
-
-            bool isCommonElement = false;
-            for (const auto& commonElement : commonElements) {
-                if (element.startsWith ("\"" + commonElement + "\":")) {
-                    isCommonElement = true;
-                    break;
-                }
-            }
-            if (isCommonElement)
+        if (common.length () > 0) common += ',';
+        String current, element;
+        int numbers = 0;
+        for (int cur = 1, nxt = 0; (nxt = JsonFunctions::findNextElement (json, cur, element)) > 0; cur = nxt) {  
+            if (std::any_of (commonElements.begin (), commonElements.end (), [&element] (const String& commonElement) { return element.startsWith ("\"" + commonElement + "\":"); }))
                 continue;
-
-            currentCount ++;
-            if (currentSize + element.length () + 1 <= splitLength) {  // +1 for the comma
-                if (currentSize > commonStart.length ()) currentPart += ",";
-                currentPart += element;
-                currentSize += element.length () + 1;
+            if ((1 + common.length ()) + current.length () + (element.length () + 1) < splitLength) {  // +1 for the comma or brace
+                if (!current.isEmpty ()) current += ",";
+                current += element;
+                numbers ++;
             } else {
-                if (currentSize > commonStart.length ())            
-                    packetCallback (currentPart + "}", elements);
-                currentPart = commonStart + "," + element;
-                currentSize = commonStart.length () + 1 + element.length ();
-                currentCount = 0;
+                if (!current.isEmpty ())
+                    callback ("{" + common + current + "}", numbers);
+                current = element;
+                numbers = 1;
             }
-  
-            DEBUG_PRINTF ("element (%d) --> %s\n", element.length () - (element [0] == ',' ? 1 : 0), &element [element [0] == ',' ? 1 : 0]);
         }
-
-        if (currentSize > commonStart.length ())
-            packetCallback (currentPart + "}", elements);
+        if (!current.isEmpty ())
+            callback ("{" + common + current + "}", numbers);
     }
 };
+
 // -----------------------------------------------------------------------------------------------
 
 #include <type_traits>

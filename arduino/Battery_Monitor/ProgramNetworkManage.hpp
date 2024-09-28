@@ -60,7 +60,7 @@ static void __ConnectManager_WiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_
 
 class ConnectManager : public Component, public Diagnosticable, private Singleton <ConnectManager>  {
     const Config::ConnectConfig& config;
-    ActivationTracker _connected, _disconnected;
+    ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
     bool _available = false;
     WiFiEventId_t _events;
 
@@ -83,37 +83,30 @@ protected:
     friend void __ConnectManager_WiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info);
     void events (const WiFiEvent_t event, const WiFiEventInfo_t info) {
         if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED) {
-            _connected ++;
-            DEBUG_PRINTF ("ConnectManager::events: WIFI_CONNECTED, ssid=%s, bssid=%s, channel=%d, authmode=%s, rssi=%d\n", 
-                __wifi_ssid_to_string (info.wifi_sta_connected.ssid, info.wifi_sta_connected.ssid_len).c_str (), 
-                __wifi_bssid_to_string (info.wifi_sta_connected.bssid).c_str (),
-                (int) info.wifi_sta_connected.channel,
-                __wifi_authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode).c_str (),
-                WiFi.RSSI ());
+            const String ssid = __wifi_ssid_to_string (info.wifi_sta_connected.ssid, info.wifi_sta_connected.ssid_len), bssid = __wifi_bssid_to_string (info.wifi_sta_connected.bssid), authmode = __wifi_authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode);
+            _connections ++;
+            DEBUG_PRINTF ("ConnectManager::events: WIFI_CONNECTED, ssid=%s, bssid=%s, channel=%d, authmode=%s, rssi=%d\n", ssid.c_str (), bssid.c_str (), (int) info.wifi_sta_connected.channel, authmode.c_str (), WiFi.RSSI ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP) {
-            _available = true;
-            DEBUG_PRINTF ("ConnectManager::events: WIFI_ALLOCATED, address=%s\n", 
-                IPAddress (info.got_ip.ip_info.ip.addr).toString ().c_str ());
+            _available = true; _allocations ++;
+            DEBUG_PRINTF ("ConnectManager::events: WIFI_ALLOCATED, address=%s\n", IPAddress (info.got_ip.ip_info.ip.addr).toString ().c_str ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
-            _available = false;
-            _disconnected ++;
-            DEBUG_PRINTF ("ConnectManager::events: WIFI_DISCONNECTED, ssid=%s, bssid=%s, reason=%s\n", 
-                __wifi_ssid_to_string (info.wifi_sta_disconnected.ssid, info.wifi_sta_disconnected.ssid_len).c_str (), 
-                __wifi_bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (),
-                __wifi_error_to_string ((wifi_err_reason_t) info.wifi_sta_disconnected.reason).c_str ());
+            const String ssid = __wifi_ssid_to_string (info.wifi_sta_disconnected.ssid, info.wifi_sta_disconnected.ssid_len), bssid = __wifi_bssid_to_string (info.wifi_sta_disconnected.bssid), reason = __wifi_error_to_string ((wifi_err_reason_t) info.wifi_sta_disconnected.reason);
+            _available = false; _disconnections += reason;
+            DEBUG_PRINTF ("ConnectManager::events: WIFI_DISCONNECTED, ssid=%s, bssid=%s, reason=%s\n", ssid.c_str (), bssid.c_str (), reason.c_str ());
         }
     }
 
 protected:
-    void collectDiagnostics (JsonObject &obj) const override {
-        JsonObject wifi = obj ["wifi"].to <JsonObject> ();
-        wifi ["mac"] = mac_address ();
-        if ((wifi ["connected"] = WiFi.isConnected ())) {
-            wifi ["address"] = WiFi.localIP ();
-            wifi ["rssi"] = WiFi.RSSI ();
+    void collectDiagnostics (JsonDocument &obj) const override {
+        JsonObject network = obj ["network"].to <JsonObject> ();
+        network ["macaddress"] = mac_address ();
+        if ((network ["connected"] = WiFi.isConnected ())) {
+            network ["ipaddress"] = WiFi.localIP ();
+            network ["rssi"] = WiFi.RSSI ();
         }
-        _connected.serialize (wifi ["connected"].to <JsonObject> ());
-        _disconnected.serialize (wifi ["disconnected"].to <JsonObject> ());
+        _connections.serialize (network ["connections"].to <JsonObject> ());
+        _allocations.serialize (network ["allocations"].to <JsonObject> ());
+        _disconnections.serialize (network ["disconnections"].to <JsonObject> ());
     }
 };
 
@@ -131,7 +124,7 @@ class NettimeManager : public Component, public Alarmable, public Diagnosticable
     PersistentData _persistentData;
     PersistentValue <long> _persistentDrift;
     TimeDriftCalculator _drifter;
-    ActivationTracker _activations;
+    ActivationTrackerWithDetail _fetches;
     counter_t _failures = 0;
     interval_t _previousTimeUpdate = 0, _previousTimeAdjust = 0;
     time_t _previousTime = 0;
@@ -151,7 +144,8 @@ public:
           if (!_previousTimeUpdate || (currentTime - _previousTimeUpdate >= config.intervalUpdate)) {
               const time_t fetchedTime = _fetcher.fetch ();
               if (fetchedTime > 0) {
-                  _activations ++;
+                  char string [16];
+                  _fetches += String (ltoa (fetchedTime, string, 16));
                   struct timeval tv = { .tv_sec = fetchedTime, .tv_usec = 0 };
                   settimeofday (&tv, nullptr);
                   if (_previousTime > 0)
@@ -188,11 +182,11 @@ protected:
         if (_failures > config.failureLimit) alarms += ALARM_TIME_NETWORK;
         if (_drifter.highDrift ()) alarms += ALARM_TIME_DRIFT;
     }
-    void collectDiagnostics (JsonObject &obj) const override {
+    void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject nettime = obj ["nettime"].to <JsonObject> ();
         nettime ["now"] = getTimeString ();
         nettime ["drift"] = _drifter.drift ();
-        _activations.serialize (nettime ["fetched"].to <JsonObject> ());
+        _fetches.serialize (nettime ["fetches"].to <JsonObject> ());
     }
 };
 

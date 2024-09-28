@@ -31,15 +31,14 @@ public:
     }
 
 protected:
-    void collectDiagnostics (JsonObject &obj) const override {
-        JsonArray temps = obj ["temps"].to <JsonArray> ();
+    void collectDiagnostics (JsonDocument &obj) const override {
+        JsonObject tmp = obj ["tmp"].to <JsonObject> ();
         for (int channel = 0; channel < MuxInterface_CD74HC4067::CHANNELS; channel ++) {
-            JsonObject entry = temps.add <JsonObject> ();
-            const ValueSet &valueSet = _muxValues [channel]; 
-            entry ["channel"] = channel;
-            entry ["now"] = valueSet.v_now;
-            entry ["min"] = valueSet.v_min;
-            entry ["max"] = valueSet.v_max;
+            char string [10];
+            JsonObject entry = tmp [itoa (channel, string, 10)].to <JsonObject> ();
+            entry ["#"] = _muxValues [channel].v_now;
+            entry ["<"] = _muxValues [channel].v_min;
+            entry [">"] = _muxValues [channel].v_max;
         }
     }
 };
@@ -52,7 +51,7 @@ class FanInterface : public Component, public Diagnosticable {
     const Config::FanInterfaceConfig& config;
     uint8_t _speed = PWM_MINVALUE, _speedMin = PWM_MAXVALUE, _speedMax = PWM_MINVALUE;
     OpenSmart_QuadMotorDriver _driver;
-    ActivationTracker _activations;
+    ActivationTracker _sets;
 
 public:
     FanInterface (const Config::FanInterfaceConfig& cfg) : config (cfg), _driver (config.I2C, { config.PIN_PWMA, config.PIN_PWMB, config.PIN_PWMC, config.PIN_PWMD}) {}
@@ -61,7 +60,7 @@ public:
     }
     void setSpeed (const uint8_t speed) {
         const uint8_t speedNew = std::clamp (speed, PWM_MINVALUE, PWM_MAXVALUE);
-        if (speedNew > config.MIN_SPEED && _speed <= config.MIN_SPEED) _activations ++;
+        if (speedNew > config.MIN_SPEED && _speed <= config.MIN_SPEED) _sets ++;
         _driver.setSpeed (_speed = speed); // all 4 fans, for now
     }
     uint8_t getSpeed () const {
@@ -69,12 +68,12 @@ public:
     }
 
 protected:
-    void collectDiagnostics (JsonObject &obj) const override {
+    void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject fan = obj ["fan"].to <JsonObject> ();
-        fan ["now"] = _speed;
-        fan ["min"] = _speedMin;
-        fan ["max"] = _speedMax;
-        _activations.serialize (fan ["activated"].to <JsonObject> ());
+        fan ["current"] = _speed;
+        fan ["minimum"] = _speedMin;
+        fan ["maximum"] = _speedMax;
+        _sets.serialize (fan);
         // % duty
     }
 };
