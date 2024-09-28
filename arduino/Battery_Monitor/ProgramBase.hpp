@@ -77,6 +77,8 @@ public:
 inline bool operator== (const AlarmSet &a, const AlarmSet &b) { return (_AlarmType) a == (_AlarmType) b; }
 inline bool operator!= (const AlarmSet &a, const AlarmSet &b) { return (_AlarmType) a != (_AlarmType) b; }
 
+// -----------------------------------------------------------------------------------------------
+
 class Alarmable {
 protected:
     ~Alarmable () {};

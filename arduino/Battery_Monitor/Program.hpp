@@ -22,12 +22,18 @@
 #include <vector>
 
 #include "Utilities.hpp"
+#include "UtilitiesJson.hpp"
+#include "UtilitiesArduino.hpp"
+
 #include "Components.hpp"
+#include "ComponentsHardware.hpp"
+#include "ComponentsBluetooth.hpp"
+
 #include "Config.hpp"
 
 // -----------------------------------------------------------------------------------------------
 
-#include "ProgramFoundations.hpp"
+#include "ProgramBase.hpp"
 #include "ProgramHardwareInterface.hpp"
 #include "ProgramHardwareManage.hpp"
 #include "ProgramNetworkManage.hpp"

@@ -1,0 +1,181 @@
+
+// -----------------------------------------------------------------------------------------------
+
+#include <ArduinoJson.h>
+
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+
+// -----------------------------------------------------------------------------------------------
+
+static String __ble_disconnect_reason (const esp_gatt_conn_reason_t reason) {
+    switch (reason) {
+      case ESP_GATT_CONN_UNKNOWN: return "UNKNOWN";
+      case ESP_GATT_CONN_L2C_FAILURE: return "L2C_FAILURE";
+      case ESP_GATT_CONN_TIMEOUT: return "TIMEOUT";
+      case ESP_GATT_CONN_TERMINATE_PEER_USER: return "PEER_USER";
+      case ESP_GATT_CONN_TERMINATE_LOCAL_HOST: return "LOCAL_HOST";
+      case ESP_GATT_CONN_FAIL_ESTABLISH: return "FAIL_ESTABLISH";
+      case ESP_GATT_CONN_LMP_TIMEOUT: return "LMP_TIMEOUT";
+      case ESP_GATT_CONN_CONN_CANCEL: return "CANCELLED";
+      case ESP_GATT_CONN_NONE: return "NONE";
+      default: return "UNDEFINED";
+    }
+}
+
+static String __ble_address_to_string (const uint8_t bleaddr []) {
+#define __BLE_MACBYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
+#define __BLE_FORMAT_ADDRESS(addr) __BLE_MACBYTETOSTRING ((addr) [0]) + ":" + __BLE_MACBYTETOSTRING ((addr) [1]) + ":" + __BLE_MACBYTETOSTRING ((addr) [2]) + ":" + __BLE_MACBYTETOSTRING ((addr) [3]) + ":" + __BLE_MACBYTETOSTRING ((addr) [4]) + ":" + __BLE_MACBYTETOSTRING ((addr) [5])
+    return __BLE_FORMAT_ADDRESS (bleaddr);
+}
+static String __ble_linkrole_to_string (const int linkrole) {
+    return String (linkrole == 0 ? "master" : "slave");
+}
+static String __ble_status_to_string (const BLECharacteristicCallbacks::Status status) {
+    switch (status) {
+      case BLECharacteristicCallbacks::Status::ERROR_NO_CLIENT: return "NO_CLIENT";
+      case BLECharacteristicCallbacks::Status::ERROR_NOTIFY_DISABLED: return "NOTIFY_DISABLED";
+      case BLECharacteristicCallbacks::Status::SUCCESS_NOTIFY: return "NOTIFY_SUCCESS";
+      case BLECharacteristicCallbacks::Status::ERROR_INDICATE_DISABLED: return "INDICATE_DISABLED";
+      case BLECharacteristicCallbacks::Status::ERROR_INDICATE_TIMEOUT: return "INDICATE_TIMEOUT";
+      case BLECharacteristicCallbacks::Status::ERROR_INDICATE_FAILURE: return "INDICATE_FAILURE";
+      case BLECharacteristicCallbacks::Status::SUCCESS_INDICATE: return "INDICATE_SUCCESS";
+      default: return "UNDEFINED";
+    }
+}
+
+// -----------------------------------------------------------------------------------------------
+
+class BluetoothNotifier : protected BLEServerCallbacks, public BLECharacteristicCallbacks {
+
+public:
+    typedef struct {
+        const String name, serviceUUID, characteristicUUID;
+        uint32_t pin;
+    } Config;
+
+private:
+    const Config& config;
+
+    BLEServer *_server = nullptr;
+    BLECharacteristic *_characteristic = nullptr;
+    ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
+    bool _advertising = false;
+    bool _connected = false;
+
+    void onConnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override {
+        const String addr = __ble_address_to_string (param->connect.remote_bda), role = __ble_linkrole_to_string (param->connect.link_role);
+        _connected = true; _connections ++;
+        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CONNECTED, %s (conn_id=%d, role=%s)\n", addr.c_str (), param->connect.conn_id, role.c_str ());
+        advertisingStop ();
+    }
+    void onDisconnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override {
+        const String addr = __ble_address_to_string (param->disconnect.remote_bda), reason = __ble_disconnect_reason ((esp_gatt_conn_reason_t) param->disconnect.reason);
+        _connected = false; _disconnections += reason;
+        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_DISCONNECTED, %s (conn_id=%d, reason=%s)\n", addr.c_str (), param->disconnect.conn_id, reason.c_str ());
+        advertisingStart ();
+    }
+    void onMtuChanged (BLEServer *, esp_ble_gatts_cb_param_t *param) override {
+        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_MTU_CHANGED, (conn_id=%d, mtu=%u)\n", param->mtu.conn_id, param->mtu.mtu);
+    }
+
+    void onWrite (BLECharacteristic *) override {
+        DEBUG_PRINTF  ("BluetoothNotifier::events: BLE_CHARACTERISTIC_WRITE\n");
+    }
+    void onNotify (BLECharacteristic *characteristic) override {
+        DEBUG_PRINTF  ("BluetoothNotifier::events: BLE_CHARACTERISTIC_NOTIFY, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
+    }
+    void onStatus(BLECharacteristic* characteristic, Status s, uint32_t code) override {
+        DEBUG_PRINTF  ("BluetoothNotifier::events: BLE_CHARACTERISTIC_STATUS, (uuid=%s, status=%s. code=%lu)\n", characteristic->getUUID ().toString ().c_str (), __ble_status_to_string (s).c_str (), code);
+    }
+
+
+    void advertisingStart () {
+        if (!_advertising) {
+            _server->getAdvertising ()->start ();
+            _advertising = true;
+            DEBUG_PRINTF ("BluetoothNotifier::advertisingStart\n");
+        }
+    }
+    void advertisingStop () {
+        if (_advertising) {
+            _server->getAdvertising ()->stop ();
+            _advertising = false;
+            DEBUG_PRINTF ("BluetoothNotifier::advertisingStop\n");
+        }
+    }
+
+public:
+    BluetoothNotifier (const Config& cfg) : config (cfg) {}
+    void advertise ()  {
+        BLEDevice::init (config.name);
+        _server = BLEDevice::createServer ();
+        _server->setCallbacks (this);
+        BLEService *service = _server->createService (config.serviceUUID);
+        _characteristic = service->createCharacteristic (config.characteristicUUID, BLECharacteristic::PROPERTY_READ |  BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY);
+        _characteristic->setCallbacks (this);
+        _characteristic->addDescriptor (new BLE2902 ());
+        _characteristic->setAccessPermissions (ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
+        service->start ();
+        BLESecurity *security = new BLESecurity ();
+        security->setStaticPIN (config.pin); 
+        BLEAdvertising *advertising = BLEDevice::getAdvertising();
+        advertising->addServiceUUID (config.serviceUUID);
+        advertising->setScanResponse (true);
+        advertising->setMinPreferred (0x06);
+        advertising->setMinPreferred (0x12);
+        advertisingStart ();
+    }
+    // json only
+    void notify (const String& data) {
+        if (!_connected) {
+            DEBUG_PRINTF ("BluetoothNotifier::notify: not in notifying state");
+            return;
+        }      
+        const int _ble_mtu = 512;
+        if (data.length () < _ble_mtu) {
+            _characteristic->setValue (data.c_str ());
+            _characteristic->notify ();
+            DEBUG_PRINTF ("BluetoothNotifier::notify: length=%u\n", data.length ());
+        } else {
+            JsonSplitter splitter (_ble_mtu, { "type", "time" });
+            splitter.splitJson (data, [&] (const String& part, const int elements) {
+                _characteristic->setValue (part.c_str ());
+                _characteristic->notify ();
+                DEBUG_PRINTF ("BluetoothNotifier::notify: length=%u, part=%u, elements=%d\n", data.length (), part.length (), elements);
+                delay (20);
+            });
+        }
+    }
+    bool connected (void) const {
+        return _connected;
+    }
+    void reset () {
+        DEBUG_PRINTF ("BluetoothNotifier::reset\n");
+        advertisingStop ();
+        _server->disconnect (0);
+        delay (500); 
+        _connected = false;
+        advertisingStart ();
+    }
+    void check () {
+        if (!_connected && !_advertising) {
+            DEBUG_PRINTF ("BluetoothNotifier::check: not connected, resetting\n");
+            reset ();
+        }
+    }    
+    void serialize (JsonObject &obj) const {
+        JsonObject bluetooth = obj ["bluetooth"].to <JsonObject> ();
+        if ((bluetooth ["connected"] = _connected)) {
+            bluetooth ["address"] = BLEDevice::getAddress ().toString ();
+            bluetooth ["devices"] = _server->getPeerDevices (true).size ();
+            bluetooth ["mtu"] = 512; // XXX fix
+        }
+        _connections.serialize (bluetooth ["connections"].to <JsonObject> ());
+        _disconnections.serialize (bluetooth ["disconnections"].to <JsonObject> ());
+    }    
+};
+
+// -----------------------------------------------------------------------------------------------
