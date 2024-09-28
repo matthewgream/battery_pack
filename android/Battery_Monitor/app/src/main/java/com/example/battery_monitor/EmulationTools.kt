@@ -12,7 +12,7 @@ object EmulationTools {
         return Build.DEVICE.contains ("emu")
     }
 
-    fun createTestData (context: Context, resource: Int): JSONObject {
+    private fun createTestData (context: Context, resource: Int): JSONObject {
         val jsonObject = JSONObject (BufferedReader (InputStreamReader (context.resources.openRawResource(resource))).use { it.readText() })
         jsonObject.put ("time", System.currentTimeMillis () / 1000)
         return jsonObject

@@ -10,6 +10,7 @@
         android:padding="16dp">
 
         <!-- Connection Status -->
+        <!-- android:background="@drawable/connection_status_background" -->
         <TextView
             android:id="@+id/connectionStatusTextView"
             android:layout_width="match_parent"
@@ -18,7 +19,10 @@
             android:textStyle="bold"
             android:gravity="center"
             android:padding="8dp"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginBottom="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="4dp"/>
 
         <!-- Operational Data Frame -->
         <FrameLayout
@@ -119,17 +123,24 @@
         <FrameLayout
             android:id="@+id/diagnosticDataFrame"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="200dp"
             android:background="@android:color/white"
             android:padding="8dp"
             android:layout_marginTop="16dp">
 
-            <TextView
-                android:id="@+id/diagDataTextView"
+            <ScrollView
+                android:id="@+id/diagnosticScrollView"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textIsSelectable="true"
-                android:fontFamily="monospace" />
+                android:layout_height="match_parent">
+
+                <TextView
+                    android:id="@+id/diagDataTextView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textIsSelectable="true"
+                    android:fontFamily="monospace" />
+
+            </ScrollView>
 
         </FrameLayout>
 
