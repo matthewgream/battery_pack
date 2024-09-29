@@ -1,5 +1,6 @@
 package com.example.battery_monitor
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -36,6 +37,7 @@ class BatteryTemperatureView @JvmOverloads constructor (
         invalidate ()
     }
 
+    @SuppressLint("DefaultLocale")
     override fun onDraw (canvas: Canvas) {
         super.onDraw (canvas)
 

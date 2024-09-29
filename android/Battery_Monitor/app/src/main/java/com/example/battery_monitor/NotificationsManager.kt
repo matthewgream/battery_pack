@@ -5,33 +5,31 @@ import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.content.pm.PackageManager
-import android.util.Log
 import androidx.core.app.NotificationCompat
 
-@SuppressLint("MissingPermission")
+@SuppressLint("MissingPermission", "InlinedApi")
 class NotificationsManager (private val activity: Activity) {
 
-    val PERMISSIONS_CODE = 2
-    private var permissionsRequested = false
-    private var permissionsObtained = false
-    private var permissionsAllowed = false
-    @SuppressLint("InlinedApi")
-    private val permissionsList = arrayOf (android.Manifest.permission.POST_NOTIFICATIONS)
+    private val permissions: PermissionsManager = PermissionsManagerFactory (activity).create (
+        tag = "Notifications",
+        permissions = arrayOf (android.Manifest.permission.POST_NOTIFICATIONS)
+    )
 
-    private var previous: String = ""
-    private var manager: NotificationManager
-    private val identifier = 1
     private val channelId = "AlarmChannel"
+    private val channelName = activity.getString (R.string.notification_channel_name)
+    private val channelDescription = activity.getString (R.string.notification_channel_description)
+    private val channelTitle = activity.getString (R.string.notification_channel_title)
+
+    private val manager: NotificationManager = activity.getSystemService (Context.NOTIFICATION_SERVICE) as NotificationManager
+    private val identifier = 1
     private var active: Int? = null
 
+    private var previous: String = ""
+
     init {
-        val channelName = activity.getString (R.string.channel_name)
-        val channelDescription = activity.getString (R.string.channel_description)
         val channel = NotificationChannel (channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = channelDescription
         }
-        manager = activity.getSystemService (Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel (channel)
     }
 
@@ -41,7 +39,7 @@ class NotificationsManager (private val activity: Activity) {
         if (current != previous) {
             val builder = NotificationCompat.Builder (activity, channelId)
                 .setSmallIcon (android.R.drawable.stat_sys_warning)
-                .setContentTitle ("Battery Monitor Alarm")
+                .setContentTitle (channelTitle)
                 .setContentText (current)
                 .setPriority (NotificationCompat.PRIORITY_DEFAULT)
                 .setOngoing (true)
@@ -69,43 +67,17 @@ class NotificationsManager (private val activity: Activity) {
 
     fun process (current: String) {
         if (current.isNotEmpty ()) {
-            if (!permissionsRequested) {
+            if (!permissions.requested) {
                 previous = current
-                permissionsRequest ()
-            } else if (!permissionsObtained) {
+                permissions.requestPermissions(
+                    onPermissionsAllowed = { reshow() }
+                )
+            } else if (!permissions.obtained) {
                 previous = current
-            } else if (permissionsAllowed) {
+            } else if (permissions.allowed) {
                 show (current)
             }
         } else
             clear ()
-    }
-
-    //
-
-    private fun onPermissionsAllowed () {
-        reshow ()
-    }
-    private fun permissionsRequest () {
-        permissionsRequested = true
-        if (!permissionsList.all { activity.checkSelfPermission (it) == PackageManager.PERMISSION_GRANTED }) {
-            Log.d ("Notifications", "Permissions request")
-            activity.requestPermissions (permissionsList, PERMISSIONS_CODE)
-        } else {
-            Log.d ("Notifications", "Permissions granted already")
-            permissionsObtained = true
-            permissionsAllowed = true
-            onPermissionsAllowed ()
-        }
-    }
-    fun permissionsHandler (grantResults: IntArray) {
-        permissionsObtained = true
-        if (grantResults.isNotEmpty () && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-            Log.d("Notifications", "Permissions granted")
-            permissionsAllowed = true
-            onPermissionsAllowed ()
-        } else {
-            Log.d("Notifications", "Permissions denied")
-        }
     }
 }

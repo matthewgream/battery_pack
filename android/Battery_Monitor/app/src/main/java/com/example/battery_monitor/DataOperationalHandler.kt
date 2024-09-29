@@ -1,10 +1,12 @@
 package com.example.battery_monitor
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.widget.TextView
 import org.json.JSONObject
 
 class DataOperationalHandler (private val activity: Activity) {
+
     private val timeTextView: TextView = activity.findViewById(R.id.timeTextView)
     private val envTempTextView: TextView = activity.findViewById(R.id.envTempTextView)
     private val batteryLabelTextView: TextView = activity.findViewById(R.id.batteryLabelTextView)
@@ -15,6 +17,7 @@ class DataOperationalHandler (private val activity: Activity) {
     private val fanSpeedTextView: TextView = activity.findViewById(R.id.fanSpeedTextView)
     private val alarmsTextView: TextView = activity.findViewById(R.id.alarmsTextView)
 
+    @SuppressLint("SetTextI18n")
     fun render(json: JSONObject) {
         activity.runOnUiThread {
             timeTextView.text = json.getString("time")
