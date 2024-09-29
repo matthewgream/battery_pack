@@ -17,6 +17,7 @@
 // #define DEFAULT_MQTT_USER "mqtt_user" // Secrets.hpp
 // #define DEFAULT_MQTT_PASS "mqtt_pass" // Secrets.hpp
 #define DEFAULT_MQTT_TOPIC DEFAULT_NAME
+#define DEFAULT_MQTT_BUFFER_SIZE (1024)
 #define DEFAULT_PUBLISH_FAILURES (3)
 
 #define DEFAULT_BLUE_NAME DEFAULT_NAME
@@ -31,9 +32,9 @@
 #define DEFAULT_NETTIME_ADJUST (1000 * 60)
 #define DEFAULT_NETTIME_FAILURES (3)
 
-#define DEFAULT_STORAGE_NAME "data.log"
+#define DEFAULT_STORAGE_NAME "/data.log"
 #define DEFAULT_STORAGE_WRITE (1000 * 30)
-#define DEFAULT_STORAGE_LENGTH_MAXIMUM (1024 * 1024)
+#define DEFAULT_STORAGE_LENGTH_MAXIMUM (1920401) // should be able to make this dynamic
 #define DEFAULT_STORAGE_LENGTH_CRITICAL (DEFAULT_STORAGE_LENGTH_MAXIMUM * 0.80)
 #define DEFAULT_STORAGE_FAILURES (3)
 
@@ -71,7 +72,7 @@ struct Config {
         BluetoothNotifier::Config blue = { .name = DEFAULT_BLUE_NAME, .serviceUUID = DEFAULT_BLUE_SERVICE, .characteristicUUID = DEFAULT_BLUE_CHARACTERISTIC, .pin = DEFAULT_BLUE_PIN };
     } deliver;
     struct PublishConfig {
-        MQTTPublisher::Config mqtt = { .client = DEFAULT_MQTT_CLIENT, .host = DEFAULT_MQTT_HOST, .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .topic = DEFAULT_MQTT_TOPIC, .port = DEFAULT_MQTT_PORT };
+        MQTTPublisher::Config mqtt = { .client = DEFAULT_MQTT_CLIENT, .host = DEFAULT_MQTT_HOST, .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .topic = DEFAULT_MQTT_TOPIC, .port = DEFAULT_MQTT_PORT, .bufferSize = DEFAULT_MQTT_BUFFER_SIZE };
         const int failureLimit = DEFAULT_PUBLISH_FAILURES;
     } publish;
     struct StorageConfig {

@@ -65,8 +65,8 @@ protected:
     }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject publish = obj ["publish"].to <JsonObject> ();
-        _mqtt.serialize (publish);
         _publishes.serialize (publish ["publishes"].to <JsonObject> ());
+        _mqtt.serialize (publish);
     }
 };
 
@@ -93,7 +93,7 @@ public:
             _appends += String (itoa (data.length (), string, 16)), _failures = 0;
         } else _failures ++;
     }
-    bool retrieve (LineCallback& callback) const {
+    bool retrieve (LineCallback& callback) { // XXX const
         return _file.read (callback);
     }
     void erase () {
@@ -104,7 +104,7 @@ public:
 protected:
     void collectAlarms (AlarmSet& alarms) const override {
         if (_failures > config.failureLimit) alarms += ALARM_STORAGE_FAIL;
-        if (_file.size () > config.lengthCritical) alarms += ALARM_STORAGE_SIZE;
+        if ((long) _file.size () > (long) config.lengthCritical) alarms += ALARM_STORAGE_SIZE;
     }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject storage = obj ["storage"].to <JsonObject> ();
@@ -114,6 +114,7 @@ protected:
         size ["critical"] = config.lengthCritical;
         size ["erasures"] = _erasures;
         _appends.serialize (storage ["appends"].to <JsonObject> ());
+        _file.serialize (storage);
     }
 };
 

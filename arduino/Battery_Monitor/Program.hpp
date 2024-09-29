@@ -97,7 +97,7 @@ class Program : public Component, public Diagnosticable {
             }
         };
         if (publish.connected ()) {
-            if (storage.size () > 0) {
+            if ((long) storage.size () > (long) 0) {
                 DEBUG_PRINTF ("Program::doCapture: publish.connected () && storage.size () > 0\n");
                 StorageLineHandler handler (publish);
                 if (storage.retrieve (handler))
@@ -110,7 +110,7 @@ class Program : public Component, public Diagnosticable {
     }
     Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
     void process () override {
-        const bool deliver = intervalDeliver, capture = intervalDeliver, diagnose = intervalDiagnose;
+        const bool deliver = intervalDeliver, capture = intervalCapture, diagnose = intervalDiagnose;
         DEBUG_PRINTF ("\nProgram::process: deliver=%d, capture=%d, diagnose=%d\n", deliver, capture, diagnose);
         if (deliver || capture) {
             const String data = doCollect ("data", [&] (JsonDocument& doc) { operational.collect (doc); });
@@ -122,6 +122,7 @@ class Program : public Component, public Diagnosticable {
             const String diag = doCollect ("diag", [&] (JsonDocument& doc) { diagnostics.collect (doc); });
             doDeliver (diag);
             DEBUG_PRINTF ("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
+            // XXX send via. mqtt if debug
         }
         activations ++;
         

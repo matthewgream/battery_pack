@@ -88,12 +88,28 @@ public:
 #include <WiFi.h>
 #include <PubSubClient.h>
 
+static String __mqtt_state_to_string (int state) {
+    switch (state) {
+      case MQTT_CONNECTION_TIMEOUT: return "CONNECTION_TIMEOUT";
+      case MQTT_CONNECTION_LOST: return "CONNECTION_LOST";
+      case MQTT_CONNECT_FAILED: return "CONNECT_FAILED";
+      case MQTT_CONNECTED: return "CONNECTED";
+      case MQTT_CONNECT_BAD_PROTOCOL: return "CONNECT_BAD_PROTOCOL";
+      case MQTT_CONNECT_BAD_CLIENT_ID: return "CONNECT_BAD_CLIENT_ID";
+      case MQTT_CONNECT_UNAVAILABLE: return "CONNECT_UNAVAILABLE";
+      case MQTT_CONNECT_BAD_CREDENTIALS: return "CONNECT_BAD_CREDENTIALS";
+      case MQTT_CONNECT_UNAUTHORIZED: return "CONNECT_UNAUTHORIZED";
+      default: return "UNDEFINED";
+    }
+}
+
 class MQTTPublisher {
 
 public:
     typedef struct {
         const String client, host, user, pass, topic;
         const uint16_t port;
+        const uint16_t bufferSize;
     } Config;
 private:
     const Config& config;
@@ -103,24 +119,24 @@ private:
 
     bool connect () {
         const bool result = _mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ());
-        DEBUG_PRINTF ("MQTTPublisher::connect: host=%s, port=%u, client=%s, user=%s, pass=%s, result=%d\n", config.host.c_str (), config.port, config.client.c_str (), config.user.c_str (), config.pass.c_str (), result);
+        DEBUG_PRINTF ("MQTTPublisher::connect: host=%s, port=%u, client=%s, user=%s, pass=%s, bufferSize=%u, result=%d\n", config.host.c_str (), config.port, config.client.c_str (), config.user.c_str (), config.pass.c_str (), config.bufferSize, result);
         return result;
     }
 public:
     MQTTPublisher (const Config& cfg) : config (cfg), _mqttClient (_wifiClient) {}
     void setup () {
-        _mqttClient.setServer (config.host.c_str (), config.port);
+        _mqttClient.setServer (config.host.c_str (), config.port)
+            .setBufferSize (config.bufferSize);
     }
     bool publish (const String& topic, const String& data) {
-        if (!_mqttClient.connected ())
-            if (!connect ())
-                return false;
         const bool result = _mqttClient.publish (topic.c_str (), data.c_str ());
         DEBUG_PRINTF ("MQTTPublisher::publish: length=%u, result=%d\n", data.length (), result);
         return result;
     }
     void process () {
         _mqttClient.loop ();
+        if (!_mqttClient.connected ())
+            connect ();
     }
     bool connected () {
         return _mqttClient.connected ();
@@ -132,7 +148,7 @@ public:
         if ((mqtt ["connected"] = mqttClient.connected ())) {
             //
         }
-        mqtt ["state"] = mqttClient.state ();    
+        mqtt ["state"] = __mqtt_state_to_string (mqttClient.state ()).c_str ();    
     }
 };
 
@@ -140,63 +156,128 @@ public:
 
 #include <SPIFFS.h>
 
+static String __file_state_to_string (int mode) {
+    switch (mode) {
+      case 0: return "ERROR";
+      case 1: return "CLOSED";
+      case 2: return "WRITING";
+      case 3: return "READING";
+      default: return "UNDEFINED";
+    }
+}
+
 class SPIFFSFile {
-    const String _filename;
-    const size_t _maximum;
-    size_t _size = 0;
 
 public:
     class LineCallback {
     public:
         virtual bool process (const String& line) = 0;
     };
+
+private:
+    const String _filename;
+    const size_t _maximum;
+    size_t _size = -1;
+    typedef enum {
+        MODE_ERROR = 0,
+        MODE_CLOSED = 1,
+        MODE_WRITING = 2,
+        MODE_READING = 3,
+    } mode_t;
+    mode_t _mode;
+    File _file;
+
+private:
+    inline void _close () {
+        _file.close ();
+        _mode = MODE_CLOSED;
+    }
+    inline void _open (const mode_t mode) {
+        // MODE_WRITING and MODE_READING only
+        _file = SPIFFS.open (_filename, mode == MODE_WRITING ? FILE_APPEND : FILE_READ);
+        if (_file) {
+            _size = _file.size ();
+            _mode = mode;
+            DEBUG_PRINTF ("SPIFFSFile::_open: %s, size=%d\n", mode == MODE_WRITING ? "WRITING" : "READING", _size);
+        } else {
+            _size = -1;
+            _mode = MODE_ERROR;
+            DEBUG_PRINTF ("SPIFFSFile::_open: %s, failed on SPIFFS.open (), file activity not available\n", mode == MODE_WRITING ? "WRITING" : "READING");
+        }
+    }
+    inline bool _append (const String& data) {
+        if (_size + (data.length () + 2) > _maximum) {
+            DEBUG_PRINTF ("SPIFFSFile::append: erasing, as size %d would exceed %d\n", _size + (data.length () + 1), _maximum);
+            _file.close ();
+            SPIFFS.remove (_filename);
+            _open (MODE_WRITING);
+            if (_mode == MODE_ERROR)
+                return false;
+        }
+        _file.println (data);
+        _size += data.length () + 2; // \r\n
+        return true;
+    }
+    inline bool _read (LineCallback& callback) {
+        while (_file.available ())
+            if (!callback.process (_file.readStringUntil ('\n')))
+                return false;
+        return true;
+    }
+    inline bool _erase () {
+        _size = -1;
+        if (!SPIFFS.remove (_filename)) {
+            _mode = MODE_ERROR;
+            return false;
+        }
+        return true;
+    }
+
+public:
     SPIFFSFile (const String& filename, const size_t maximum): _filename (filename), _maximum (maximum) {}
     bool begin () {
         if (!SPIFFS.begin (true)) {
-            DEBUG_PRINTF ("SPIFFSFile::begin: failed on SPIFFS.begin ()\n");
+            DEBUG_PRINTF ("SPIFFSFile::begin: failed on SPIFFS.begin (), file activity not available\n");
+            _mode = MODE_ERROR;
             return false;
         }
-        File file = SPIFFS.open (_filename, FILE_READ);
-        if (file) {
-            _size = file.size ();
-            file.close ();
-        }
-        DEBUG_PRINTF ("SPIFFSFile::begin: size=%d\n", _size);
+        const size_t totalBytes = SPIFFS.totalBytes (), usedBytes = SPIFFS.usedBytes ();
+        DEBUG_PRINTF ("SPIFFSFile::begin: FS totalBytes=%d, usedBytes=%d, available=%.2f%%\n", totalBytes, usedBytes, (float) ((totalBytes - usedBytes) * 100.0) / (float) totalBytes);
+        _mode = MODE_CLOSED;
         return true;
     }
     //
-    size_t size () const { return _size; }
+    size_t size () const { 
+        return _size;
+    }
     bool append (const String& data) {
         DEBUG_PRINTF ("SPIFFSFile::append: size=%d, length=%u\n", _size, data.length ());
-        if (_size + data.length () > _maximum)
-            erase ();
-        File file = SPIFFS.open (_filename, FILE_APPEND);
-        if (file) {
-            file.println (data);
-            _size = file.size ();
-            file.close ();
-            return true;
-        }
-        return false;
+        if (_mode == MODE_ERROR)    return false;
+        if (_mode == MODE_READING)  _close ();
+        if (_mode == MODE_CLOSED)   _open (MODE_WRITING);
+        if (_mode == MODE_ERROR)    return false;
+        return _append (data);
     }
-    bool read (LineCallback& callback) const {
+    bool read (LineCallback& callback) { // XXX const
         DEBUG_PRINTF ("SPIFFSFile::read: size=%d\n", _size);
-        File file = SPIFFS.open (_filename, FILE_READ);
-        if (file) {
-            while (file.available ()) {
-                if (!callback.process (file.readStringUntil ('\n'))) {
-                    file.close ();
-                    return false;
-                }
-            }
-            file.close ();
-        }
-        return true;
+        if (_mode == MODE_ERROR)    return false;
+        if (_mode == MODE_WRITING)  _close ();
+        if (_mode == MODE_CLOSED)   _open (MODE_READING);
+        if (_mode == MODE_ERROR)    return false;
+        return _read (callback);
     }
-    void erase () {
-        DEBUG_PRINTF ("SPIFFSFile::erase: size=%d\n", _size);
-        SPIFFS.remove (_filename);
-        _size = 0;
+    bool erase () {
+        DEBUG_PRINTF ("SPIFFSFile::erase\n");
+        if (_mode == MODE_ERROR)    return false;
+        if (_mode == MODE_WRITING)  _close ();
+        if (_mode == MODE_READING)  _close ();
+        if (_mode == MODE_ERROR)    return false;
+        return _erase ();
+    }
+    //
+    void serialize (JsonObject &obj) const {
+        JsonObject file = obj ["file"].to <JsonObject> ();
+        file ["state"] = __file_state_to_string ((int) _mode).c_str ();    
     }
 };
 
