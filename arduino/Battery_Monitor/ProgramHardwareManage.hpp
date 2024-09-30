@@ -12,8 +12,9 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
+// XXX probably should be template class according to probe numbers
 class TemperatureManagerBatterypack: public TemperatureManager, public Alarmable {
-    static constexpr int _num = 15; // config.temperature.PROBE_NUMBER - 1
+    static inline constexpr int _num = 15; // config.temperature.PROBE_NUMBER - 1
     typedef std::array <float, _num> Values;
     float _min, _max, _avg;
     Values _values;
@@ -41,12 +42,12 @@ public:
         _avg = sum / (1.0 * cnt);
         DEBUG_PRINTF ("], avg=%.2f, min=%.2f, max=%.2f\n", _avg, _min, _max);
     }
-    float min () const { return _min; }
-    float max () const { return _max; }
-    float avg () const { return _avg; }
-    const Values& getTemperatures () const { return _values; }
-    float setpoint () const { return (config.WARNING + config.CRITICAL) / 2.0f; }
-    float current () const { return _max; }
+    inline float min () const { return _min; }
+    inline float max () const { return _max; }
+    inline float avg () const { return _avg; }
+    inline const Values& getTemperatures () const { return _values; }
+    inline float setpoint () const { return (config.WARNING + config.CRITICAL) / 2.0f; }
+    inline float current () const { return _max; }
 
 protected:
     void collectAlarms (AlarmSet& alarms) const override {
@@ -67,7 +68,7 @@ public:
         _value = _filter.update (_temperature.get (config.PROBE_ENVIRONMENT));
         DEBUG_PRINTF ("TemperatureManagerEnvironment::process: temp=%.2f\n", _value);
     }
-    float getTemperature () const { return _value; }
+    inline float getTemperature () const { return _value; }
 
 protected:
     void collectAlarms (AlarmSet& alarms) const override {

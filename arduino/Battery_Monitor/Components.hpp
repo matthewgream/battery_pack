@@ -46,7 +46,7 @@ https://github.com/espressif/esp-idf/blob/v4.3/examples/protocols/sntp/main/sntp
 class TimeDriftCalculator {
     long _driftMs;
     bool _highDrift = false;
-    static constexpr long MAX_DRIFT_MS = 60 * 1000;
+    static inline constexpr long MAX_DRIFT_MS = 60 * 1000;
 
 public:
     TimeDriftCalculator (const long driftMs) : _driftMs (driftMs) {}
@@ -72,10 +72,10 @@ public:
         DEBUG_PRINTF ("TimeDriftCalculator::applyDrift: adjustMs=%ld\n", adjustMs);
         return adjustMs;
     }
-    bool highDrift () const {
+    inline bool highDrift () const {
       return _highDrift;
     }
-    long drift () const {
+    inline long drift () const {
       return _driftMs;
     }
 };
@@ -103,7 +103,7 @@ static String __mqtt_state_to_string (const int state) {
     }
 }
 
-class MQTTPublisher {
+class MQTTPublisher: public JsonSerializable {
 
 public:
     typedef struct {
@@ -138,7 +138,7 @@ public:
         if (!_mqttClient.connected ())
             connect ();
     }
-    bool connected () {
+    inline bool connected () {
         return _mqttClient.connected ();
     }
     //
@@ -166,7 +166,7 @@ static String __file_state_to_string (const int mode) {
     }
 }
 
-class SPIFFSFile {
+class SPIFFSFile: public JsonSerializable  {
 
 public:
     class LineCallback {
@@ -176,8 +176,8 @@ public:
 
 private:
     const String _filename;
-    const size_t _maximum;
-    size_t _size = -1;
+    const long _maximum;
+    long _size = -1;
     typedef enum {
         MODE_ERROR = 0,
         MODE_CLOSED = 1,
@@ -188,26 +188,26 @@ private:
     File _file;
 
 private:
-    inline void _close () {
+    void _close () {
         _file.close ();
         _mode = MODE_CLOSED;
     }
-    inline void _open (const mode_t mode) {
+    void _open (const mode_t mode) {
         // MODE_WRITING and MODE_READING only
         _file = SPIFFS.open (_filename, mode == MODE_WRITING ? FILE_APPEND : FILE_READ);
         if (_file) {
             _size = _file.size ();
             _mode = mode;
-            DEBUG_PRINTF ("SPIFFSFile::_open: %s, size=%d\n", mode == MODE_WRITING ? "WRITING" : "READING", _size);
+            DEBUG_PRINTF ("SPIFFSFile::_open: %s, size=%ld\n", mode == MODE_WRITING ? "WRITING" : "READING", _size);
         } else {
             _size = -1;
             _mode = MODE_ERROR;
             DEBUG_PRINTF ("SPIFFSFile::_open: %s, failed on SPIFFS.open (), file activity not available\n", mode == MODE_WRITING ? "WRITING" : "READING");
         }
     }
-    inline bool _append (const String& data) {
+    bool _append (const String& data) {
         if (_size + (data.length () + 2) > _maximum) {
-            DEBUG_PRINTF ("SPIFFSFile::append: erasing, as size %d would exceed %d\n", _size + (data.length () + 1), _maximum);
+            DEBUG_PRINTF ("SPIFFSFile::append: erasing, as size %ld would exceed %ld\n", _size + (data.length () + 1), _maximum);
             _file.close ();
             SPIFFS.remove (_filename);
             _open (MODE_WRITING);
@@ -218,13 +218,13 @@ private:
         _size += data.length () + 2; // \r\n
         return true;
     }
-    inline bool _read (LineCallback& callback) {
+    bool _read (LineCallback& callback) {
         while (_file.available ())
             if (!callback.process (_file.readStringUntil ('\n')))
                 return false;
         return true;
     }
-    inline bool _erase () {
+    bool _erase () {
         _size = -1;
         if (!SPIFFS.remove (_filename)) {
             _mode = MODE_ERROR;
@@ -234,24 +234,24 @@ private:
     }
 
 public:
-    SPIFFSFile (const String& filename, const size_t maximum): _filename (filename), _maximum (maximum) {}
+    SPIFFSFile (const String& filename, const long maximum): _filename (filename), _maximum (maximum) {}
     bool begin () {
         if (!SPIFFS.begin (true)) {
             DEBUG_PRINTF ("SPIFFSFile::begin: failed on SPIFFS.begin (), file activity not available\n");
             _mode = MODE_ERROR;
             return false;
         }
-        const size_t totalBytes = SPIFFS.totalBytes (), usedBytes = SPIFFS.usedBytes ();
-        DEBUG_PRINTF ("SPIFFSFile::begin: FS totalBytes=%d, usedBytes=%d, available=%.2f%%\n", totalBytes, usedBytes, (float) ((totalBytes - usedBytes) * 100.0) / (float) totalBytes);
+        const long totalBytes = SPIFFS.totalBytes (), usedBytes = SPIFFS.usedBytes ();
+        DEBUG_PRINTF ("SPIFFSFile::begin: FS totalBytes=%lu, usedBytes=%lu, available=%.2f%%\n", totalBytes, usedBytes, (float) ((totalBytes - usedBytes) * 100.0) / (float) totalBytes);
         _mode = MODE_CLOSED;
         return true;
     }
     //
-    size_t size () const {
+    inline long size () const {
         return _size;
     }
     bool append (const String& data) {
-        DEBUG_PRINTF ("SPIFFSFile::append: size=%d, length=%u\n", _size, data.length ());
+        DEBUG_PRINTF ("SPIFFSFile::append: size=%ld, length=%u\n", _size, data.length ());
         if (_mode == MODE_ERROR)    return false;
         if (_mode == MODE_READING)  _close ();
         if (_mode == MODE_CLOSED)   _open (MODE_WRITING);
@@ -259,7 +259,7 @@ public:
         return _append (data);
     }
     bool read (LineCallback& callback) { // XXX const
-        DEBUG_PRINTF ("SPIFFSFile::read: size=%d\n", _size);
+        DEBUG_PRINTF ("SPIFFSFile::read: size=%ld\n", _size);
         if (_mode == MODE_ERROR)    return false;
         if (_mode == MODE_WRITING)  _close ();
         if (_mode == MODE_CLOSED)   _open (MODE_READING);

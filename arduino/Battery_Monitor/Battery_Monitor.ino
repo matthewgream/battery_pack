@@ -12,9 +12,9 @@
 #define BUILD_D ((__DATE__[4] == ' ') ? (__DATE__[5] - '0') : (__DATE__[4] - '0') * 10 + (__DATE__[5] - '0'))
 #define BUILD_T __TIME__
 
-static constexpr const char __build_name [] = "battery monitor";
-static constexpr const char __build_vers [] = "0.99" ;
-static constexpr const char __build_time [] = {
+static inline constexpr const char __build_name [] = "battery monitor";
+static inline constexpr const char __build_vers [] = "0.99" ;
+static inline constexpr const char __build_time [] = {
     BUILD_Y/1000 + '0', (BUILD_Y%1000)/100 + '0', (BUILD_Y%100)/10 + '0', BUILD_Y%10 + '0',  BUILD_M/10 + '0', BUILD_M%10 + '0',  BUILD_D/10 + '0', BUILD_D%10 + '0',
     BUILD_T [0], BUILD_T [1], BUILD_T [3], BUILD_T [4], BUILD_T [6], BUILD_T [7],
     '\0'

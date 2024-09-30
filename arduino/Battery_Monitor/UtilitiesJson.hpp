@@ -1,6 +1,13 @@
 
 // -----------------------------------------------------------------------------------------------
 
+class JsonSerializable {
+public:
+    virtual void serialize (JsonObject& obj) const = 0;
+};
+
+// -----------------------------------------------------------------------------------------------
+
 #include <ArduinoJson.h>
 
 class JsonCollector {
@@ -23,11 +30,11 @@ public:
 
 namespace JsonFunctions {
     inline int findValueKey (const String& json, const String& key) {
-        return json.indexOf ("\"" + key + "\":");
+        return (json.isEmpty () || key.isEmpty ()) ? -1 : json.indexOf ("\"" + key + "\":");
     }
     inline int findValueStart (const String& json, const int keyPos) {
         int valueStart = json.indexOf (":", keyPos) + 1;
-        while (isSpace (json.charAt (valueStart))) valueStart ++;
+        while (valueStart < json.length () && isSpace (json.charAt (valueStart))) valueStart ++;
         return valueStart;
     }
     inline int findValueEnd (const String& json, const int valueStart) {

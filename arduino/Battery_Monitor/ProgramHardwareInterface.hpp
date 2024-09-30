@@ -2,7 +2,7 @@
 // -----------------------------------------------------------------------------------------------
 
 class TemperatureInterface : public Component, public Diagnosticable {
-    static constexpr int ADC_RESOLUTION = 12, ADC_MINVALUE = 0, ADC_MAXVALUE = ((1 << ADC_RESOLUTION) - 1);
+    static inline constexpr int ADC_RESOLUTION = 12, ADC_MINVALUE = 0, ADC_MAXVALUE = ((1 << ADC_RESOLUTION) - 1);
     typedef struct { uint16_t v_now, v_min, v_max; } ValueSet;
     const Config::TemperatureInterfaceConfig& config;
     MuxInterface_CD74HC4067 _muxInterface;
@@ -45,8 +45,8 @@ protected:
 // -----------------------------------------------------------------------------------------------
 
 class FanInterface : public Component, public Diagnosticable {
-    static constexpr int PWM_RESOLUTION = 8;
-    static constexpr uint8_t PWM_MINVALUE = 0, PWM_MAXVALUE = ((1 << PWM_RESOLUTION) - 1);
+    static inline constexpr int PWM_RESOLUTION = 8;
+    static inline constexpr uint8_t PWM_MINVALUE = 0, PWM_MAXVALUE = ((1 << PWM_RESOLUTION) - 1);
     const Config::FanInterfaceConfig& config;
     uint8_t _speed = PWM_MINVALUE, _speedMin = PWM_MAXVALUE, _speedMax = PWM_MINVALUE;
     OpenSmart_QuadMotorDriver _driver;
@@ -61,8 +61,10 @@ public:
         const uint8_t speedNew = std::clamp (speed, PWM_MINVALUE, PWM_MAXVALUE);
         if (speedNew > config.MIN_SPEED && _speed <= config.MIN_SPEED) _sets ++;
         _driver.setSpeed (_speed = speed); // all 4 fans, for now
+        if (_speed < _speedMin) _speedMin = _speed;
+        if (_speed > _speedMax) _speedMax = _speed;
     }
-    uint8_t getSpeed () const {
+   inline uint8_t getSpeed () const {
         return _speed;
     }
 

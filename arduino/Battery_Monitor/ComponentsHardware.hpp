@@ -9,7 +9,7 @@ public:
     typedef struct {
         const int PIN_S0, PIN_S1, PIN_S2, PIN_S3, PIN_SIG;
     } Config;
-    static constexpr int CHANNELS = 16;
+    static inline constexpr int CHANNELS = 16;
 private:
     const Config& config;
 
@@ -41,8 +41,8 @@ public:
 class OpenSmart_QuadMotorDriver {
 
 public:
-    static constexpr int MotorCount = 4;
-    static constexpr int I2cAddress = 0x20;
+    static inline constexpr int MotorCount = 4;
+    static inline constexpr int I2cAddress = 0x20;
     enum MotorID {
         MOTOR_A = 0,
         MOTOR_B = 1,

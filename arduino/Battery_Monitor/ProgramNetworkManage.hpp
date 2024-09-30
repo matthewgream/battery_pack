@@ -62,11 +62,11 @@ class ConnectManager : public Component, public Diagnosticable, private Singleto
     const Config::ConnectConfig& config;
     ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
     bool _available = false;
-    WiFiEventId_t _events;
+    WiFiEventId_t _events = 0;
 
 public:
     ConnectManager (const Config::ConnectConfig& cfg) : Singleton <ConnectManager> (this), config (cfg) {}
-    ~ConnectManager () { WiFi.removeEvent (_events); }
+    ~ConnectManager () { if (_events) WiFi.removeEvent (_events); }
     void begin () override {
         _events = WiFi.onEvent (__ConnectManager_WiFiEventHandler);
         WiFi.setHostname (config.client.c_str ());
@@ -75,7 +75,7 @@ public:
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
         DEBUG_PRINTF ("ConnectManager::begin: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), mac_address ().c_str (), config.client.c_str ());
     }
-    bool isAvailable () const {
+    inline bool isAvailable () const {
         return _available;
     }
 
@@ -179,7 +179,7 @@ public:
             strftime (timeString, sizeof (timeString), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
         return String (timeString);
     }
-    operator String () const { return getTimeString (); }
+    inline operator String () const { return getTimeString (); }
 
 protected:
     void collectAlarms (AlarmSet& alarms) const override {

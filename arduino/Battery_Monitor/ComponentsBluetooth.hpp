@@ -48,7 +48,7 @@ static String __ble_status_to_string (const BLECharacteristicCallbacks::Status s
 
 // -----------------------------------------------------------------------------------------------
 
-class BluetoothNotifier : protected BLEServerCallbacks, protected BLECharacteristicCallbacks {
+class BluetoothNotifier: public JsonSerializable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks {
 
 public:
     typedef struct {
@@ -154,10 +154,10 @@ public:
             });
         }
     }
-    int maxpacket (void) const {
+    inline int maxpacket (void) const {
         return _maxpacket;
     }
-    bool connected (void) const {
+    inline bool connected (void) const {
         return _connected;
     }
     void reset () {

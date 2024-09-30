@@ -97,7 +97,7 @@ class Program : public Component, public Diagnosticable {
             }
         };
         if (publish.connected ()) {
-            if ((long) storage.size () > (long) 0) {
+            if (storage.size () > 0) {
                 DEBUG_PRINTF ("Program::doCapture: publish.connected () && storage.size () > 0\n");
                 StorageLineHandler handler (publish);
                 if (storage.retrieve (handler))

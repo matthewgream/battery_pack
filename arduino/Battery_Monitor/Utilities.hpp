@@ -27,9 +27,9 @@ typedef unsigned long counter_t;
 
 // -----------------------------------------------------------------------------------------------
 
-String IntToString (const long n) {
+inline String IntToString (const long n) {
     char s [32 + 1];
-    return String (itoa (n, s, sizeof (s) - 1));
+    return String (ltoa (n, s, sizeof (s) - 1));
 }
 
 // -----------------------------------------------------------------------------------------------
@@ -44,14 +44,19 @@ class MovingAverage {
     static_assert (WINDOW > 0, "WINDOW size must be positive");
     std::array <T, WINDOW> values {};
     T sum = T (0);
-    std::size_t index = 0, count = 0;
+    size_t count = 0;
 
 public:
     T update (const T value) {
-        if (count == WINDOW) sum -= values [index]; else count ++;
-        values [index] = value; index = (index + 1) % WINDOW;
+        if (count < WINDOW)
+            values [count ++] = value;
+        else {
+            sum -= values [0];
+            std::rotate (values.begin (), values.begin () + 1, values.end ());
+            values.back () = value;
+        }
         sum += value;
-        return  sum / static_cast <T> (count);
+        return sum / count;
     }
 };
 
@@ -88,7 +93,7 @@ class AlphaSmoothing {
 
 public:
     AlphaSmoothing (const float alpha) : _alpha (alpha) {}
-    float apply (const float value) {
+    inline float apply (const float value) {
         return (_value = (_alpha * value + (1.0f - _alpha) * _value));
     }
 };
@@ -122,7 +127,7 @@ class Uptime {
 
 public:
     Uptime () : _started (millis ()) {}
-    interval_t seconds () const {
+    inline interval_t seconds () const {
         return (millis () - _started) / 1000;
     }
 };
@@ -133,24 +138,21 @@ public:
 #include <ArduinoJson.h>
 
 class ActivationTracker {
-    interval_t _seconds = 0;
     counter_t _number = 0;
+    unsigned long _millis = 0;
 
 public:
     ActivationTracker () {}
-    interval_t seconds () const { return _seconds; }
-    counter_t  number () const { return _number; }
+    inline interval_t seconds () const { return _millis / 1000; }
+    inline counter_t  number () const { return _number; }
     ActivationTracker& operator ++ (int) {
-        _seconds = millis () / 1000;
+        _millis = millis ();
         _number ++;
         return *this;
     }
-    virtual void serialize (JsonObject &obj) const {
-        obj ["last"] = _seconds;
-        obj ["count"] = _number;
-    }
-    virtual void serialize (JsonObject &&obj) const { // weird C++ stuff
-        obj ["last"] = _seconds;
+    template <typename JsonObjectT>
+    void serialize (JsonObjectT&& obj) const {
+        obj ["last"] = _millis / 1000;
         obj ["count"] = _number;
     }
 };
@@ -165,15 +167,11 @@ public:
         _detail = detail;
         return *this;
     }
-    void serialize (JsonObject &obj) const override {
+    template <typename JsonObjectT>
+    void serialize (JsonObjectT&& obj) const {
         ActivationTracker::serialize (obj);
         if (!_detail.isEmpty ())
-            obj ["detail"] = _detail.c_str ();
-    }
-    void serialize (JsonObject &&obj) const override { // weird C++ stuff
-        ActivationTracker::serialize (obj);
-        if (!_detail.isEmpty ())
-            obj ["detail"] = _detail.c_str ();
+            obj ["detail"] = _detail;
     }
 };
 
@@ -189,10 +187,11 @@ inline T map (const T x, const T in_min, const T in_max, const T out_min, const 
 
 // -----------------------------------------------------------------------------------------------
 
-float steinharthart_calculator (const float VALUE, const float VALUE_MAX, const float REFERENCE_RESISTANCE, const float NOMINAL_RESISTANCE, const float NOMINAL_TEMPERATURE) {
-    static constexpr float BETA = 3950.0;
-    const float STEINHART = (log ((REFERENCE_RESISTANCE / ((VALUE_MAX / VALUE) - 1.0)) / NOMINAL_RESISTANCE) / BETA) + (1.0 / (NOMINAL_TEMPERATURE + 273.15));
-    return (1.0 / STEINHART) - 273.15;
+float steinharthart_calculator (const float value, const float value_max, const float resistance_reference, const float resistance_nominal, const float temperature_nominal) {
+    static constexpr float beta = 3950.0, kelvin_constant = 273.15f;
+    float resistance = resistance_reference / ((value_max / value) - 1.0f);
+    float steinhart = logf (resistance / resistance_nominal) / beta + 1.0f / (temperature_nominal + kelvin_constant);
+    return 1.0f / steinhart - kelvin_constant;
 }
 
 // -----------------------------------------------------------------------------------------------

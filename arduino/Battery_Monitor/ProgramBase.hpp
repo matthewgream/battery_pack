@@ -61,7 +61,8 @@ public:
     inline bool isAny (const int number) const { return (_alarmSet & _ALARM_NUMB (number)); }
     inline operator _AlarmType () const { return _alarmSet; }
     inline AlarmSet& operator+= (const _AlarmType alarm) { _alarmSet |= alarm; return *this; }
-    inline AlarmSet& operator+= (const AlarmSet& alarmset) { _alarmSet |= alarmset._alarmSet; return *this; }
+    inline AlarmSet& operator+= (const AlarmSet& other) { _alarmSet |= other._alarmSet; return *this; }
+    inline AlarmSet operator^ (const AlarmSet& other) const { AlarmSet result; result._alarmSet = _alarmSet ^ other._alarmSet; return result; }
     String toStringBitmap () const {
         String s;
         for (int number = 0; number < _ALARM_COUNT; number ++)
@@ -105,20 +106,19 @@ public:
         AlarmSet alarms;
         for (const auto& alarmable : _alarmables)
             alarmable->collectAlarms (alarms);
-        if (alarms != _alarms) {
+        AlarmSet changes = alarms ^ _alarms;
+        if (!changes.isNone ()) {
             for (int number = 0; number < alarms.size (); number ++)
-                if (alarms.isAny (number) && !_alarms.isAny (number))
-                    _activations [number] ++;
-                else if (!alarms.isAny (number) && _alarms.isAny (number))
-                    _deactivations [number] ++;
+                if (changes.isAny (number))
+                    (alarms.isAny (number) ? _activations [number] : _deactivations [number]) ++;
             if (config.PIN_ALARM > 0)
                 digitalWrite (config.PIN_ALARM, alarms.isNone () ? LOW : HIGH);
             DEBUG_PRINTF ("AlarmManager::process: alarms: %s <-- %s\n", alarms.toStringBitmap ().c_str (), _alarms.toStringBitmap ().c_str ());
             _alarms = alarms;
         }
     }
-    String getAlarmsAsBitmap () const { return _alarms.toStringBitmap (); }
-    String getAlarmsAsString () const { return _alarms.toStringNames (); }
+    inline String getAlarmsAsBitmap () const { return _alarms.toStringBitmap (); }
+    inline String getAlarmsAsString () const { return _alarms.toStringNames (); }
 
 protected:
     void collectDiagnostics (JsonDocument &obj) const override { // XXX this is too large and needs reduction

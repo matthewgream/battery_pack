@@ -60,7 +60,7 @@ public:
         }
         return false;
     }
-    bool connected () { return _network.isAvailable () && _mqtt.connected (); }
+    inline bool connected () { return _network.isAvailable () && _mqtt.connected (); }
 
 protected:
     void collectAlarms (AlarmSet& alarms) const override {
@@ -87,7 +87,7 @@ public:
     void begin () override {
         _failures = _file.begin () ? 0 : _failures + 1;
     }
-    size_t size () const {
+    inline long size () const {
         return _file.size ();
     }
     bool append (const String& data) {
@@ -97,7 +97,7 @@ public:
         } else _failures ++;
         return false;
     }
-    bool retrieve (LineCallback& callback) { // XXX const
+    inline bool retrieve (LineCallback& callback) { // XXX const
         return _file.read (callback);
     }
     void erase () {
@@ -108,7 +108,7 @@ public:
 protected:
     void collectAlarms (AlarmSet& alarms) const override {
         if (_failures > config.failureLimit) alarms += ALARM_STORAGE_FAIL;
-        if ((long) _file.size () > (long) config.lengthCritical) alarms += ALARM_STORAGE_SIZE;
+        if (_file.size () > (long) config.lengthCritical) alarms += ALARM_STORAGE_SIZE;
     }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject storage = obj ["storage"].to <JsonObject> ();
