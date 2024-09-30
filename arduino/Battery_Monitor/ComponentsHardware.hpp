@@ -64,7 +64,7 @@ private:
     static constexpr uint8_t encode_controlvalue (const int motorID, const uint8_t directions, const uint8_t value) {
         return (directions & (~(0x03 << (2 * motorID)))) | (value << (2 * motorID));
     }
-    
+
     const uint8_t _i2c;
     const MotorSpeedPins _pwms;
     uint8_t _directions;

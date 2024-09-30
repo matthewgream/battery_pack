@@ -108,6 +108,7 @@ class Program : public Component, public Diagnosticable {
         } else
             storage.append (data);
     }
+
     Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
     void process () override {
         const bool deliver = intervalDeliver, capture = intervalCapture, diagnose = intervalDiagnose;
@@ -125,14 +126,15 @@ class Program : public Component, public Diagnosticable {
             // XXX send via. mqtt if debug
         }
         activations ++;
-        
+
+        // XXX counting part sizes to be < mtu
         // const String x = doCollect ("diag", [&] (JsonDocument& doc) { diagnostics.collect (doc); });
         // DEBUG_PRINTF ("Program::_debug_: diag, length=%d, content=<<<%s>>>\n", x.length (), x.c_str ());
         // JsonSplitter splitter (512, { "type", "time" });
         // splitter.splitJson (x, [&] (const String& part, const int elements) {
         //     DEBUG_PRINTF ("Program::_debug_: length=%u, part=%u, elements=%d\n", x.length (), part.length (), elements);
         //     DEBUG_PRINTF ("--> %s\n", part.c_str ());
-        // }); 
+        // });
 
     }
 
@@ -143,7 +145,7 @@ public:
         fanInterface (config.fan), fanManager (config.fan, fanInterface, temperatureManagerBatterypack, fanControllingAlgorithm, fanSmoothingAlgorithm),
         network (config.network), nettime (config.nettime, network),
         deliver (config.deliver), publish (config.publish, network), storage (config.storage),
-        alarms (config.alarm, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &publish, &storage }),
+        alarms (config.alarm, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage }),
         diagnostics (config.diagnostic, { &temperatureInterface, &fanInterface, &network, &nettime, &deliver, &publish, &storage, &alarms, this }), operational (*this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
         components ({ &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager,
@@ -159,7 +161,8 @@ public:
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject program = obj ["program"].to <JsonObject> ();
-//        program ["build"] = build_info;
+        extern const String build_info;
+        program ["build"] = build_info;
         program ["uptime"] = uptime.seconds ();
         activations.serialize (program ["iterations"].to <JsonObject> ());
     }

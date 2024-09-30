@@ -100,7 +100,7 @@ public:
     void splitJson (const String& json, const std::function<void (const String&, const int)> callback) {
         String common;
         for (const auto& commonElement : commonElements) {
-            String value; 
+            String value;
             if (JsonFunctions::findValue (json, commonElement, value) >= 0) {
                 if (!common.isEmpty ()) common += ",";
                 common += "\"" + commonElement + "\":" + value;
@@ -109,7 +109,7 @@ public:
         if (common.length () > 0) common += ',';
         String current, element;
         int numbers = 0;
-        for (int cur = 1, nxt = 0; (nxt = JsonFunctions::findNextElement (json, cur, element)) > 0; cur = nxt) {  
+        for (int cur = 1, nxt = 0; (nxt = JsonFunctions::findNextElement (json, cur, element)) > 0; cur = nxt) {
             if (std::any_of (commonElements.begin (), commonElements.end (), [&element] (const String& commonElement) { return element.startsWith ("\"" + commonElement + "\":"); }))
                 continue;
             if ((1 + common.length ()) + current.length () + (element.length () + 1) < splitLength) {  // +1 for the comma or brace

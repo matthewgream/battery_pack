@@ -8,7 +8,7 @@ class TemperatureInterface : public Component, public Diagnosticable {
     MuxInterface_CD74HC4067 _muxInterface;
     std::array <ValueSet, MuxInterface_CD74HC4067::CHANNELS> _muxValues;
     void updatevalues (const int channel, const uint16_t value) {
-        ValueSet &valueSet = _muxValues [channel]; 
+        ValueSet &valueSet = _muxValues [channel];
         valueSet.v_now = value;
         if (value > valueSet.v_min) valueSet.v_min = value;
         if (value < valueSet.v_max) valueSet.v_max = value;
@@ -34,8 +34,7 @@ protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject tmp = obj ["tmp"].to <JsonObject> ();
         for (int channel = 0; channel < MuxInterface_CD74HC4067::CHANNELS; channel ++) {
-            char string [10];
-            JsonObject entry = tmp [itoa (channel, string, 10)].to <JsonObject> ();
+            JsonObject entry = tmp [IntToString (channel)].to <JsonObject> ();
             entry ["#"] = _muxValues [channel].v_now;
             entry ["<"] = _muxValues [channel].v_min;
             entry [">"] = _muxValues [channel].v_max;

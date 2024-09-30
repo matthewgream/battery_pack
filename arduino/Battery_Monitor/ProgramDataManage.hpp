@@ -1,7 +1,7 @@
 
 // -----------------------------------------------------------------------------------------------
 
-class DeliverManager : public Component, public Diagnosticable {
+class DeliverManager : public Component, public Alarmable, public Diagnosticable {
     const Config::DeliverConfig& config;
     BluetoothNotifier _blue;
     ActivationTrackerWithDetail _delivers;
@@ -14,18 +14,22 @@ public:
     void process () override {
         _blue.check ();
     }
-    void deliver (const String& data) {
+    bool deliver (const String& data) {
         if (_blue.connected ()) {
-            char string [16];
-            _delivers += String (itoa (data.length (), string, 10)), _blue.notify (data);
+            _delivers += IntToString (data.length ()), _blue.notify (data);
+            return true;
         }
+        return false;
     }
 
 protected:
+    void collectAlarms (AlarmSet& alarms) const override {
+        if (_blue.maxpacket () > config.blue.mtu) alarms += ALARM_DELIVER_SIZE;
+    }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject deliver = obj ["deliver"].to <JsonObject> ();
-        _blue.serialize (deliver);
         _delivers.serialize (deliver ["delivers"].to <JsonObject> ());
+        _blue.serialize (deliver);
     }
 };
 
@@ -50,8 +54,7 @@ public:
     bool publish (const String& data) {
         if (_network.isAvailable ()) {
           if (_mqtt.connected () && _mqtt.publish (config.mqtt.topic, data)) {
-              char string [16];
-              _publishes += String (itoa (data.length (), string, 10)), _failures = 0;
+              _publishes += IntToString (data.length ()), _failures = 0;
               return true;
           } else _failures ++;
         }
@@ -87,11 +90,12 @@ public:
     size_t size () const {
         return _file.size ();
     }
-    void append (const String& data) {
+    bool append (const String& data) {
         if (_file.append (data)) {
-            char string [16];
-            _appends += String (itoa (data.length (), string, 16)), _failures = 0;
+            _appends += IntToString (data.length ()), _failures = 0;
+            return true;
         } else _failures ++;
+        return false;
     }
     bool retrieve (LineCallback& callback) { // XXX const
         return _file.read (callback);

@@ -88,7 +88,7 @@ public:
 #include <WiFi.h>
 #include <PubSubClient.h>
 
-static String __mqtt_state_to_string (int state) {
+static String __mqtt_state_to_string (const int state) {
     switch (state) {
       case MQTT_CONNECTION_TIMEOUT: return "CONNECTION_TIMEOUT";
       case MQTT_CONNECTION_LOST: return "CONNECTION_LOST";
@@ -148,7 +148,7 @@ public:
         if ((mqtt ["connected"] = mqttClient.connected ())) {
             //
         }
-        mqtt ["state"] = __mqtt_state_to_string (mqttClient.state ()).c_str ();    
+        mqtt ["state"] = __mqtt_state_to_string (mqttClient.state ());
     }
 };
 
@@ -156,7 +156,7 @@ public:
 
 #include <SPIFFS.h>
 
-static String __file_state_to_string (int mode) {
+static String __file_state_to_string (const int mode) {
     switch (mode) {
       case 0: return "ERROR";
       case 1: return "CLOSED";
@@ -247,7 +247,7 @@ public:
         return true;
     }
     //
-    size_t size () const { 
+    size_t size () const {
         return _size;
     }
     bool append (const String& data) {
@@ -277,7 +277,7 @@ public:
     //
     void serialize (JsonObject &obj) const {
         JsonObject file = obj ["file"].to <JsonObject> ();
-        file ["state"] = __file_state_to_string ((int) _mode).c_str ();    
+        file ["state"] = __file_state_to_string ((int) _mode);
     }
 };
 

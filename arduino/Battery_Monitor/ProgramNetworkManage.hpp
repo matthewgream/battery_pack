@@ -7,7 +7,7 @@ static String __wifi_ssid_to_string (const uint8_t ssid [], const uint8_t ssid_l
 static String __wifi_bssid_to_string (const uint8_t bssid []) {
 #define __BSSID_MACBYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
 #define __BSSID_FORMAT_BSSID(addr) __BSSID_MACBYTETOSTRING ((addr)[0]) + ":" + __BSSID_MACBYTETOSTRING ((addr)[1]) + ":" + __BSSID_MACBYTETOSTRING ((addr)[2]) + ":" + __BSSID_MACBYTETOSTRING ((addr)[3]) + ":" + __BSSID_MACBYTETOSTRING ((addr)[4]) + ":" + __BSSID_MACBYTETOSTRING ((addr)[5])
-    return __BSSID_FORMAT_BSSID (bssid); 
+    return __BSSID_FORMAT_BSSID (bssid);
 }
 static String __wifi_authmode_to_string (const wifi_auth_mode_t authmode) {
     switch (authmode) {
@@ -83,16 +83,21 @@ protected:
     friend void __ConnectManager_WiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info);
     void events (const WiFiEvent_t event, const WiFiEventInfo_t info) {
         if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED) {
-            const String ssid = __wifi_ssid_to_string (info.wifi_sta_connected.ssid, info.wifi_sta_connected.ssid_len), bssid = __wifi_bssid_to_string (info.wifi_sta_connected.bssid), authmode = __wifi_authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode);
             _connections ++;
-            DEBUG_PRINTF ("ConnectManager::events: WIFI_CONNECTED, ssid=%s, bssid=%s, channel=%d, authmode=%s, rssi=%d\n", ssid.c_str (), bssid.c_str (), (int) info.wifi_sta_connected.channel, authmode.c_str (), WiFi.RSSI ());
+            DEBUG_PRINTF ("ConnectManager::events: WIFI_CONNECTED, ssid=%s, bssid=%s, channel=%d, authmode=%s, rssi=%d\n",
+                __wifi_ssid_to_string (info.wifi_sta_connected.ssid, info.wifi_sta_connected.ssid_len).c_str (),
+                __wifi_bssid_to_string (info.wifi_sta_connected.bssid).c_str (), (int) info.wifi_sta_connected.channel,
+                __wifi_authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode).c_str (), WiFi.RSSI ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP) {
             _available = true; _allocations ++;
             DEBUG_PRINTF ("ConnectManager::events: WIFI_ALLOCATED, address=%s\n", IPAddress (info.got_ip.ip_info.ip.addr).toString ().c_str ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
-            const String ssid = __wifi_ssid_to_string (info.wifi_sta_disconnected.ssid, info.wifi_sta_disconnected.ssid_len), bssid = __wifi_bssid_to_string (info.wifi_sta_disconnected.bssid), reason = __wifi_error_to_string ((wifi_err_reason_t) info.wifi_sta_disconnected.reason);
+            const String reason = __wifi_error_to_string ((wifi_err_reason_t) info.wifi_sta_disconnected.reason);
             _available = false; _disconnections += reason;
-            DEBUG_PRINTF ("ConnectManager::events: WIFI_DISCONNECTED, ssid=%s, bssid=%s, reason=%s\n", ssid.c_str (), bssid.c_str (), reason.c_str ());
+            DEBUG_PRINTF ("ConnectManager::events: WIFI_DISCONNECTED, ssid=%s, bssid=%s, reason=%s\n",
+                __wifi_ssid_to_string (info.wifi_sta_disconnected.ssid, info.wifi_sta_disconnected.ssid_len).c_str (),
+                __wifi_bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (), 
+                reason.c_str ());
         }
     }
 
@@ -144,8 +149,7 @@ public:
           if (!_previousTimeUpdate || (currentTime - _previousTimeUpdate >= config.intervalUpdate)) {
               const time_t fetchedTime = _fetcher.fetch ();
               if (fetchedTime > 0) {
-                  char string [16];
-                  _fetches += String (ltoa (fetchedTime, string, 16));
+                  _fetches += IntToString (fetchedTime);
                   struct timeval tv = { .tv_sec = fetchedTime, .tv_usec = 0 };
                   settimeofday (&tv, nullptr);
                   if (_previousTime > 0)

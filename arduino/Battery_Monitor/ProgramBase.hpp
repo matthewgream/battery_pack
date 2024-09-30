@@ -46,8 +46,9 @@ typedef uint32_t _AlarmType;
 #define ALARM_PUBLISH_FAIL          _ALARM_NUMB (4)
 #define ALARM_TIME_DRIFT            _ALARM_NUMB (5)
 #define ALARM_TIME_NETWORK          _ALARM_NUMB (6)
-#define _ALARM_COUNT                 (7)
-static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TEMP_MIN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "TIME_DRIFT", "TIME_NETWORK" };
+#define ALARM_DELIVER_SIZE          _ALARM_NUMB (7)
+#define _ALARM_COUNT                 (8)
+static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TEMP_MIN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "TIME_DRIFT", "TIME_NETWORK", "DELIVER_SIZE" };
 #define _ALARM_NAME(x)               (_ALARM_NAMES [x])
 
 class AlarmSet {
@@ -62,13 +63,13 @@ public:
     inline AlarmSet& operator+= (const _AlarmType alarm) { _alarmSet |= alarm; return *this; }
     inline AlarmSet& operator+= (const AlarmSet& alarmset) { _alarmSet |= alarmset._alarmSet; return *this; }
     String toStringBitmap () const {
-        String s; 
+        String s;
         for (int number = 0; number < _ALARM_COUNT; number ++)
             s += (_alarmSet & _ALARM_NUMB (number)) ? '1' : '0';
         return s;
     }
     String toStringNames () const {
-        String s; 
+        String s;
         for (int number = 0; number < _ALARM_COUNT; number ++)
             s += (_alarmSet & _ALARM_NUMB (number)) ? (String (s.isEmpty () ? "" : ",") + String (_ALARM_NAME (number))) : "";
         return s;
@@ -120,7 +121,7 @@ public:
     String getAlarmsAsString () const { return _alarms.toStringNames (); }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override { // XXX too large
+    void collectDiagnostics (JsonDocument &obj) const override { // XXX this is too large and needs reduction
         JsonArray alarms = obj ["alarms"].to <JsonArray> ();
         for (int number = 0; number < _alarms.size (); number ++) {
             JsonObject alarm = alarms.add <JsonObject> ();

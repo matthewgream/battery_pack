@@ -27,6 +27,13 @@ typedef unsigned long counter_t;
 
 // -----------------------------------------------------------------------------------------------
 
+String IntToString (const long n) {
+    char s [32 + 1];
+    return String (itoa (n, s, sizeof (s) - 1));
+}
+
+// -----------------------------------------------------------------------------------------------
+
 #include <array>
 #include <type_traits>
 #include <cstddef>
@@ -213,14 +220,14 @@ void exception_catcher (F&& f) {
 template <typename T>
 class Singleton {
     static_assert (std::is_class_v <T>, "T must be a class type");
-    inline static T* _instance = nullptr; 
+    inline static T* _instance = nullptr;
 public:
     inline static T* instance () { return _instance; }
     Singleton (T* t) {
       if (_instance != nullptr)
           throw std::runtime_error ("duplicate Singleton initializer");
       _instance = t;
-    } 
+    }
     virtual ~Singleton () { _instance = nullptr; }
 };
 
