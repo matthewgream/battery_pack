@@ -69,7 +69,7 @@ private:
     const MotorSpeedPins _pwms;
     uint8_t _directions;
 
-    void directions_update (int motorID, uint8_t value) {
+    void directions_update (const int motorID, const uint8_t value) {
         for (int id = 0; id < MotorCount; id ++)
             if (motorID == -1 || motorID == id)
                 _directions = encode_controlvalue (_directions, id, value);
@@ -77,7 +77,7 @@ private:
         Wire.write (_directions);
         Wire.endTransmission ();
     }
-    void speed_update (int motorID, uint8_t value) {
+    void speed_update (const int motorID, const uint8_t value) {
         for (int id = 0; id < MotorCount; id ++)
             if (motorID == -1 || motorID == id)
                 analogWrite (_pwms [id], value);
@@ -90,9 +90,18 @@ public:
         Wire.begin ();
         stop ();
     }
-    void setSpeed (int speed, int motorID = -1) { speed_update (motorID, (speed > 255) ? (uint8_t) 255 : static_cast <uint8_t> (speed)); }
-    void setDirection (int direction, int motorID = -1) { directions_update (motorID, (direction == MOTOR_CLOCKWISE) ? MOTOR_CONTROL_CLOCKWISE : MOTOR_CONTROL_ANTICLOCKWISE); }
-    void stop (int motorID = -1) { directions_update (motorID, MOTOR_CONTROL_OFF); }
+    void setSpeed (const int speed, const int motorID = -1) {
+        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setSpeed: %d -> %d\n", motorID, (speed > 255) ? (uint8_t) 255 : static_cast <uint8_t> (speed));
+        speed_update (motorID, (speed > 255) ? (uint8_t) 255 : static_cast <uint8_t> (speed));
+    }
+    void setDirection (const int direction, const int motorID = -1) {
+        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setDirection: %d -> %s\n", motorID, (direction == MOTOR_CLOCKWISE) ? "CLOCKWISE" : "ANTICLOCKWISE");
+        directions_update (motorID, (direction == MOTOR_CLOCKWISE) ? MOTOR_CONTROL_CLOCKWISE : MOTOR_CONTROL_ANTICLOCKWISE);
+    }
+    void stop (const int motorID = -1) {
+        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::stop: %d\n", motorID);
+        directions_update (motorID, MOTOR_CONTROL_OFF);
+    }
 };
 
 // -----------------------------------------------------------------------------------------------

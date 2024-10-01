@@ -175,7 +175,7 @@ public:
         }
     }
     //
-    void serialize (JsonObject &obj) const {
+    void serialize (JsonObject &obj) const override {
         JsonObject bluetooth = obj ["bluetooth"].to <JsonObject> ();
         if ((bluetooth ["connected"] = _connected)) {
             bluetooth ["address"] = BLEDevice::getAddress ().toString ();
@@ -183,8 +183,8 @@ public:
             bluetooth ["mtu"] = config.mtu;
         }
         bluetooth ["maxpacket"] = _maxpacket;
-        _connections.serialize (bluetooth ["connections"].to <JsonObject> ());
-        _disconnections.serialize (bluetooth ["disconnections"].to <JsonObject> ());
+        _connections.serialize (bluetooth ["connects"].to <JsonObject> ());
+        _disconnections.serialize (bluetooth ["disconnects"].to <JsonObject> ());
     }
 };
 

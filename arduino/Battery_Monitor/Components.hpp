@@ -45,7 +45,7 @@ https://github.com/espressif/esp-idf/blob/v4.3/examples/protocols/sntp/main/sntp
 
 class TimeDriftCalculator {
     long _driftMs;
-    bool _highDrift = false;
+    bool _isHighDrift = false;
     static inline constexpr long MAX_DRIFT_MS = 60 * 1000;
 
 public:
@@ -53,7 +53,7 @@ public:
     long updateDrift (time_t periodSecs, const interval_t periodMs) {
         long driftMs = (((periodSecs * 1000) - periodMs) * (60 * 60 * 1000)) / periodMs; // ms per hour
         driftMs = (_driftMs * 3 + driftMs) / 4; // 75% old value, 25% new value
-        if (driftMs > MAX_DRIFT_MS || driftMs < -MAX_DRIFT_MS) _highDrift = true;
+        if (driftMs > MAX_DRIFT_MS || driftMs < -MAX_DRIFT_MS) _isHighDrift = true;
         _driftMs = std::clamp (driftMs, -MAX_DRIFT_MS, MAX_DRIFT_MS);
         DEBUG_PRINTF ("TimeDriftCalculator::updateDrift: driftMs=%ld\n", _driftMs);
         return _driftMs;
@@ -72,8 +72,8 @@ public:
         DEBUG_PRINTF ("TimeDriftCalculator::applyDrift: adjustMs=%ld\n", adjustMs);
         return adjustMs;
     }
-    inline bool highDrift () const {
-      return _highDrift;
+    inline bool isHighDrift () const {
+      return _isHighDrift;
     }
     inline long drift () const {
       return _driftMs;
@@ -142,7 +142,7 @@ public:
         return _mqttClient.connected ();
     }
     //
-    void serialize (JsonObject &obj) const {
+    void serialize (JsonObject &obj) const override {
         PubSubClient& mqttClient = const_cast <MQTTPublisher *> (this)->_mqttClient;
         JsonObject mqtt = obj ["mqtt"].to <JsonObject> ();
         if ((mqtt ["connected"] = mqttClient.connected ())) {
@@ -156,7 +156,7 @@ public:
 
 #include <SPIFFS.h>
 
-static String __file_state_to_string (const int mode) {
+static String __file_mode_to_string (const int mode) {
     switch (mode) {
       case 0: return "ERROR";
       case 1: return "CLOSED";
@@ -166,6 +166,7 @@ static String __file_state_to_string (const int mode) {
     }
 }
 
+// should be two classes
 class SPIFFSFile: public JsonSerializable  {
 
 public:
@@ -176,8 +177,8 @@ public:
 
 private:
     const String _filename;
-    const long _maximum;
     long _size = -1;
+    long _totalBytes, _usedBytes;
     typedef enum {
         MODE_ERROR = 0,
         MODE_CLOSED = 1,
@@ -188,6 +189,18 @@ private:
     File _file;
 
 private:
+    bool _init () {
+        if (!SPIFFS.begin (true)) {
+            DEBUG_PRINTF ("SPIFFSFile::begin: failed on SPIFFS.begin (), file activity not available\n");
+            _mode = MODE_ERROR;
+            return false;
+        }        
+        _totalBytes = SPIFFS.totalBytes ();
+        _usedBytes = SPIFFS.usedBytes ();
+        DEBUG_PRINTF ("SPIFFSFile::begin: available=%.2f%% (totalBytes=%lu, usedBytes=%lu)\n", (float) ((_totalBytes - _usedBytes) * 100.0) / (float) _totalBytes, _totalBytes, _usedBytes);
+        _mode = MODE_CLOSED;
+        return true;
+    }
     void _close () {
         _file.close ();
         _mode = MODE_CLOSED;
@@ -206,16 +219,18 @@ private:
         }
     }
     bool _append (const String& data) {
-        if (_size + (data.length () + 2) > _maximum) {
-            DEBUG_PRINTF ("SPIFFSFile::append: erasing, as size %ld would exceed %ld\n", _size + (data.length () + 1), _maximum);
+        if ((data.length () + 2) > (_totalBytes - _usedBytes)) {
+            DEBUG_PRINTF ("SPIFFSFile::_append: erasing, as size %ld would exceed %ld\n", _size + (data.length () + 1), _totalBytes);
             _file.close ();
             SPIFFS.remove (_filename);
+            _usedBytes = 0;
             _open (MODE_WRITING);
             if (_mode == MODE_ERROR)
                 return false;
         }
         _file.println (data);
         _size += data.length () + 2; // \r\n
+        _usedBytes += (data.length () + 2); // probably is not 100% correct due to metadata (e.g. FAT)
         return true;
     }
     bool _read (LineCallback& callback) {
@@ -226,6 +241,7 @@ private:
     }
     bool _erase () {
         _size = -1;
+        _usedBytes = 0;
         if (!SPIFFS.remove (_filename)) {
             _mode = MODE_ERROR;
             return false;
@@ -234,21 +250,16 @@ private:
     }
 
 public:
-    SPIFFSFile (const String& filename, const long maximum): _filename (filename), _maximum (maximum) {}
+    SPIFFSFile (const String& filename): _filename (filename) {}
     bool begin () {
-        if (!SPIFFS.begin (true)) {
-            DEBUG_PRINTF ("SPIFFSFile::begin: failed on SPIFFS.begin (), file activity not available\n");
-            _mode = MODE_ERROR;
-            return false;
-        }
-        const long totalBytes = SPIFFS.totalBytes (), usedBytes = SPIFFS.usedBytes ();
-        DEBUG_PRINTF ("SPIFFSFile::begin: FS totalBytes=%lu, usedBytes=%lu, available=%.2f%%\n", totalBytes, usedBytes, (float) ((totalBytes - usedBytes) * 100.0) / (float) totalBytes);
-        _mode = MODE_CLOSED;
-        return true;
+        return _init ();
     }
     //
     inline long size () const {
         return _size;
+    }
+    inline float remains () const {
+        return (float) ((_totalBytes - _usedBytes) * 100.0) / (float) _totalBytes;
     }
     bool append (const String& data) {
         DEBUG_PRINTF ("SPIFFSFile::append: size=%ld, length=%u\n", _size, data.length ());
@@ -275,9 +286,12 @@ public:
         return _erase ();
     }
     //
-    void serialize (JsonObject &obj) const {
+    void serialize (JsonObject &obj) const override {
         JsonObject file = obj ["file"].to <JsonObject> ();
-        file ["state"] = __file_state_to_string ((int) _mode);
+        file ["mode"] = __file_mode_to_string ((int) _mode);
+        file ["size"] = size ();
+        file ["left"] = _totalBytes - _usedBytes;
+        file ["remains"] = remains ();
     }
 };
 

@@ -104,14 +104,14 @@ protected:
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject network = obj ["network"].to <JsonObject> ();
-        network ["macaddress"] = mac_address ();
+        network ["macaddr"] = mac_address ();
         if ((network ["connected"] = WiFi.isConnected ())) {
-            network ["ipaddress"] = WiFi.localIP ();
+            network ["ipaddr"] = WiFi.localIP ();
             network ["rssi"] = WiFi.RSSI ();
         }
-        _connections.serialize (network ["connections"].to <JsonObject> ());
+        _connections.serialize (network ["connects"].to <JsonObject> ());
         _allocations.serialize (network ["allocations"].to <JsonObject> ());
-        _disconnections.serialize (network ["disconnections"].to <JsonObject> ());
+        _disconnections.serialize (network ["disconnects"].to <JsonObject> ());
     }
 };
 
@@ -184,7 +184,7 @@ public:
 protected:
     void collectAlarms (AlarmSet& alarms) const override {
         if (_failures > config.failureLimit) alarms += ALARM_TIME_NETWORK;
-        if (_drifter.highDrift ()) alarms += ALARM_TIME_DRIFT;
+        if (_drifter.isHighDrift ()) alarms += ALARM_TIME_DRIFT;
     }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject nettime = obj ["nettime"].to <JsonObject> ();

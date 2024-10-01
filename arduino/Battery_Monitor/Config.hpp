@@ -35,8 +35,7 @@
 
 #define DEFAULT_STORAGE_NAME "/data.log"
 #define DEFAULT_STORAGE_WRITE (1000 * 30)
-#define DEFAULT_STORAGE_LENGTH_MAXIMUM (1920401) // should be able to make this dynamic
-#define DEFAULT_STORAGE_LENGTH_CRITICAL (DEFAULT_STORAGE_LENGTH_MAXIMUM * 0.80)
+#define DEFAULT_STORAGE_REMAINS (0.20) // percentage
 #define DEFAULT_STORAGE_FAILURES (3)
 
 #define DEFAULT_INTERVAL_PROCESS (1000 * 5)
@@ -78,7 +77,7 @@ struct Config {
     } publish;
     struct StorageConfig {
         const String filename = DEFAULT_STORAGE_NAME;
-        const size_t lengthMaximum = DEFAULT_STORAGE_LENGTH_MAXIMUM, lengthCritical = DEFAULT_STORAGE_LENGTH_CRITICAL;
+        const float remainLimit = DEFAULT_STORAGE_REMAINS;
         const int failureLimit = DEFAULT_STORAGE_FAILURES;
     } storage;
 

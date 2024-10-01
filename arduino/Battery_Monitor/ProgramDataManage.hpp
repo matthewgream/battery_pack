@@ -68,6 +68,9 @@ protected:
     }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject publish = obj ["publish"].to <JsonObject> ();
+        JsonObject failures = publish ["failures"].to <JsonObject> ();
+        failures ["count"] = _failures;
+        failures ["limit"] = config.failureLimit;
         _publishes.serialize (publish ["publishes"].to <JsonObject> ());
         _mqtt.serialize (publish);
     }
@@ -83,7 +86,7 @@ class StorageManager : public Component, public Alarmable, public Diagnosticable
 
 public:
     typedef SPIFFSFile::LineCallback LineCallback;
-    StorageManager (const Config::StorageConfig& cfg) : config (cfg), _file (config.filename, config.lengthMaximum) {}
+    StorageManager (const Config::StorageConfig& cfg) : config (cfg), _file (config.filename) {}
     void begin () override {
         _failures = _file.begin () ? 0 : _failures + 1;
     }
@@ -108,15 +111,15 @@ public:
 protected:
     void collectAlarms (AlarmSet& alarms) const override {
         if (_failures > config.failureLimit) alarms += ALARM_STORAGE_FAIL;
-        if (_file.size () > (long) config.lengthCritical) alarms += ALARM_STORAGE_SIZE;
+        if (_file.remains () < config.remainLimit) alarms += ALARM_STORAGE_SIZE;
     }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject storage = obj ["storage"].to <JsonObject> ();
-        JsonObject size = storage ["size"].to <JsonObject> ();
-        size ["current"] = _file.size ();
-        size ["maximum"] = config.lengthMaximum;
-        size ["critical"] = config.lengthCritical;
-        size ["erasures"] = _erasures;
+        storage ["critical"] = config.remainLimit;
+        storage ["erasures"] = _erasures;
+        JsonObject failures = storage ["failures"].to <JsonObject> ();
+        failures ["count"] = _failures;
+        failures ["limit"] = config.failureLimit;
         _appends.serialize (storage ["appends"].to <JsonObject> ());
         _file.serialize (storage);
     }

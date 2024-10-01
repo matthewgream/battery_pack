@@ -75,7 +75,7 @@ class Program : public Component, public Diagnosticable {
     OperationalManager operational;
 
     Uptime uptime;
-    ActivationTracker activations;
+    ActivationTracker cycles;
 
     //
 
@@ -123,11 +123,13 @@ class Program : public Component, public Diagnosticable {
             const String diag = doCollect ("diag", [&] (JsonDocument& doc) { diagnostics.collect (doc); });
             doDeliver (diag);
             DEBUG_PRINTF ("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
-            // XXX send via. mqtt if debug
+#ifdef DEBUG
+            if (publish.connected ())
+                publish.publish (diag);
+#endif
         }
-        activations ++;
+        cycles ++;
 
-        // XXX counting part sizes to be < mtu
         // const String x = doCollect ("diag", [&] (JsonDocument& doc) { diagnostics.collect (doc); });
         // DEBUG_PRINTF ("Program::_debug_: diag, length=%d, content=<<<%s>>>\n", x.length (), x.c_str ());
         // JsonSplitter splitter (512, { "type", "time" });
@@ -164,7 +166,7 @@ protected:
         extern const String build_info;
         program ["build"] = build_info;
         program ["uptime"] = uptime.seconds ();
-        activations.serialize (program ["iterations"].to <JsonObject> ());
+        cycles.serialize (program ["cycles"].to <JsonObject> ());
     }
 };
 
