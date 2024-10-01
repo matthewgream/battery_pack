@@ -12,7 +12,7 @@ import androidx.core.view.GestureDetectorCompat
 import org.json.JSONObject
 
 @SuppressLint("ClickableViewAccessibility")
-class DataDiagnosticHandler (private val activity: Activity) {
+class DataProcessorDiagnostic (private val activity: Activity) {
 
     private val scrollView: ScrollView = activity.findViewById (R.id.diagnosticScrollView)
     private val textView: TextView = activity.findViewById (R.id.diagDataTextView)

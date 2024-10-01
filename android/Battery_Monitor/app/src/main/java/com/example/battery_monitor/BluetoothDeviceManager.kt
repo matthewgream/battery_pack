@@ -15,28 +15,33 @@ import android.os.Looper
 import android.util.Log
 import java.util.UUID
 
+@Suppress("PropertyName")
+class BluetoothDeviceManagerConfig {
+    val DEVICE_NAME = "BatteryMonitor"
+    val SERVICE_UUID: UUID = UUID.fromString ("4fafc201-1fb5-459e-8fcc-c5c9c331914b")
+    val CHARACTERISTIC_UUID: UUID = UUID.fromString ("beb5483e-36e1-4688-b7f5-ea07361b26a8")
+    val MTU = 512
+    val CONNECTION_TIMEOUT = 30000L // 30 seconds
+    val DISCOVERY_TIMEOUT = 10000L // 10 seconds
+}
+
 @SuppressLint("MissingPermission")
-@Suppress("PrivatePropertyName")
 class BluetoothDeviceManager (
     private val activity: Activity,
     private val adapter: BluetoothAdapter,
+    private val config: BluetoothDeviceManagerConfig,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
     private val isPermitted: () -> Boolean
 ) {
     private val handler = Handler (Looper.getMainLooper ())
 
-    private val DEVICE_NAME = "BatteryMonitor"
-    private val SERVICE_UUID = UUID.fromString("4fafc201-1fb5-459e-8fcc-c5c9c331914b")
-    private val CHARACTERISTIC_UUID = UUID.fromString("beb5483e-36e1-4688-b7f5-ea07361b26a8")
+    private var connectionTimeoutRunnable: Runnable? = null
+    private var discoveryTimeoutRunnable: Runnable? = null
 
     private var bluetoothGatt: BluetoothGatt? = null
     private var isConnected = false
 
-    private val DEFAULT_MTU = 512
-
-    private val CONNECTION_TIMEOUT = 30000L // 30 seconds
-    private var connectionTimeoutRunnable: Runnable? = null
     private fun connectionTimeoutStart () {
         connectionTimeoutRunnable = Runnable {
             if (!isConnected) {
@@ -44,7 +49,7 @@ class BluetoothDeviceManager (
                 disconnect ()
             }
         }
-        handler.postDelayed (connectionTimeoutRunnable!!, CONNECTION_TIMEOUT)
+        handler.postDelayed (connectionTimeoutRunnable!!, config.CONNECTION_TIMEOUT)
     }
     private fun connectionTimeoutCancel () {
         connectionTimeoutRunnable?.let {
@@ -52,9 +57,6 @@ class BluetoothDeviceManager (
             connectionTimeoutRunnable = null
         }
     }
-
-    private val DISCOVERY_TIMEOUT = 10000L // 10 seconds
-    private var discoveryTimeoutRunnable: Runnable? = null
     private fun discoveryTimeoutStart () {
         discoveryTimeoutRunnable = Runnable {
             if (!isConnected) {
@@ -62,7 +64,7 @@ class BluetoothDeviceManager (
                 disconnect ()
             }
         }
-        handler.postDelayed (discoveryTimeoutRunnable!!, DISCOVERY_TIMEOUT)
+        handler.postDelayed (discoveryTimeoutRunnable!!, config.DISCOVERY_TIMEOUT)
     }
     private fun discoveryTimeoutCancel () {
         discoveryTimeoutRunnable?.let {
@@ -73,11 +75,11 @@ class BluetoothDeviceManager (
 
     private val scanner: BluetoothDeviceScanner = BluetoothDeviceScanner (
         adapter.bluetoothLeScanner,
-        DEVICE_NAME,
-        SERVICE_UUID,
+        BluetoothDeviceScannerConfig (config.DEVICE_NAME, config.SERVICE_UUID),
         onFound = { device -> connect (device) }
     )
     private val checker: BluetoothDeviceChecker = BluetoothDeviceChecker (
+        BluetoothDeviceCheckerConfig (),
         isConnected = { isConnected () },
         onTimeout = { reconnect () }
     )
@@ -151,7 +153,7 @@ class BluetoothDeviceManager (
         checker.start ()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             gatt.requestConnectionPriority (BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER)
-            gatt.requestMtu (DEFAULT_MTU)
+            gatt.requestMtu (config.MTU)
         }
         discoveryTimeoutStart ()
         gatt.discoverServices ()
@@ -160,11 +162,11 @@ class BluetoothDeviceManager (
     private fun discovered (gatt: BluetoothGatt) {
         Log.d ("Bluetooth", "Device discovery completed")
         discoveryTimeoutCancel ()
-        val characteristic = gatt.getService (SERVICE_UUID)?.getCharacteristic (CHARACTERISTIC_UUID)
+        val characteristic = gatt.getService (config.SERVICE_UUID)?.getCharacteristic (config.CHARACTERISTIC_UUID)
         if (characteristic != null) {
             Log.d ("Bluetooth", "Device notifications enable for ${characteristic.uuid}")
             bluetoothGatt?.setCharacteristicNotification (characteristic, true)
-            val descriptor = characteristic.getDescriptor (UUID.fromString ("00002902-0000-1000-8000-00805f9b34fb"))
+            val descriptor = characteristic.getDescriptor (UUID.fromString ("00002902-0000-1000-8000-00805f9b34fb")) //  "Client Characteristic Configuration"
             descriptor?.let {
                 @Suppress("DEPRECATION")
                 it.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
@@ -172,7 +174,7 @@ class BluetoothDeviceManager (
                 bluetoothGatt?.writeDescriptor (it)
             }
         } else {
-            Log.e ("Bluetooth", "Device characteristic $CHARACTERISTIC_UUID or service $SERVICE_UUID not found")
+            Log.e ("Bluetooth", "Device characteristic ${config.CHARACTERISTIC_UUID} or service ${config.SERVICE_UUID} not found")
             disconnect ()
         }
     }

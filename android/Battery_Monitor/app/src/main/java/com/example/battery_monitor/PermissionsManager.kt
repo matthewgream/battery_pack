@@ -9,7 +9,7 @@ class PermissionsManagerFactory (private val activity: Activity) {
         private var requestCode = 1000
     }
     fun create (tag: String, permissions: Array<String>): PermissionsManager {
-        val manager = PermissionsManager (activity, requestCode++, tag, permissions)
+        val manager = PermissionsManager (activity, requestCode ++, tag, permissions)
         if (activity is PermissionsAwareActivity)
             activity.addOnRequestPermissionsResultListener { receivedRequestCode, _, grantResults ->
                 if (receivedRequestCode == manager.requestCode) {
@@ -68,8 +68,7 @@ class PermissionsManager (
             Log.d (tag, "Permissions granted")
             allowed = true
             onAllowed?.invoke ()
-        } else {
+        } else
             Log.d (tag, "Permissions denied")
-        }
     }
 }

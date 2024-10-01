@@ -23,7 +23,6 @@ class NotificationsManager (private val activity: Activity) {
     private val manager: NotificationManager = activity.getSystemService (Context.NOTIFICATION_SERVICE) as NotificationManager
     private val identifier = 1
     private var active: Int? = null
-
     private var previous: String = ""
 
     init {
@@ -38,7 +37,7 @@ class NotificationsManager (private val activity: Activity) {
     private fun show (current: String) {
         if (current != previous) {
             val builder = NotificationCompat.Builder (activity, channelId)
-                .setSmallIcon (android.R.drawable.stat_sys_warning)
+                .setSmallIcon (R.drawable.ic_temp_fan)
                 .setContentTitle (channelTitle)
                 .setContentText (current)
                 .setPriority (NotificationCompat.PRIORITY_DEFAULT)
@@ -67,17 +66,18 @@ class NotificationsManager (private val activity: Activity) {
 
     fun process (current: String) {
         if (current.isNotEmpty ()) {
-            if (!permissions.requested) {
-                previous = current
-                permissions.requestPermissions(
-                    onPermissionsAllowed = { reshow() }
-                )
-            } else if (!permissions.obtained) {
-                previous = current
-            } else if (permissions.allowed) {
-                show (current)
+            when {
+                !permissions.requested -> {
+                    previous = current
+                    permissions.requestPermissions (
+                        onPermissionsAllowed = { reshow () }
+                    )
+                }
+                !permissions.obtained -> previous = current
+                permissions.allowed ->  show (current)
             }
-        } else
+        } else {
             clear ()
+        }
     }
 }

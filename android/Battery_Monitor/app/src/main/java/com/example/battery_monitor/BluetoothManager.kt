@@ -7,7 +7,6 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 
 @SuppressLint("MissingPermission")
 class BluetoothManager (private val activity: Activity, dataCallback: (String) -> Unit, statusCallback: () -> Unit) {
@@ -26,7 +25,7 @@ class BluetoothManager (private val activity: Activity, dataCallback: (String) -
         )
     )
     private val adapter: BluetoothAdapter by lazy {
-        val bluetoothManager = activity.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val bluetoothManager = activity.getSystemService (Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothManager.adapter
     }
     private val checker: BluetoothStateReceiver = BluetoothStateReceiver (
@@ -35,6 +34,7 @@ class BluetoothManager (private val activity: Activity, dataCallback: (String) -
         onEnabled = { device.locate () }
     )
     private val device: BluetoothDeviceManager = BluetoothDeviceManager (activity, adapter,
+        BluetoothDeviceManagerConfig (),
         dataCallback,
         statusCallback,
         isPermitted = { permissions.allowed }

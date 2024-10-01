@@ -9,7 +9,7 @@ import android.util.AttributeSet
 import android.view.View
 import androidx.core.content.ContextCompat
 
-class DisplayBatteryTemperatureView @JvmOverloads constructor (
+class DataViewBatteryTemperature @JvmOverloads constructor (
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0

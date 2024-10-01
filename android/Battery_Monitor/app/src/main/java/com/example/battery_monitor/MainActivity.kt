@@ -19,22 +19,20 @@ class MainActivity : PermissionsAwareActivity () {
     }
     private var powerSaveState : Boolean = false
 
-    private lateinit var bluetoothManager: BluetoothManager
-    private lateinit var dataDiagnosticHandler: DataDiagnosticHandler
-    private lateinit var dataOperationalHandler: DataOperationalHandler
     private lateinit var notificationsManager: NotificationsManager
+    private lateinit var dataProcessor: DataProcessor
+    private lateinit var bluetoothManager: BluetoothManager
 
     //
 
     override fun onCreate (savedInstanceState: Bundle?) {
         super.onCreate (savedInstanceState)
         setContentView (R.layout.activity_main)
-        bluetoothManager = BluetoothManager (this,
-            dataCallback = { data -> processDataReceived (JSONObject (data)) },
-            statusCallback = { processDataConnection (bluetoothManager.isAvailable (), bluetoothManager.isPermitted (), bluetoothManager.isConnected ()) })
-        dataDiagnosticHandler = DataDiagnosticHandler (this)
-        dataOperationalHandler = DataOperationalHandler (this)
         notificationsManager = NotificationsManager(this)
+        dataProcessor = DataProcessor (this, notificationsManager)
+        bluetoothManager = BluetoothManager (this,
+            dataCallback = { data -> dataProcessor.processDataReceived (JSONObject (data)) },
+            statusCallback = { processDataConnection (bluetoothManager.isAvailable (), bluetoothManager.isPermitted (), bluetoothManager.isConnected ()) })
         setupConnectionStatusDoubleTap ()
         setupPowerSave ()
     }
@@ -95,7 +93,7 @@ class MainActivity : PermissionsAwareActivity () {
         }
     }
 
-    private fun processDataConnection (available: Boolean, permitted: Boolean, connected: Boolean) {
+    fun processDataConnection (available: Boolean, permitted: Boolean, connected: Boolean) {
         val text = when {
             !available -> "Bluetooth not available"
             !permitted -> "Bluetooth not permitted"
@@ -103,20 +101,9 @@ class MainActivity : PermissionsAwareActivity () {
             else -> "Bluetooth connected"
         }
         val color = getColor (if (connected) R.color.connected_color else R.color.disconnected_color)
-
         runOnUiThread {
             connectionStatusTextView.text = text
             connectionStatusTextView.setTextColor (color)
-        }
-    }
-    private fun processDataReceived (json: JSONObject) {
-        when (val type = json.getString ("type")) {
-            "data" -> {
-                dataOperationalHandler.render (json)
-                notificationsManager.process (json.getString ("alm"))
-            }
-            "diag" -> dataDiagnosticHandler.render (json)
-            else -> Log.w ("Main", "JSON type unknown: $type")
         }
     }
 }

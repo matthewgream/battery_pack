@@ -101,22 +101,20 @@ class DutyCycleScanner(private val bluetoothAdapter: BluetoothAdapter) {
 
 */
 
-@SuppressLint("MissingPermission")
-class BluetoothDeviceScanner (
-    private val scanner: BluetoothLeScanner,
-    private val name: String,
+@Suppress("PropertyName")
+class BluetoothDeviceScannerConfig (
+    val name: String,
     uuid: UUID,
-    private val onFound: (BluetoothDevice) -> Unit
 ) {
-    private val handler = Handler (Looper.getMainLooper ())
-    private var scanTimeoutRunnable: Runnable? = null
-    private var scanRetryRunnable: Runnable? = null
+    val SCAN_DELAY = 5000L // 5 seconds
+    val SCAN_PERIOD = 30000L // 30 seconds
 
-    private val filter = ScanFilter.Builder ()
+    val filter: ScanFilter = ScanFilter.Builder ()
         .setDeviceName (name)
         .setServiceUuid (ParcelUuid (uuid))
         .build ()
-    private val settings = ScanSettings.Builder ()
+
+    val settings: ScanSettings = ScanSettings.Builder ()
         .setLegacy (false)
         .setPhy (ScanSettings.PHY_LE_ALL_SUPPORTED)
         .setScanMode (ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -126,16 +124,25 @@ class BluetoothDeviceScanner (
         .setNumOfMatches (ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
         .setReportDelay (0L)
         .build ()
+}
 
-    private val SCAN_DELAY = 5000L // 5 seconds
-    private val SCAN_PERIOD = 30000L // 30 seconds
+@SuppressLint("MissingPermission")
+class BluetoothDeviceScanner (
+    private val scanner: BluetoothLeScanner,
+    private val config: BluetoothDeviceScannerConfig,
+    private val onFound: (BluetoothDevice) -> Unit
+) {
+    private val handler = Handler (Looper.getMainLooper ())
+
+    private var scanTimeoutRunnable: Runnable? = null
+    private var scanRetryRunnable: Runnable? = null
 
     private var isScanning = false
 
     private val callback = object : ScanCallback () {
         override fun onScanResult (callbackType: Int, result: ScanResult) {
             val device = result.device
-            if (device.name == name) {
+            if (device.name == config.name) {
                 val deviceName = result.scanRecord?.deviceName
                 val txPower = result.scanRecord?.txPowerLevel
                 val rssi = result.rssi
@@ -154,7 +161,7 @@ class BluetoothDeviceScanner (
             }
             stop ()
             scanRetryRunnable = Runnable { start() }
-            handler.postDelayed (scanRetryRunnable!!, SCAN_DELAY)
+            handler.postDelayed (scanRetryRunnable!!, config.SCAN_DELAY)
         }
     }
 
@@ -170,10 +177,10 @@ class BluetoothDeviceScanner (
 
     fun start () {
         if (!isScanning) {
-            scanner.startScan (listOf (filter), settings, callback)
+            scanner.startScan (listOf (config.filter), config.settings, callback)
             scanTimeoutRunnable = Runnable { stop() }
-            handler.postDelayed (scanTimeoutRunnable!!, SCAN_PERIOD)
-            Log.d ("Bluetooth", "Device scan started, for ${SCAN_PERIOD/1000} seconds")
+            handler.postDelayed (scanTimeoutRunnable!!, config.SCAN_PERIOD)
+            Log.d ("Bluetooth", "Device scan started, for ${config.SCAN_PERIOD/1000} seconds")
             isScanning = true
         }
     }
