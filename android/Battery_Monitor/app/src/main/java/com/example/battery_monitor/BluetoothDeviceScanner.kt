@@ -7,8 +7,6 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
-import android.os.Handler
-import android.os.Looper
 import android.os.ParcelUuid
 import android.util.Log
 import java.util.UUID
@@ -131,23 +129,21 @@ class BluetoothDeviceScanner (
     private val scanner: BluetoothLeScanner,
     private val config: BluetoothDeviceScannerConfig,
     private val onFound: (BluetoothDevice) -> Unit
-) {
-    private val handler = Handler (Looper.getMainLooper ())
+) : BluetoothComponent ("BluetoothDeviceScanner") {
 
-    private var scanTimeoutRunnable: Runnable? = null
-    private var scanRetryRunnable: Runnable? = null
-
-    private var isScanning = false
+    private val retryRunnable = Runnable {
+        start ()
+    }
 
     private val callback = object : ScanCallback () {
         override fun onScanResult (callbackType: Int, result: ScanResult) {
             val device = result.device
             if (device.name == config.name) {
+                stop ()
                 val deviceName = result.scanRecord?.deviceName
                 val txPower = result.scanRecord?.txPowerLevel
                 val rssi = result.rssi
                 Log.d ("Bluetooth", "Device scan located, device ${device.name} / ${device.address} [deviceName=$deviceName, txPower=$txPower, rssi=$rssi]")
-                stop ()
                 onFound (device)
             }
         }
@@ -159,9 +155,7 @@ class BluetoothDeviceScanner (
                 SCAN_FAILED_INTERNAL_ERROR -> Log.e ("Bluetooth", "Device scan failed: internal error")
                 else -> Log.e ("Bluetooth", "Device scan failed: error $errorCode")
             }
-            stop ()
-            scanRetryRunnable = Runnable { start() }
-            handler.postDelayed (scanRetryRunnable!!, config.SCAN_DELAY)
+            restartAfterDelay ()
         }
     }
 
@@ -175,23 +169,23 @@ class BluetoothDeviceScanner (
 //        }, SCAN_PERIOD)
 //    }
 
-    fun start () {
-        if (!isScanning) {
-            scanner.startScan (listOf (config.filter), config.settings, callback)
-            scanTimeoutRunnable = Runnable { stop() }
-            handler.postDelayed (scanTimeoutRunnable!!, config.SCAN_PERIOD)
-            Log.d ("Bluetooth", "Device scan started, for ${config.SCAN_PERIOD/1000} seconds")
-            isScanning = true
-        }
+    private fun restartAfterDelay () {
+        stop ()
+        handler.postDelayed (retryRunnable, config.SCAN_DELAY)
     }
 
-    fun stop () {
-        if (isScanning) {
-            isScanning = false
-            scanTimeoutRunnable?.let { handler.removeCallbacks (it) }
-            scanRetryRunnable?.let { handler.removeCallbacks (it) }
-            scanner.stopScan (callback)
-            Log.d ("Bluetooth", "Device scan stopped")
-        }
+    override val timer: Long
+        get () = config.SCAN_PERIOD
+
+    override fun onStart () {
+        scanner.startScan (listOf (config.filter), config.settings, callback)
+    }
+    override fun onStop () {
+        handler.removeCallbacks (retryRunnable)
+        scanner.stopScan (callback)
+    }
+    override fun onTimer () : Boolean {
+        restartAfterDelay ()
+        return false
     }
 }

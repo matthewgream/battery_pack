@@ -15,6 +15,7 @@ import android.os.Looper
 import android.util.Log
 import java.util.UUID
 
+
 @Suppress("PropertyName")
 class BluetoothDeviceManagerConfig {
     val DEVICE_NAME = "BatteryMonitor"
@@ -36,41 +37,22 @@ class BluetoothDeviceManager (
 ) {
     private val handler = Handler (Looper.getMainLooper ())
 
-    private var connectionTimeoutRunnable: Runnable? = null
-    private var discoveryTimeoutRunnable: Runnable? = null
-
     private var bluetoothGatt: BluetoothGatt? = null
     private var isConnected = false
 
-    private fun connectionTimeoutStart () {
-        connectionTimeoutRunnable = Runnable {
-            if (!isConnected) {
-                Log.e ("Bluetooth", "Device connect timeout")
-                disconnect ()
-            }
-        }
-        handler.postDelayed (connectionTimeoutRunnable!!, config.CONNECTION_TIMEOUT)
-    }
-    private fun connectionTimeoutCancel () {
-        connectionTimeoutRunnable?.let {
-            handler.removeCallbacks (it)
-            connectionTimeoutRunnable = null
+    private lateinit var timeoutName: String
+    private val timeoutRunnable = Runnable {
+        if (!isConnected) {
+            Log.e ("Bluetooth", "Device $timeoutName timeout")
+            disconnect ()
         }
     }
-    private fun discoveryTimeoutStart () {
-        discoveryTimeoutRunnable = Runnable {
-            if (!isConnected) {
-                Log.e ("Bluetooth", "Device discovery timeout")
-                disconnect ()
-            }
-        }
-        handler.postDelayed (discoveryTimeoutRunnable!!, config.DISCOVERY_TIMEOUT)
+    private fun timeoutStart (name: String, timeout: Long) {
+        timeoutName = name
+        handler.postDelayed (timeoutRunnable, timeout)
     }
-    private fun discoveryTimeoutCancel () {
-        discoveryTimeoutRunnable?.let {
-            handler.removeCallbacks (it)
-            discoveryTimeoutRunnable = null
-        }
+    private fun timeoutStop () {
+        handler.removeCallbacks (timeoutRunnable)
     }
 
     private val scanner: BluetoothDeviceScanner = BluetoothDeviceScanner (
@@ -136,18 +118,19 @@ class BluetoothDeviceManager (
             isConnected -> Log.d ("Bluetooth", "Bluetooth device is already connected, will not locate")
             else -> scanner.start ()
         }
+        Log.d ("Bluetooth", "end of locate")
     }
 
     private fun connect (device: BluetoothDevice) {
         Log.d ("Bluetooth", "Device connect to ${device.name} / ${device.address}")
-        connectionTimeoutStart ()
+        timeoutStart ("connection", config.CONNECTION_TIMEOUT)
         bluetoothGatt = device.connectGatt (activity, true, gattCallback)
     }
 
     @SuppressLint("ObsoleteSdkInt")
     private fun connected (gatt: BluetoothGatt) {
         Log.d ("Bluetooth", "Device connected to GATT server")
-        connectionTimeoutCancel ()
+        timeoutStop ()
         isConnected = true
         statusCallback ()
         checker.start ()
@@ -155,13 +138,13 @@ class BluetoothDeviceManager (
             gatt.requestConnectionPriority (BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER)
             gatt.requestMtu (config.MTU)
         }
-        discoveryTimeoutStart ()
+        timeoutStart ("discovery", config.DISCOVERY_TIMEOUT)
         gatt.discoverServices ()
     }
 
     private fun discovered (gatt: BluetoothGatt) {
         Log.d ("Bluetooth", "Device discovery completed")
-        discoveryTimeoutCancel ()
+        timeoutStop ()
         val characteristic = gatt.getService (config.SERVICE_UUID)?.getCharacteristic (config.CHARACTERISTIC_UUID)
         if (characteristic != null) {
             Log.d ("Bluetooth", "Device notifications enable for ${characteristic.uuid}")
@@ -195,9 +178,7 @@ class BluetoothDeviceManager (
             bluetoothGatt?.close ()
             bluetoothGatt = null
         }
-        discoveryTimeoutCancel ()
-        connectionTimeoutCancel ()
-        handler.removeCallbacksAndMessages (null)
+        timeoutStop ()
         scanner.stop ()
         checker.stop ()
         isConnected = false
