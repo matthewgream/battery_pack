@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 
 @SuppressLint("MissingPermission")
 class BluetoothManager (private val activity: Activity, dataCallback: (String) -> Unit, statusCallback: () -> Unit) {
@@ -65,8 +66,16 @@ class BluetoothManager (private val activity: Activity, dataCallback: (String) -
     fun onDoubleTap () {
         device.reconnect ()
     }
+    fun onPowerSave (enabled: Boolean) {
+        // ??? reduce the scanning
+        // ??? reduce the data reception period
+        // ??? reduce the diagnostics rendering
+    }
+
+    //
 
     fun isAvailable (): Boolean = adapter.isEnabled
     fun isPermitted (): Boolean = permissions.allowed
     fun isConnected (): Boolean = device.isConnected ()
+
 }

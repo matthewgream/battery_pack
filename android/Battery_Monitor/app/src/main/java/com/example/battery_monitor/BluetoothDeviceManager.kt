@@ -33,6 +33,8 @@ class BluetoothDeviceManager (
     private var bluetoothGatt: BluetoothGatt? = null
     private var isConnected = false
 
+    private val DEFAULT_MTU = 512
+
     private val CONNECTION_TIMEOUT = 30000L // 30 seconds
     private var connectionTimeoutRunnable: Runnable? = null
     private fun connectionTimeoutStart () {
@@ -50,9 +52,24 @@ class BluetoothDeviceManager (
             connectionTimeoutRunnable = null
         }
     }
-//    private val DISCOVERY_TIMEOUT = 10000L // 10 seconds
-    private val DEFAULT_MTU = 512
-//    private val discoveryTimeoutToken = 12312
+
+    private val DISCOVERY_TIMEOUT = 10000L // 10 seconds
+    private var discoveryTimeoutRunnable: Runnable? = null
+    private fun discoveryTimeoutStart () {
+        discoveryTimeoutRunnable = Runnable {
+            if (!isConnected) {
+                Log.e ("Bluetooth", "Device discovery timeout")
+                disconnect ()
+            }
+        }
+        handler.postDelayed (discoveryTimeoutRunnable!!, DISCOVERY_TIMEOUT)
+    }
+    private fun discoveryTimeoutCancel () {
+        discoveryTimeoutRunnable?.let {
+            handler.removeCallbacks (it)
+            discoveryTimeoutRunnable = null
+        }
+    }
 
     private val scanner: BluetoothDeviceScanner = BluetoothDeviceScanner (
         adapter.bluetoothLeScanner,
@@ -69,20 +86,20 @@ class BluetoothDeviceManager (
         override fun onConnectionStateChange (gatt: BluetoothGatt, status: Int, newState: Int) {
             when (status) {
                 BluetoothGatt.GATT_SUCCESS -> {
-                    connectionTimeoutCancel ()
                     when (newState) {
                         BluetoothProfile.STATE_CONNECTED -> connected (gatt)
                         BluetoothProfile.STATE_DISCONNECTED -> disconnected ()
                     }
+                    return
                 }
-                0x85 -> Log.e("Bluetooth", "Device connection timed out")
-                0x3E -> Log.e("Bluetooth", "Device connection terminated by local host")
-                0x3B -> Log.e("Bluetooth", "Device connection terminated by remote device")
-                else -> Log.e("Bluetooth", "Device connection state change error: $status")
+                0x3E -> Log.e ("Bluetooth", "Device connection terminated by local host")
+                0x3B -> Log.e ("Bluetooth", "Device connection terminated by remote device")
+                0x85 -> Log.e ("Bluetooth", "Device connection timed out")
+                else -> Log.e ("Bluetooth", "Device connection state change error: $status")
             }
+            disconnect ()
         }
         override fun onServicesDiscovered (gatt: BluetoothGatt, status: Int) {
-//            handler.removeCallbacksAndMessages (discoveryTimeoutToken)
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 Log.e ("Bluetooth", "Device discovery error: $status")
                 disconnect ()
@@ -94,10 +111,12 @@ class BluetoothDeviceManager (
             dataReceived (characteristic.uuid, value)
         }
         override fun onMtuChanged (gatt: BluetoothGatt, mtu: Int, status: Int) {
-            if (status == BluetoothGatt.GATT_SUCCESS)
-                Log.d ("Bluetooth", "Device MTU changed to $mtu")
-            else
+            if (status != BluetoothGatt.GATT_SUCCESS) {
                 Log.e ("Bluetooth", "Device MTU change failed: $status")
+                // disconnect ??
+            } else {
+                Log.d ("Bluetooth", "Device MTU changed to $mtu")
+            }
         }
     }
 
@@ -110,46 +129,37 @@ class BluetoothDeviceManager (
         Log.d ("Bluetooth", "Device locate initiated")
         statusCallback ()
         when {
-            !adapter.isEnabled -> {
-                Log.e ("Bluetooth", "Bluetooth is not enabled")
-                // prompt to enable? TBD
-            }
-            !isPermitted () -> {
-                Log.e ("Bluetooth", "Bluetooth is not permitted")
-                // re-request permission TBD
-            }
-            isConnected -> {
-                Log.d ("Bluetooth", "Bluetooth is already connected, will not locate")
-            }
+            !adapter.isEnabled -> Log.e ("Bluetooth", "Bluetooth is not enabled")
+            !isPermitted () -> Log.e ("Bluetooth", "Bluetooth is not permitted")
+            isConnected -> Log.d ("Bluetooth", "Bluetooth device is already connected, will not locate")
             else -> scanner.start ()
         }
     }
 
     private fun connect (device: BluetoothDevice) {
-        Log.d ("Bluetooth", "Device connect, to ${device.name} / ${device.address}")
-        bluetoothGatt = device.connectGatt (activity, true, gattCallback)
+        Log.d ("Bluetooth", "Device connect to ${device.name} / ${device.address}")
         connectionTimeoutStart ()
+        bluetoothGatt = device.connectGatt (activity, true, gattCallback)
     }
 
     @SuppressLint("ObsoleteSdkInt")
     private fun connected (gatt: BluetoothGatt) {
-        Log.d ("Bluetooth", "Device connected (to GATT server)")
+        Log.d ("Bluetooth", "Device connected to GATT server")
+        connectionTimeoutCancel ()
         isConnected = true
         statusCallback ()
+        checker.start ()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             gatt.requestConnectionPriority (BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER)
             gatt.requestMtu (DEFAULT_MTU)
         }
-//        handler.postDelayed ({
-//            Log.e ("Bluetooth", "Device discovery timeout")
-//            disconnect ()
-//        }, discoveryTimeoutToken, DISCOVERY_TIMEOUT)
+        discoveryTimeoutStart ()
         gatt.discoverServices ()
-        checker.start ()
     }
 
     private fun discovered (gatt: BluetoothGatt) {
         Log.d ("Bluetooth", "Device discovery completed")
+        discoveryTimeoutCancel ()
         val characteristic = gatt.getService (SERVICE_UUID)?.getCharacteristic (CHARACTERISTIC_UUID)
         if (characteristic != null) {
             Log.d ("Bluetooth", "Device notifications enable for ${characteristic.uuid}")
@@ -178,21 +188,26 @@ class BluetoothDeviceManager (
     }
 
     fun disconnect () {
-        connectionTimeoutCancel ()
-        handler.removeCallbacksAndMessages (null)
-        scanner.stop ()
-        checker.stop ()
         if (bluetoothGatt != null) {
             Log.d ("Bluetooth", "Device disconnect")
             bluetoothGatt?.close ()
             bluetoothGatt = null
         }
+        discoveryTimeoutCancel ()
+        connectionTimeoutCancel ()
+        handler.removeCallbacksAndMessages (null)
+        scanner.stop ()
+        checker.stop ()
         isConnected = false
         statusCallback ()
     }
 
     private fun disconnected () {
-        Log.d ("Bluetooth", "Device disconnected (from GATT server)")
+        Log.d ("Bluetooth", "Device disconnected from GATT server")
+        if (bluetoothGatt != null) {
+            bluetoothGatt?.close ()
+            bluetoothGatt = null
+        }
         checker.stop ()
         isConnected = false
         statusCallback ()
@@ -200,7 +215,7 @@ class BluetoothDeviceManager (
     }
 
     fun reconnect () {
-        Log.d ("Bluetooth", "Device reconnect (forced)")
+        Log.d ("Bluetooth", "Device reconnect")
         disconnect ()
         handler.postDelayed ({
             locate ()

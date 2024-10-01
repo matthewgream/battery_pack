@@ -95,7 +95,7 @@
 
                 </LinearLayout>
 
-                <com.example.battery_monitor.BatteryTemperatureView
+                <com.example.battery_monitor.DisplayBatteryTemperatureView
                     android:id="@+id/batteryTempValuesView"
                     android:layout_width="match_parent"
                     android:layout_height="150dp"

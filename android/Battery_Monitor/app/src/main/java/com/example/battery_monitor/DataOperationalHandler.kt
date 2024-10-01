@@ -13,7 +13,7 @@ class DataOperationalHandler (private val activity: Activity) {
     private val batteryTempMinTextView: TextView = activity.findViewById(R.id.batteryTempMinTextView)
     private val batteryTempAvgTextView: TextView = activity.findViewById(R.id.batteryTempAvgTextView)
     private val batteryTempMaxTextView: TextView = activity.findViewById(R.id.batteryTempMaxTextView)
-    private val batteryTempValuesView: BatteryTemperatureView = activity.findViewById(R.id.batteryTempValuesView)
+    private val batteryTempValuesView: DisplayBatteryTemperatureView = activity.findViewById(R.id.batteryTempValuesView)
     private val fanSpeedTextView: TextView = activity.findViewById(R.id.fanSpeedTextView)
     private val alarmsTextView: TextView = activity.findViewById(R.id.alarmsTextView)
 

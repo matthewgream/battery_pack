@@ -1,9 +1,9 @@
 package com.example.battery_monitor
 
 import android.annotation.SuppressLint
-//import android.content.Context
+import android.content.Context
 import android.os.Bundle
-//import android.os.PowerManager
+import android.os.PowerManager
 import android.util.Log
 import android.widget.TextView
 import org.json.JSONObject
@@ -17,6 +17,7 @@ class MainActivity : PermissionsAwareActivity () {
     private val connectionStatusTextView: TextView by lazy {
         findViewById (R.id.connectionStatusTextView)
     }
+    private var powerSaveState : Boolean = false
 
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var dataDiagnosticHandler: DataDiagnosticHandler
@@ -35,6 +36,7 @@ class MainActivity : PermissionsAwareActivity () {
         dataOperationalHandler = DataOperationalHandler (this)
         notificationsManager = NotificationsManager(this)
         setupConnectionStatusDoubleTap ()
+        setupPowerSave ()
     }
 
     override fun onDestroy () {
@@ -52,8 +54,32 @@ class MainActivity : PermissionsAwareActivity () {
         super.onResume ()
         bluetoothManager.onResume ()
     }
+    private fun onPowerSave (enabled: Boolean) {
+        Log.d ("Main", "onPowerSave")
+        bluetoothManager.onPowerSave (enabled)
+    }
 
     //
+
+    private fun setupPowerSave () {
+        val powerManager = getSystemService (Context.POWER_SERVICE) as PowerManager
+        powerSaveState = powerManager.isPowerSaveMode
+        powerManager.addThermalStatusListener { status ->
+            when (status) {
+                PowerManager.THERMAL_STATUS_SEVERE,
+                PowerManager.THERMAL_STATUS_CRITICAL ->
+                    if (!powerSaveState) {
+                        powerSaveState = true
+                        onPowerSave(true)
+                    }
+                else ->
+                    if (powerSaveState ) {
+                        powerSaveState = false
+                        onPowerSave(false)
+                }
+            }
+        }
+    }
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupConnectionStatusDoubleTap () {
@@ -93,20 +119,4 @@ class MainActivity : PermissionsAwareActivity () {
             else -> Log.w ("Main", "JSON type unknown: $type")
         }
     }
-
-//    fun canPerformBluetoothOperations (): Boolean {
-//        val powerManager = getSystemService (Context.POWER_SERVICE) as PowerManager
-//        return !powerManager.isPowerSaveMode && resources.getBoolean (R.bool.config_bluetooth_allowed_while_driving)
-//    }
-//    fun registerDozeListener () {
-//        val powerManager = getSystemService (Context.POWER_SERVICE) as PowerManager
-//        powerManager.addThermalStatusListener { status ->
-//            when (status) {
-//                PowerManager.THERMAL_STATUS_SEVERE,
-//                PowerManager.THERMAL_STATUS_CRITICAL -> pause ()
-//                else -> resume ()
-//            }
-//        }
-//    }
-
 }

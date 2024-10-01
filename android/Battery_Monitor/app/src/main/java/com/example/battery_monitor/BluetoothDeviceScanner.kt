@@ -13,8 +13,95 @@ import android.os.ParcelUuid
 import android.util.Log
 import java.util.UUID
 
+/*
+class AdaptiveBluetoothScanner(private val bluetoothAdapter: BluetoothAdapter) {
+    private var scanInterval = 5000L // Start with 5 seconds
+    private var scanDuration = 10000L // Start with 10 seconds
+    private val maxInterval = 5 * 60 * 1000L // 5 minutes
+    private val minInterval = 1000L // 1 second
+    private var deviceFoundRecently = false
+
+    private val handler = Handler(Looper.getMainLooper())
+    private var isScanning = false
+
+    private val scanCallback = object : ScanCallback() {
+        override fun onScanResult(callbackType: Int, result: ScanResult) {
+            // Device found logic
+            deviceFoundRecently = true
+            decreaseScanInterval()
+        }
+    }
+
+    fun startAdaptiveScanning() {
+        handler.post(object : Runnable {
+            override fun run() {
+                if (isScanning) {
+                    stopScan()
+                    if (!deviceFoundRecently) {
+                        increaseScanInterval()
+                    }
+                    deviceFoundRecently = false
+                    handler.postDelayed(this, scanInterval)
+                } else {
+                    startScan()
+                    handler.postDelayed(this, scanDuration)
+                }
+            }
+        })
+    }
+
+    private fun startScan() {
+        isScanning = true
+        bluetoothAdapter.bluetoothLeScanner.startScan(scanCallback)
+    }
+
+    private fun stopScan() {
+        isScanning = false
+        bluetoothAdapter.bluetoothLeScanner.stopScan(scanCallback)
+    }
+
+    private fun increaseScanInterval() {
+        scanInterval = (scanInterval * 1.5).toLong().coerceAtMost(maxInterval)
+    }
+
+    private fun decreaseScanInterval() {
+        scanInterval = (scanInterval * 0.7).toLong().coerceAtLeast(minInterval)
+    }
+}
+
+class DutyCycleScanner(private val bluetoothAdapter: BluetoothAdapter) {
+    private val SCAN_PERIOD_ACTIVE = 10000L // 10 seconds
+    private val SCAN_PERIOD_IDLE = 50000L // 50 seconds
+    private val handler = Handler(Looper.getMainLooper())
+
+    private val scanCallback = object : ScanCallback() {
+        // Implement callback methods
+    }
+
+    fun startDutyCycleScanning() {
+        scanCycle()
+    }
+
+    private fun scanCycle() {
+        startScan()
+        handler.postDelayed({
+            stopScan()
+            handler.postDelayed({ scanCycle() }, SCAN_PERIOD_IDLE)
+        }, SCAN_PERIOD_ACTIVE)
+    }
+
+    private fun startScan() {
+        bluetoothAdapter.bluetoothLeScanner.startScan(scanCallback)
+    }
+
+    private fun stopScan() {
+        bluetoothAdapter.bluetoothLeScanner.stopScan(scanCallback)
+    }
+}
+
+*/
+
 @SuppressLint("MissingPermission")
-@Suppress("PrivatePropertyName")
 class BluetoothDeviceScanner (
     private val scanner: BluetoothLeScanner,
     private val name: String,
@@ -31,6 +118,7 @@ class BluetoothDeviceScanner (
         .build ()
     private val settings = ScanSettings.Builder ()
         .setLegacy (false)
+        .setPhy (ScanSettings.PHY_LE_ALL_SUPPORTED)
         .setScanMode (ScanSettings.SCAN_MODE_LOW_LATENCY)
         .setScanMode (ScanSettings.SCAN_MODE_LOW_POWER)
         .setCallbackType (ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
@@ -41,8 +129,6 @@ class BluetoothDeviceScanner (
 
     private val SCAN_DELAY = 5000L // 5 seconds
     private val SCAN_PERIOD = 30000L // 30 seconds
-//    private val SCAN_PERIOD = 10000L // 10 seconds
-//    private val SCAN_INTERVAL = 60000L // 1 minute
 
     private var isScanning = false
 
@@ -72,6 +158,8 @@ class BluetoothDeviceScanner (
         }
     }
 
+//    private val SCAN_PERIOD = 10000L // 10 seconds
+//    private val SCAN_INTERVAL = 60000L // 1 minute
 //    fun dutyCycleScan () {
 //        start ()
 //        handler.postDelayed ({
@@ -82,11 +170,11 @@ class BluetoothDeviceScanner (
 
     fun start () {
         if (!isScanning) {
-            isScanning = true
             scanner.startScan (listOf (filter), settings, callback)
             scanTimeoutRunnable = Runnable { stop() }
             handler.postDelayed (scanTimeoutRunnable!!, SCAN_PERIOD)
             Log.d ("Bluetooth", "Device scan started, for ${SCAN_PERIOD/1000} seconds")
+            isScanning = true
         }
     }
 
