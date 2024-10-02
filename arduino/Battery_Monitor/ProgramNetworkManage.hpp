@@ -69,13 +69,13 @@ private:
     const Config &config;
     ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
     bool _available = false;
-    WiFiEventId_t _events = 0;
+    WiFiEventId_t _eventsHandle = 0;
 
 public:
     ConnectManager (const Config& cfg) : Singleton <ConnectManager> (this), config (cfg) {}
-    ~ConnectManager () { if (_events) WiFi.removeEvent (_events); }
+    ~ConnectManager () { if (_eventsHandle) WiFi.removeEvent (_eventsHandle); }
     void begin () override {
-        _events = WiFi.onEvent (__ConnectManager_WiFiEventHandler);
+        _eventsHandle = WiFi.onEvent (__ConnectManager_WiFiEventHandler);
         WiFi.setHostname (config.client.c_str ());
         WiFi.setAutoReconnect (true);
         WiFi.mode (WIFI_STA);
@@ -166,7 +166,7 @@ public:
               const time_t fetchedTime = _fetcher.fetch ();
               if (fetchedTime > 0) {
                   _fetches += IntToString (fetchedTime);
-                  struct timeval tv = { .tv_sec = fetchedTime, .tv_usec = 0 };
+                  const struct timeval tv = { .tv_sec = fetchedTime, .tv_usec = 0 };
                   settimeofday (&tv, nullptr);
                   if (_previousTime > 0)
                       _persistentDrift = _drifter.updateDrift (fetchedTime - _previousTime, currentTime - _previousTimeUpdate);

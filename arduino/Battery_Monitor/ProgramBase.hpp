@@ -47,14 +47,16 @@ typedef uint32_t _AlarmType;
 #define ALARM_NONE                  (0UL)
 #define ALARM_TIME_SYNC             _ALARM_NUMB (0)
 #define ALARM_TIME_DRIFT            _ALARM_NUMB (1)
-#define ALARM_TEMPERATURE_MINIMAL   _ALARM_NUMB (2)
-#define ALARM_TEMPERATURE_MAXIMAL   _ALARM_NUMB (3)
-#define ALARM_STORAGE_FAIL          _ALARM_NUMB (4)
-#define ALARM_STORAGE_SIZE          _ALARM_NUMB (5)
-#define ALARM_PUBLISH_FAIL          _ALARM_NUMB (6)
-#define ALARM_DELIVER_SIZE          _ALARM_NUMB (7)
-#define _ALARM_COUNT                 (8)
-static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_MIN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "DELIVER_SIZE" };
+#define ALARM_TEMPERATURE_FAILURE   _ALARM_NUMB (2)
+#define ALARM_TEMPERATURE_MINIMAL   _ALARM_NUMB (3)
+#define ALARM_TEMPERATURE_WARNING   _ALARM_NUMB (4)
+#define ALARM_TEMPERATURE_MAXIMAL   _ALARM_NUMB (5)
+#define ALARM_STORAGE_FAIL          _ALARM_NUMB (6)
+#define ALARM_STORAGE_SIZE          _ALARM_NUMB (7)
+#define ALARM_PUBLISH_FAIL          _ALARM_NUMB (8)
+#define ALARM_DELIVER_SIZE          _ALARM_NUMB (9)
+#define _ALARM_COUNT                 (10)
+static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_FAIL", "TEMP_MIN", "TEMP_WARN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "DELIVER_SIZE" };
 #define _ALARM_NAME(x)               (_ALARM_NAMES [x])
 
 class AlarmSet {
@@ -65,7 +67,7 @@ public:
     inline size_t size () const { return _ALARM_COUNT; }
     inline bool isAny () const { return (_alarms != ALARM_NONE); }
     inline bool isSet (const int number) const { return (_alarms & _ALARM_NUMB (number)); }
-    inline operator _AlarmType () const { return _alarms; }
+    inline operator const _AlarmType& () const { return _alarms; }
     inline AlarmSet& operator+= (const _AlarmType alarm) { _alarms |= alarm; return *this; }
     inline AlarmSet& operator+= (const AlarmSet& other) { _alarms |= other._alarms; return *this; }
     inline AlarmSet operator^ (const AlarmSet& other) const { AlarmSet result; result._alarms = _alarms ^ other._alarms; return result; }

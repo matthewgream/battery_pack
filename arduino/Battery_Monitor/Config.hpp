@@ -68,10 +68,11 @@ struct Config {
     // hardware managers
     TemperatureManager::Config temperatureManager = {
         .PROBE_NUMBER = 16, .PROBE_ENVIRONMENT = 15,
-        .MINIMAL = -20.0, .WARNING = 40.0, .CRITICAL = 50.0
+        .SETPOINT = 25.0,
+        .FAILURE = -100.0, .MINIMAL = -20.0, .WARNING = 35.0, .MAXIMAL = 45.0
     };
     FanManager::Config fanManager = {
-        .MIN_SPEED = 85, .MAX_SPEED = 255
+        .NO_SPEED = 0, .MIN_SPEED = 85, .MAX_SPEED = 255
     };
 
     // network managers

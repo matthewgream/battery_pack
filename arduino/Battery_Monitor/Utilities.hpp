@@ -47,7 +47,7 @@ class MovingAverage {
     size_t count = 0;
 
 public:
-    T update (const T value) {
+    virtual T update (const T value) {
         if (count < WINDOW)
             values [count ++] = value;
         else {
@@ -56,9 +56,27 @@ public:
             values.back () = value;
         }
         sum += value;
-        return sum / count;
+        return sum / static_cast<T> (count);
     }
 };
+
+template <typename T, int WINDOW = 16>
+class MovingAverageValue: public MovingAverage <T, WINDOW> {
+    T val = T (0);
+    std::function <T(T)> process;
+public:
+    MovingAverageValue (std::function <T(T)> proc = [] (T x) { return x; }): process (proc) {}
+    virtual T update (const T value) override {
+        val = process (MovingAverage <T, WINDOW>::update (value));
+        return val;
+    }
+    inline MovingAverageValue& operator= (const T value) { update (value); return *this; }
+    inline operator const T& () const { return val; }
+};
+
+inline float round2places (float value) {
+    return std::round (value * 100.0f) / 100.0f;
+}
 
 // -----------------------------------------------------------------------------------------------
 

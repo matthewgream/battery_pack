@@ -34,7 +34,7 @@ public:
         analogReadResolution (ADC_RESOLUTION);
         _muxInterface.enable ();
     }
-    float get (const int channel) const {
+    float getTemperature (const int channel) const {
         assert (channel >= 0 && channel < MuxInterface_CD74HC4067::CHANNELS && "Channel out of range");
         uint16_t value = _muxInterface.get (channel);
         const_cast <TemperatureInterface*> (this)->updateValues (channel, value);
