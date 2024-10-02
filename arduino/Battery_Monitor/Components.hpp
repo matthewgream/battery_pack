@@ -107,13 +107,13 @@ class MQTTPublisher: public JsonSerializable {
 
 public:
     typedef struct {
-        const String client, host, user, pass, topic;
-        const uint16_t port;
-        const uint16_t bufferSize;
+        String client, host, user, pass, topic;
+        uint16_t port;
+        uint16_t bufferSize;
     } Config;
-private:
-    const Config& config;
 
+private:
+    const Config config;
     WiFiClient _wifiClient;
     PubSubClient _mqttClient;
 

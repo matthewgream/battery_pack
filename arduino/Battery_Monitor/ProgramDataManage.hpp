@@ -2,12 +2,19 @@
 // -----------------------------------------------------------------------------------------------
 
 class DeliverManager : public Component, public Alarmable, public Diagnosticable {
-    const Config::DeliverConfig& config;
+
+public:
+    typedef struct {
+        BluetoothNotifier::Config blue;
+    } Config;
+
+private:
+    const Config config;
     BluetoothNotifier _blue;
     ActivationTrackerWithDetail _delivers;
 
 public:
-    DeliverManager (const Config::DeliverConfig& cfg) : config (cfg), _blue (cfg.blue) {}
+    DeliverManager (const Config& cfg) : config (cfg), _blue (cfg.blue) {}
     void begin () override {
         _blue.advertise ();
     }
@@ -34,16 +41,24 @@ protected:
 };
 
 // -----------------------------------------------------------------------------------------------
-
+    
 class PublishManager : public Component, public Alarmable, public Diagnosticable {
-    const Config::PublishConfig& config;
+
+public:
+    typedef struct {
+        MQTTPublisher::Config mqtt;
+        int failureLimit;
+    } Config;
+
+private:
+    const Config config;
     ConnectManager &_network;
     MQTTPublisher _mqtt;
     ActivationTrackerWithDetail _publishes;
     counter_t _failures = 0;
 
 public:
-    PublishManager (const Config::PublishConfig& cfg, ConnectManager &network) : config (cfg), _network (network), _mqtt (cfg.mqtt) {}
+    PublishManager (const Config& cfg, ConnectManager &network) : config (cfg), _network (network), _mqtt (cfg.mqtt) {}
     void begin () override {
         _mqtt.setup ();
     }
@@ -79,14 +94,23 @@ protected:
 // -----------------------------------------------------------------------------------------------
 
 class StorageManager : public Component, public Alarmable, public Diagnosticable {
-    const Config::StorageConfig& config;
+
+public:
+    typedef struct {
+        String filename ;
+        float remainLimit;
+        int failureLimit;
+    } Config;
+
+private:
+    const Config config;
     SPIFFSFile _file;
     ActivationTrackerWithDetail _appends;
     counter_t _failures = 0, _erasures = 0;
 
 public:
     typedef SPIFFSFile::LineCallback LineCallback;
-    StorageManager (const Config::StorageConfig& cfg) : config (cfg), _file (config.filename) {}
+    StorageManager (const Config& cfg) : config (cfg), _file (config.filename) {}
     void begin () override {
         _failures = _file.begin () ? 0 : _failures + 1;
     }

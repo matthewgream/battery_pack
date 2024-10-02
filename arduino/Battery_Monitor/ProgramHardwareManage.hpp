@@ -2,12 +2,19 @@
 // -----------------------------------------------------------------------------------------------
 
 class TemperatureManager: public Component {
+
+public:
+    typedef struct {
+        int PROBE_NUMBER, PROBE_ENVIRONMENT;
+        float MINIMAL, WARNING, CRITICAL;
+    } Config;
+
 protected:
-    const Config::TemperatureInterfaceConfig& config;
+    const Config config;
     TemperatureInterface& _temperature;
 
 public:
-    TemperatureManager (const Config::TemperatureInterfaceConfig& cfg, TemperatureInterface& temperature) : config (cfg), _temperature (temperature) {};
+    TemperatureManager (const Config& cfg, TemperatureInterface& temperature) : config (cfg), _temperature (temperature) {};
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -18,10 +25,10 @@ class TemperatureManagerBatterypack: public TemperatureManager, public Alarmable
     typedef std::array <float, _num> Values;
     float _min, _max, _avg;
     Values _values;
-    std::array <MovingAverage <float>, _num> _filters;
+    std::array <MovingAverage <float, 16>, _num> _filters;
 
 public:
-    TemperatureManagerBatterypack (const Config::TemperatureInterfaceConfig& cfg, TemperatureInterface& temperature) : TemperatureManager (cfg, temperature) {};
+    TemperatureManagerBatterypack (const TemperatureManager::Config& cfg, TemperatureInterface& temperature) : TemperatureManager (cfg, temperature) {};
     void process () override {
         float sum = 0.0;
         _min = 1000.0;
@@ -60,10 +67,10 @@ protected:
 
 class TemperatureManagerEnvironment : public TemperatureManager, public Alarmable {
     float _value;
-    MovingAverage <float> _filter;
+    MovingAverage <float, 16> _filter;
 
 public:
-    TemperatureManagerEnvironment (const Config::TemperatureInterfaceConfig& cfg, TemperatureInterface& temperature) : TemperatureManager (cfg, temperature) {};
+    TemperatureManagerEnvironment (const TemperatureManager::Config& cfg, TemperatureInterface& temperature) : TemperatureManager (cfg, temperature) {};
     void process () override {
         _value = _filter.update (_temperature.get (config.PROBE_ENVIRONMENT));
         DEBUG_PRINTF ("TemperatureManagerEnvironment::process: temp=%.2f\n", _value);
@@ -80,14 +87,21 @@ protected:
 // -----------------------------------------------------------------------------------------------
 
 class FanManager : public Component {
-    const Config::FanInterfaceConfig &config;
+
+public:
+    typedef struct {
+        uint8_t MIN_SPEED, MAX_SPEED;
+    } Config;
+
+private:
+    const Config config;
     FanInterface &_fan;
     PidController &_controllerAlgorithm;
     AlphaSmoothing &_smootherAlgorithm;
     const TemperatureManagerBatterypack& _temperatures;
 
 public:
-    FanManager (const Config::FanInterfaceConfig& cfg, FanInterface& fan, const TemperatureManagerBatterypack& temperatures, PidController& controller, AlphaSmoothing& smoother) : config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _temperatures (temperatures) {}
+    FanManager (const Config& cfg, FanInterface& fan, const TemperatureManagerBatterypack& temperatures, PidController& controller, AlphaSmoothing& smoother) : config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _temperatures (temperatures) {}
     void process () override {
         const float setpoint = _temperatures.setpoint (), current = _temperatures.current ();
         const float speedCalculated = _controllerAlgorithm.apply (setpoint, current);

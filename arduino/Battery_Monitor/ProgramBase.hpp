@@ -23,11 +23,16 @@ public:
 };
 
 class DiagnosticManager : public Component {
-    const Config::DiagnosticConfig& config;
+public:
+    typedef struct {
+    } Config;
+
+private:
+    const Config config;
     Diagnosticable::List _diagnosticables;
 
 public:
-    DiagnosticManager (const Config::DiagnosticConfig& cfg, const Diagnosticable::List diagnosticables) : config (cfg), _diagnosticables (diagnosticables) {}
+    DiagnosticManager (const Config& cfg, const Diagnosticable::List diagnosticables) : config (cfg), _diagnosticables (diagnosticables) {}
     void collect (JsonDocument &doc) const {
         for (const auto& diagnosticable : _diagnosticables)
             diagnosticable->collectDiagnostics (doc);
@@ -91,15 +96,22 @@ public:
 };
 
 class AlarmManager : public Component, public Diagnosticable {
-    const Config::AlarmConfig& config;
+
+public:
+    typedef struct {
+        int PIN_ALARM = 0;
+    } Config;
+
+private:
+    const Config config;
     Alarmable::List _alarmables;
     AlarmSet _alarms;
     std::array <ActivationTracker, _ALARM_COUNT> _activations, _deactivations;
 
 public:
-    AlarmManager (const Config::AlarmConfig& cfg, const Alarmable::List alarmables) : config (cfg), _alarmables (alarmables) {}
+    AlarmManager (const Config& cfg, const Alarmable::List alarmables) : config (cfg), _alarmables (alarmables) {}
     void begin () override {
-        if (config.PIN_ALARM > 0)
+        if (config.PIN_ALARM >= 0)
             pinMode (config.PIN_ALARM, OUTPUT);
     }
     void process () override {
@@ -111,8 +123,8 @@ public:
             for (int number = 0; number < alarms.size (); number ++)
                 if (changes.isAny (number))
                     (alarms.isAny (number) ? _activations [number] : _deactivations [number]) ++;
-            if (config.PIN_ALARM > 0)
-                digitalWrite (config.PIN_ALARM, alarms.isNone () ? LOW : HIGH);
+            if (config.PIN_ALARM >= 0)
+                digitalWrite (config.PIN_ALARM, alarms.isNone () ? LOW : HIGH); // Active HIGH
             DEBUG_PRINTF ("AlarmManager::process: alarms: %s <-- %s\n", alarms.toStringBitmap ().c_str (), _alarms.toStringBitmap ().c_str ());
             _alarms = alarms;
         }

@@ -29,8 +29,6 @@
 #include "ComponentsHardware.hpp"
 #include "ComponentsBluetooth.hpp"
 
-#include "Config.hpp"
-
 // -----------------------------------------------------------------------------------------------
 
 #include "ProgramBase.hpp"
@@ -38,6 +36,8 @@
 #include "ProgramHardwareManage.hpp"
 #include "ProgramNetworkManage.hpp"
 #include "ProgramDataManage.hpp"
+
+#include "Config.hpp"
 
 // -----------------------------------------------------------------------------------------------
 
@@ -143,8 +143,8 @@ class Program : public Component, public Diagnosticable {
 public:
     Program () :
         fanControllingAlgorithm (10.0f, 0.1f, 1.0f), fanSmoothingAlgorithm (0.1f),
-        temperatureInterface (config.temperature), temperatureManagerBatterypack (config.temperature, temperatureInterface), temperatureManagerEnvironment (config.temperature, temperatureInterface),
-        fanInterface (config.fan), fanManager (config.fan, fanInterface, temperatureManagerBatterypack, fanControllingAlgorithm, fanSmoothingAlgorithm),
+        temperatureInterface (config.temperatureInterface), temperatureManagerBatterypack (config.temperatureManager, temperatureInterface), temperatureManagerEnvironment (config.temperatureManager, temperatureInterface),
+        fanInterface (config.fanInterface), fanManager (config.fanManager, fanInterface, temperatureManagerBatterypack, fanControllingAlgorithm, fanSmoothingAlgorithm),
         network (config.network), nettime (config.nettime, network),
         deliver (config.deliver), publish (config.publish, network), storage (config.storage),
         alarms (config.alarm, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage }),

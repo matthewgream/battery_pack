@@ -1,93 +1,97 @@
 
 // -----------------------------------------------------------------------------------------------
 
-#include "Secrets.hpp"
-
 #define DEFAULT_SERIAL_BAUD 115200
 
 #define DEFAULT_NAME "BatteryMonitor"
 
-#define DEFAULT_WIFI_CLIENT DEFAULT_NAME
+#include "Secrets.hpp"
 // #define DEFAULT_WIFI_SSID "wifi_ssid" // Secrets.hpp
 // #define DEFAULT_WIFI_PASS "wifi_pass" // Secrets.hpp
-
-#define DEFAULT_MQTT_CLIENT DEFAULT_NAME
-// #define DEFAULT_MQTT_HOST "mqtt.local" // Secrets.hpp
-// #define DEFAULT_MQTT_PORT 1883 // Secrets.hpp
 // #define DEFAULT_MQTT_USER "mqtt_user" // Secrets.hpp
 // #define DEFAULT_MQTT_PASS "mqtt_pass" // Secrets.hpp
-#define DEFAULT_MQTT_TOPIC DEFAULT_NAME
-#define DEFAULT_MQTT_BUFFER_SIZE (2048)
-#define DEFAULT_PUBLISH_FAILURES (3)
+// #define DEFAULT_BLUE_PIN 123456 // Secrets.hpp
 
-#define DEFAULT_BLUE_NAME DEFAULT_NAME
-#define DEFAULT_BLUE_SERVICE "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define DEFAULT_BLUE_CHARACTERISTIC "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-#define DEFAULT_BLUE_PIN 123456
-#define DEFAULT_BLUE_MTU (512)
-#define DEFAULT_DELIVER_FAILURES (3)
+// -----------------------------------------------------------------------------------------------
 
-#define DEFAULT_NETTIME_USERAGENT (String (DEFAULT_NAME) + String ("/1.0"))
-#define DEFAULT_NETTIME_SERVER "https://www.google.com"
-#define DEFAULT_NETTIME_UPDATE (1000 * 60 * 60)
-#define DEFAULT_NETTIME_ADJUST (1000 * 60)
-#define DEFAULT_NETTIME_FAILURES (3)
+/*
+C3-ZERO -- https://www.waveshare.com/esp32-c3-zero.htm
+OPENSMART -- https://www.aliexpress.com/item/1005003356486895.html
+CD74HC4067 -- https://deepbluembedded.com/arduino-cd74hc4067-analog-multiplexer-library-code/
 
-#define DEFAULT_STORAGE_NAME "/data.log"
-#define DEFAULT_STORAGE_WRITE (1000 * 30)
-#define DEFAULT_STORAGE_REMAINS (0.20) // percentage
-#define DEFAULT_STORAGE_FAILURES (3)
-
-#define DEFAULT_INTERVAL_PROCESS (1000 * 5)
-#define DEFAULT_INTERVAL_DELIVER (1000 * 15)
-#define DEFAULT_INTERVAL_CAPTURE (1000 * 15)
-#define DEFAULT_INTERVAL_DIAGNOSE (1000 * 60)
++-----+---------------+-----------+------------+
+| DIR | C3-ZERO       | OPENSMART | CD74HC4067 |
++-----+---------------+-----------+------------+
+| GND | 1  GND        | 8  GND    | 8  GND     |
+| VCC | 2  5V         | 7  VCC    | 7  VCC     |
+| N/C | 3  3V3        |           |            |
+| OUT | 4  GP0  (I2C) | 6  SCL    |            |
+| OUT | 5  GP1  (I2C) | 5  SDA    |            |
+| OUT | 6  GP2  (PWM) | 4  PWMA   |            |
+| OUT | 7  GP3  (PWM) | 3  PWMB   |            |
+| OUT | 8  GP4  (PWM) | 2  PWMC   |            |
+| OUT | 9  GP5  (PWM) | 1  PWMD   |            |
+| OUT | 10 GP6  (ADC) |           | 1  SIG     |
+| OUT | 11 GP7  (TTL) |           | 2  S3      |
+| OUT | 12 GP8  (TTL) |           | 3  S2      |
+| OUT | 13 GP9  (TTL) |           | 4  S1      |
+| OUT | 14 GP10 (TTL) |           | 5  S0      |
+| IN  | 15 GP18 (TTL) |           | 6  EN      |
+| N/C | 16 GP19       |           |            |
+| N/C | 17 GP20       |           |            |
+| N/C | 18 GP21       |           |            |
++-----+---------------+-----------+------------+
+*/
 
 // -----------------------------------------------------------------------------------------------
 
 struct Config {
 
-    struct TemperatureInterfaceConfig {
-        MuxInterface_CD74HC4067::Config mux = { .PIN_S0 = 2, .PIN_S1 = 3, .PIN_S2 = 4, .PIN_S3 = 5, .PIN_SIG = 6 };
-        struct Thermister {
-            const float REFERENCE_RESISTANCE = 10000.0, NOMINAL_RESISTANCE = 10000.0, NOMINAL_TEMPERATURE = 25.0;
-        } thermister;
-        const int PROBE_NUMBER = 16, PROBE_ENVIRONMENT = 15;
-        const float MINIMAL = -20.0, WARNING = 40.0, CRITICAL = 50.0;
-    } temperature;
-    struct FanInterfaceConfig {
-        const int PIN_PWMA = 7, PIN_PWMB = 8, PIN_PWMC = 9, PIN_PWMD = 10, I2C = OpenSmart_QuadMotorDriver::I2cAddress;
-        const uint8_t MIN_SPEED = 85, MAX_SPEED = 255;
-    } fan;
+    // hardware interfaces
+    TemperatureInterface::Config temperatureInterface = {
+        .mux = { .PIN_EN = 18, .PIN_SIG = 6, .PIN_ADDR = { 10, 9, 8, 7 } },
+        .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
+    };
+    FanInterface::Config fanInterface = {
+        .qmd = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 0, .PIN_PWMS = { 2, 3, 4, 5 } },
+        .MIN_SPEED = 85, .MAX_SPEED = 255 // duplicated, not ideal
+    };
+    // hardware managers
+    TemperatureManager::Config temperatureManager = {
+        .PROBE_NUMBER = 16, .PROBE_ENVIRONMENT = 15,
+        .MINIMAL = -20.0, .WARNING = 40.0, .CRITICAL = 50.0
+    };
+    FanManager::Config fanManager = {
+        .MIN_SPEED = 85, .MAX_SPEED = 255
+    };
 
-    struct ConnectConfig {
-        const String client = DEFAULT_WIFI_CLIENT, ssid = DEFAULT_WIFI_SSID, pass = DEFAULT_WIFI_PASS;
-    } network;
-    struct NettimeConfig {
-        const String useragent = DEFAULT_NETTIME_USERAGENT, server = DEFAULT_NETTIME_SERVER;
-        const interval_t intervalUpdate = DEFAULT_NETTIME_UPDATE, intervalAdjust = DEFAULT_NETTIME_ADJUST;
-        const int failureLimit = DEFAULT_NETTIME_FAILURES;
-    } nettime;
-    struct DeliverConfig {
-        BluetoothNotifier::Config blue = { .name = DEFAULT_BLUE_NAME, .serviceUUID = DEFAULT_BLUE_SERVICE, .characteristicUUID = DEFAULT_BLUE_CHARACTERISTIC, .pin = DEFAULT_BLUE_PIN, .mtu = DEFAULT_BLUE_MTU };
-    } deliver;
-    struct PublishConfig {
-        MQTTPublisher::Config mqtt = { .client = DEFAULT_MQTT_CLIENT, .host = DEFAULT_MQTT_HOST, .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .topic = DEFAULT_MQTT_TOPIC, .port = DEFAULT_MQTT_PORT, .bufferSize = DEFAULT_MQTT_BUFFER_SIZE };
-        const int failureLimit = DEFAULT_PUBLISH_FAILURES;
-    } publish;
-    struct StorageConfig {
-        const String filename = DEFAULT_STORAGE_NAME;
-        const float remainLimit = DEFAULT_STORAGE_REMAINS;
-        const int failureLimit = DEFAULT_STORAGE_FAILURES;
-    } storage;
+    // network managers
+    ConnectManager::Config network = {
+        .client = DEFAULT_NAME, .ssid = DEFAULT_WIFI_SSID, .pass = DEFAULT_WIFI_PASS
+    };
+    NettimeManager::Config nettime = {
+        .useragent = String (DEFAULT_NAME) + String ("/1.0"), .server = "https://www.google.com",
+        .intervalUpdate = 60*60*1000, .intervalAdjust = 60*1000,
+        .failureLimit = 3
+    };
 
-    struct AlarmConfig {
-        const int PIN_ALARM = 0;
-    } alarm;
-    struct DiagnosticConfig {
-    } diagnostic;
+    // data managers
+    DeliverManager::Config deliver = {
+        .blue = { .name = DEFAULT_NAME, .serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", .characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", .pin = DEFAULT_BLUE_PIN, .mtu = 512 }
+    };
+    PublishManager::Config publish = {
+        .mqtt = { .client = DEFAULT_NAME, .host = "mqtt.local", .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .topic = DEFAULT_NAME, .port = 1883, .bufferSize = 2048 },
+        .failureLimit = 3
+    };
+    StorageManager::Config storage = {
+        .filename = "/data.log",
+        .remainLimit = 0.20, .failureLimit = 3,
+    };
 
-    const interval_t intervalProcess = DEFAULT_INTERVAL_PROCESS, intervalDeliver = DEFAULT_INTERVAL_DELIVER, intervalCapture = DEFAULT_INTERVAL_CAPTURE, intervalDiagnose = DEFAULT_INTERVAL_DIAGNOSE;
+    // program
+    AlarmManager::Config alarm = { .PIN_ALARM = -1 };
+    DiagnosticManager::Config diagnostic = { }; 
+    interval_t intervalProcess = 5*1000, intervalDeliver = 15*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;
 };
 
 // -----------------------------------------------------------------------------------------------

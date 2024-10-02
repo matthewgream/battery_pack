@@ -2,9 +2,19 @@
 // -----------------------------------------------------------------------------------------------
 
 class TemperatureInterface : public Component, public Diagnosticable {
+
+public:
+    typedef struct {
+        MuxInterface_CD74HC4067::Config mux;
+        struct Thermister {
+            float REFERENCE_RESISTANCE, NOMINAL_RESISTANCE, NOMINAL_TEMPERATURE;
+        } thermister;
+    } Config;
+
+private:
+    const Config config;
     static inline constexpr int ADC_RESOLUTION = 12, ADC_MINVALUE = 0, ADC_MAXVALUE = ((1 << ADC_RESOLUTION) - 1);
     typedef struct { uint16_t v_now, v_min, v_max; } ValueSet;
-    const Config::TemperatureInterfaceConfig& config;
     MuxInterface_CD74HC4067 _muxInterface;
     std::array <ValueSet, MuxInterface_CD74HC4067::CHANNELS> _muxValues;
     void updateValues (const int channel, const uint16_t value) {
@@ -15,13 +25,13 @@ class TemperatureInterface : public Component, public Diagnosticable {
     }
 
 public:
-    TemperatureInterface (const Config::TemperatureInterfaceConfig& cfg) : config (cfg), _muxInterface (cfg.mux) {
+    TemperatureInterface (const Config cfg) : config (cfg), _muxInterface (cfg.mux) {
         for (int channel = 0; channel < MuxInterface_CD74HC4067::CHANNELS; channel ++)
             _muxValues [channel] = { .v_now = ADC_MINVALUE, .v_min = ADC_MAXVALUE, .v_max = ADC_MINVALUE };
     }
     void begin () override {
         analogReadResolution (ADC_RESOLUTION);
-        _muxInterface.configure ();
+        _muxInterface.enable ();
     }
     float get (const int channel) const {
         assert (channel >= 0 && channel < MuxInterface_CD74HC4067::CHANNELS && "Channel out of range");
@@ -45,15 +55,23 @@ protected:
 // -----------------------------------------------------------------------------------------------
 
 class FanInterface : public Component, public Diagnosticable {
+
+public:
+    typedef struct  {
+        OpenSmart_QuadMotorDriver::Config qmd;
+        uint8_t MIN_SPEED, MAX_SPEED;
+    } Config;
+
+private:
+    const Config config;
     static inline constexpr int PWM_RESOLUTION = 8;
     static inline constexpr uint8_t PWM_MINVALUE = 0, PWM_MAXVALUE = ((1 << PWM_RESOLUTION) - 1);
-    const Config::FanInterfaceConfig& config;
     uint8_t _speed = PWM_MINVALUE, _speedMin = PWM_MAXVALUE, _speedMax = PWM_MINVALUE;
     OpenSmart_QuadMotorDriver _driver;
     ActivationTracker _sets;
 
 public:
-    FanInterface (const Config::FanInterfaceConfig& cfg) : config (cfg), _driver (config.I2C, { config.PIN_PWMA, config.PIN_PWMB, config.PIN_PWMC, config.PIN_PWMD}) {}
+    FanInterface (const Config& cfg) : config (cfg), _driver (config.qmd) {}
     void begin () override {
         _driver.setDirection (OpenSmart_QuadMotorDriver::MOTOR_CLOCKWISE); // all 4 fans, for now
         _driver.setSpeed (_speed);

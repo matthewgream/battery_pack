@@ -59,13 +59,20 @@ class ConnectManager;
 static void __ConnectManager_WiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info);
 
 class ConnectManager : public Component, public Diagnosticable, private Singleton <ConnectManager>  {
-    const Config::ConnectConfig& config;
+
+public:
+    typedef struct {
+        String client, ssid, pass;
+    } Config;
+
+private:
+    const Config config;
     ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
     bool _available = false;
     WiFiEventId_t _events = 0;
 
 public:
-    ConnectManager (const Config::ConnectConfig& cfg) : Singleton <ConnectManager> (this), config (cfg) {}
+    ConnectManager (const Config& cfg) : Singleton <ConnectManager> (this), config (cfg) {}
     ~ConnectManager () { if (_events) WiFi.removeEvent (_events); }
     void begin () override {
         _events = WiFi.onEvent (__ConnectManager_WiFiEventHandler);
@@ -123,7 +130,16 @@ static void __ConnectManager_WiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_
 // -----------------------------------------------------------------------------------------------
 
 class NettimeManager : public Component, public Alarmable, public Diagnosticable {
-    const Config::NettimeConfig& config;
+
+public:
+    typedef struct {
+        String useragent, server;
+        interval_t intervalUpdate, intervalAdjust;
+        int failureLimit;
+    } Config;
+
+private:
+    const Config config;
     ConnectManager &_network;
     NetworkTimeFetcher _fetcher;
     PersistentData _persistentData;
@@ -136,7 +152,7 @@ class NettimeManager : public Component, public Alarmable, public Diagnosticable
     PersistentValue <uint32_t> _persistentTime;
 
 public:
-    NettimeManager (const Config::NettimeConfig& cfg, ConnectManager &network) : config (cfg), _network (network), _fetcher (cfg.useragent, cfg.server), _persistentData ("nettime"), _persistentDrift (_persistentData, "drift", 0), _drifter (_persistentDrift), _persistentTime (_persistentData, "time", 0) {
+    NettimeManager (const Config& cfg, ConnectManager &network) : config (cfg), _network (network), _fetcher (cfg.useragent, cfg.server), _persistentData ("nettime"), _persistentDrift (_persistentData, "drift", 0), _drifter (_persistentDrift), _persistentTime (_persistentData, "time", 0) {
       if (_persistentTime > 0UL) {
           struct timeval tv = { .tv_sec = _persistentTime, .tv_usec = 0 };
           settimeofday (&tv, nullptr);
