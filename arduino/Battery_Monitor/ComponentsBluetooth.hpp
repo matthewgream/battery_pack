@@ -58,7 +58,7 @@ public:
     } Config;
 
 private:
-    const Config config;
+    const Config &config;
     BLEServer *_server = nullptr;
     BLECharacteristic *_characteristic = nullptr;
     ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;

@@ -3,6 +3,8 @@
 
 class TemperatureInterface : public Component, public Diagnosticable {
 
+    static inline constexpr int ADC_RESOLUTION = 12, ADC_MINVALUE = 0, ADC_MAXVALUE = ((1 << ADC_RESOLUTION) - 1);
+
 public:
     typedef struct {
         MuxInterface_CD74HC4067::Config mux;
@@ -12,8 +14,7 @@ public:
     } Config;
 
 private:
-    const Config config;
-    static inline constexpr int ADC_RESOLUTION = 12, ADC_MINVALUE = 0, ADC_MAXVALUE = ((1 << ADC_RESOLUTION) - 1);
+    const Config &config;
     typedef struct { uint16_t v_now, v_min, v_max; } ValueSet;
     MuxInterface_CD74HC4067 _muxInterface;
     std::array <ValueSet, MuxInterface_CD74HC4067::CHANNELS> _muxValues;
@@ -56,6 +57,9 @@ protected:
 
 class FanInterface : public Component, public Diagnosticable {
 
+    static inline constexpr int PWM_RESOLUTION = 8;
+    static inline constexpr uint8_t PWM_MINVALUE = 0, PWM_MAXVALUE = ((1 << PWM_RESOLUTION) - 1);
+
 public:
     typedef struct  {
         OpenSmart_QuadMotorDriver::Config qmd;
@@ -63,9 +67,7 @@ public:
     } Config;
 
 private:
-    const Config config;
-    static inline constexpr int PWM_RESOLUTION = 8;
-    static inline constexpr uint8_t PWM_MINVALUE = 0, PWM_MAXVALUE = ((1 << PWM_RESOLUTION) - 1);
+    const Config &config;
     uint8_t _speed = PWM_MINVALUE, _speedMin = PWM_MAXVALUE, _speedMax = PWM_MINVALUE;
     OpenSmart_QuadMotorDriver _driver;
     ActivationTracker _sets;

@@ -6,6 +6,7 @@
 
 // https://deepbluembedded.com/arduino-cd74hc4067-analog-multiplexer-library-code/
 class MuxInterface_CD74HC4067 { // technically this is ADC as well due to PIN_SIG
+
 public:
     static inline constexpr int AddrWidth = 4;
     static inline constexpr int CHANNELS = 16;
@@ -16,7 +17,7 @@ public:
     } Config;
 
 private:
-    const Config config;
+    const Config &config;
 
 public:
     MuxInterface_CD74HC4067 (const Config& cfg) : config (cfg) { 
@@ -76,7 +77,7 @@ public:
     typedef uint8_t MotorSpeed;
 
 private:
-    const Config config;
+    const Config &config;
     uint8_t _directions;
 
     enum MotorControl {

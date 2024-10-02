@@ -66,7 +66,7 @@ public:
     } Config;
 
 private:
-    const Config config;
+    const Config &config;
     ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
     bool _available = false;
     WiFiEventId_t _events = 0;
@@ -139,7 +139,7 @@ public:
     } Config;
 
 private:
-    const Config config;
+    const Config &config;
     ConnectManager &_network;
     NetworkTimeFetcher _fetcher;
     PersistentData _persistentData;

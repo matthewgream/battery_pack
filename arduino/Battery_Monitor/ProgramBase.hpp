@@ -23,12 +23,13 @@ public:
 };
 
 class DiagnosticManager : public Component {
+
 public:
     typedef struct {
     } Config;
 
 private:
-    const Config config;
+    const Config &config;
     Diagnosticable::List _diagnosticables;
 
 public:
@@ -99,11 +100,11 @@ class AlarmManager : public Component, public Diagnosticable {
 
 public:
     typedef struct {
-        int PIN_ALARM = 0;
+        int PIN_ALARM;
     } Config;
 
 private:
-    const Config config;
+    const Config &config;
     Alarmable::List _alarmables;
     AlarmSet _alarms;
     std::array <ActivationTracker, _ALARM_COUNT> _activations, _deactivations;

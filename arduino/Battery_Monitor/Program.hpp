@@ -140,9 +140,10 @@ class Program : public Component, public Diagnosticable {
 
     }
 
+    static inline constexpr float FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
 public:
     Program () :
-        fanControllingAlgorithm (10.0f, 0.1f, 1.0f), fanSmoothingAlgorithm (0.1f),
+        fanControllingAlgorithm (FAN_CONTROL_P, FAN_CONTROL_I, FAN_CONTROL_D), fanSmoothingAlgorithm (FAN_SMOOTH_A),
         temperatureInterface (config.temperatureInterface), temperatureManagerBatterypack (config.temperatureManager, temperatureInterface), temperatureManagerEnvironment (config.temperatureManager, temperatureInterface),
         fanInterface (config.fanInterface), fanManager (config.fanManager, fanInterface, temperatureManagerBatterypack, fanControllingAlgorithm, fanSmoothingAlgorithm),
         network (config.network), nettime (config.nettime, network),

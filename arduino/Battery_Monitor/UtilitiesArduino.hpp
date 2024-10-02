@@ -3,9 +3,10 @@
 
 #include <nvs_flash.h>
 
-#define DEFAULT_PERSISTENT_PARTITION "nvs"
-
 class PersistentData {
+
+    static inline constexpr const char* DEFAULT_PERSISTENT_PARTITION = "nvs";
+
 public:
     static int _initialised;
     static bool _initialise () { return _initialised || (++ _initialised && nvs_flash_init_partition (DEFAULT_PERSISTENT_PARTITION) == ESP_OK); }

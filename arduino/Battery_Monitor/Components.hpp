@@ -44,9 +44,11 @@ https://github.com/espressif/esp-idf/blob/v4.3/examples/protocols/sntp/main/sntp
 #include <ctime>
 
 class TimeDriftCalculator {
+
+    static inline constexpr long MAX_DRIFT_MS = 60 * 1000;
+
     long _driftMs;
     bool _isHighDrift = false;
-    static inline constexpr long MAX_DRIFT_MS = 60 * 1000;
 
 public:
     TimeDriftCalculator (const long driftMs) : _driftMs (driftMs) {}
@@ -113,7 +115,7 @@ public:
     } Config;
 
 private:
-    const Config config;
+    const Config &config;
     WiFiClient _wifiClient;
     PubSubClient _mqttClient;
 

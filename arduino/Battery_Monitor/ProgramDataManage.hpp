@@ -9,7 +9,7 @@ public:
     } Config;
 
 private:
-    const Config config;
+    const Config &config;
     BluetoothNotifier _blue;
     ActivationTrackerWithDetail _delivers;
 
@@ -51,7 +51,7 @@ public:
     } Config;
 
 private:
-    const Config config;
+    const Config &config;
     ConnectManager &_network;
     MQTTPublisher _mqtt;
     ActivationTrackerWithDetail _publishes;
@@ -103,7 +103,7 @@ public:
     } Config;
 
 private:
-    const Config config;
+    const Config &config;
     SPIFFSFile _file;
     ActivationTrackerWithDetail _appends;
     counter_t _failures = 0, _erasures = 0;

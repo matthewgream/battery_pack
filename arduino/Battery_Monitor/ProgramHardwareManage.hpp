@@ -10,7 +10,7 @@ public:
     } Config;
 
 protected:
-    const Config config;
+    const Config &config;
     TemperatureInterface& _temperature;
 
 public:
@@ -21,11 +21,13 @@ public:
 
 // XXX probably should be template class according to probe numbers
 class TemperatureManagerBatterypack: public TemperatureManager, public Alarmable {
-    static inline constexpr int _num = 15; // config.temperature.PROBE_NUMBER - 1
-    typedef std::array <float, _num> Values;
+
+    static inline constexpr int PROBE_COUNT = 15; // config.temperature.PROBE_NUMBER - 1
+
+    typedef std::array <float, PROBE_COUNT> Values;
     float _min, _max, _avg;
     Values _values;
-    std::array <MovingAverage <float, 16>, _num> _filters;
+    std::array <MovingAverage <float, 16>, PROBE_COUNT> _filters;
 
 public:
     TemperatureManagerBatterypack (const TemperatureManager::Config& cfg, TemperatureInterface& temperature) : TemperatureManager (cfg, temperature) {};
@@ -94,7 +96,7 @@ public:
     } Config;
 
 private:
-    const Config config;
+    const Config &config;
     FanInterface &_fan;
     PidController &_controllerAlgorithm;
     AlphaSmoothing &_smootherAlgorithm;
