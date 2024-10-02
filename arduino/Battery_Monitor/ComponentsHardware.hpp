@@ -2,6 +2,38 @@
 // -----------------------------------------------------------------------------------------------
 
 #include <Arduino.h>
+
+class AlarmInterface_SinglePIN {
+
+public:
+    typedef struct {
+        int PIN_ALARM;
+    } Config;
+
+private:
+    const Config &config;
+    bool _enabled = false;
+
+public:
+    AlarmInterface_SinglePIN (const Config& cfg) : config (cfg) {
+        if (config.PIN_ALARM >= 0) {
+            pinMode (config.PIN_ALARM, OUTPUT);
+            digitalWrite (config.PIN_ALARM, LOW); // Active HIGH
+        }
+    }
+
+    void set (const bool enabled) {
+        if (config.PIN_ALARM >= 0)
+            if (enabled != _enabled) {
+                digitalWrite (config.PIN_ALARM, enabled ? HIGH : LOW); // Active HIGH
+                _enabled = enabled;
+            }
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+
+#include <Arduino.h>
 #include <array>
 
 // https://deepbluembedded.com/arduino-cd74hc4067-analog-multiplexer-library-code/
@@ -20,8 +52,7 @@ private:
     const Config &config;
 
 public:
-    MuxInterface_CD74HC4067 (const Config& cfg) : config (cfg) { 
-        // not necessary to explicitly set pinModes
+    MuxInterface_CD74HC4067 (const Config& cfg) : config (cfg) {
         pinMode (config.PIN_EN, OUTPUT);
         digitalWrite (config.PIN_EN, HIGH); // OFF
         pinMode (config.PIN_ADDR [0], OUTPUT);
@@ -48,6 +79,17 @@ public:
 
 #include <Wire.h>
 #include <array>
+
+static String __osqmd_motorid_to_string (const int motorId) {
+    switch (motorId) {
+        case -1: return "ABCD";
+        case 0:  return "A";
+        case 1:  return "B";
+        case 2:  return "C";
+        case 3:  return "D";
+        default: return "UNDEFINED";
+    }
+}
 
 // https://www.aliexpress.com/item/1005002430639515.html
 class OpenSmart_QuadMotorDriver {
@@ -115,15 +157,15 @@ public:
             pinMode (pin, OUTPUT), analogWrite (pin, 0);
     }
     void setSpeed (const MotorSpeed speed, const int motorID = MOTOR_ALL) {
-        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setSpeed: %d -> %d\n", motorID, speed);
+        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setSpeed: %s -> %d\n", __osqmd_motorid_to_string (motorID).c_str (), speed);
         speed_update (motorID, speed);
     }
     void setDirection (const MotorDirection direction, const int motorID = MOTOR_ALL) {
-        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setDirection: %d -> %s\n", motorID, (direction == MOTOR_CLOCKWISE) ? "CLOCKWISE" : "ANTICLOCKWISE");
+        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setDirection: %s -> %s\n", __osqmd_motorid_to_string (motorID).c_str (), (direction == MOTOR_CLOCKWISE) ? "CLOCKWISE" : "ANTICLOCKWISE");
         directions_update (motorID, (direction == MOTOR_CLOCKWISE) ? MOTOR_CONTROL_CLOCKWISE : MOTOR_CONTROL_ANTICLOCKWISE);
     }
     void stop (const int motorID = MOTOR_ALL) {
-        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::stop: %d\n", motorID);
+        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::stop: %s\n", __osqmd_motorid_to_string (motorID).c_str ());
         directions_update (motorID, MOTOR_CONTROL_OFF);
     }
 };

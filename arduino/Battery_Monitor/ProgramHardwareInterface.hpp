@@ -3,7 +3,7 @@
 
 class TemperatureInterface : public Component, public Diagnosticable {
 
-    static inline constexpr int ADC_RESOLUTION = 12, ADC_MINVALUE = 0, ADC_MAXVALUE = ((1 << ADC_RESOLUTION) - 1);
+    static inline constexpr int ADC_RESOLUTION = 12, ADC_MINVALUE = 0, ADC_MAXVALUE = (1 << ADC_RESOLUTION) - 1;
 
 public:
     typedef struct {
@@ -26,7 +26,7 @@ private:
     }
 
 public:
-    TemperatureInterface (const Config cfg) : config (cfg), _muxInterface (cfg.mux) {
+    TemperatureInterface (const Config& cfg) : config (cfg), _muxInterface (cfg.mux) {
         for (int channel = 0; channel < MuxInterface_CD74HC4067::CHANNELS; channel ++)
             _muxValues [channel] = { .v_now = ADC_MINVALUE, .v_min = ADC_MAXVALUE, .v_max = ADC_MINVALUE };
     }
@@ -42,14 +42,10 @@ public:
     }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override { // XXX this is too large and needs reduction
+    void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject tmp = obj ["tmp"].to <JsonObject> ();
-        for (int channel = 0; channel < MuxInterface_CD74HC4067::CHANNELS; channel ++) {
-            JsonObject entry = tmp [IntToString (channel)].to <JsonObject> ();
-            entry ["#"] = _muxValues [channel].v_now;
-            entry ["<"] = _muxValues [channel].v_min;
-            entry [">"] = _muxValues [channel].v_max;
-        }
+        for (int channel = 0; channel < MuxInterface_CD74HC4067::CHANNELS; channel ++)
+            tmp [IntToString (channel)] = IntToString (_muxValues [channel].v_now) + "," + IntToString (_muxValues [channel].v_min) + "," + IntToString (_muxValues [channel].v_max);
     }
 };
 
@@ -96,9 +92,7 @@ public:
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject fan = obj ["fan"].to <JsonObject> ();
-        fan ["now"] = _speed;
-        fan ["min"] = _speedMin;
-        fan ["max"] = _speedMax;
+        fan ["speed"] = IntToString (_speed) + "," + IntToString (_speedMin) + "," + IntToString (_speedMax);
         _sets.serialize (fan);
         // % duty
     }

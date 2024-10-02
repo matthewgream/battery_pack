@@ -199,7 +199,7 @@ public:
 
 protected:
     void collectAlarms (AlarmSet& alarms) const override {
-        if (_failures > config.failureLimit) alarms += ALARM_TIME_NETWORK;
+        if (_failures > config.failureLimit) alarms += ALARM_TIME_SYNC;
         if (_drifter.isHighDrift ()) alarms += ALARM_TIME_DRIFT;
     }
     void collectDiagnostics (JsonDocument &obj) const override {

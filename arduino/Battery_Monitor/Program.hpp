@@ -1,25 +1,8 @@
 
-/*
-    https://www.waveshare.com/esp32-c3-zero.htm
-    https://www.waveshare.com/wiki/ESP32-C3-Zero
-    https://github.com/mikedotalmond/Arduino-MuxInterface-CD74HC4067
-    https://github.com/ugurakas/Esp32-C3-LP-Project
-    https://github.com/ClaudeMarais/ContinousAnalogRead_ESP32-C3
-    https://docs.espressif.com/projects/esp-idf/en/release-v4.4/esp32/api-reference/peripherals/adc.html
-    https://github.com/khoih-prog/ESP32_FastPWM
-*/
-
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
 #include <Arduino.h>
-#include <WiFi.h>
-
-#include <ArduinoJson.h>
-
-#include <ctime>
-#include <array>
-#include <vector>
 
 #include "Utilities.hpp"
 #include "UtilitiesJson.hpp"
@@ -41,18 +24,8 @@
 
 // -----------------------------------------------------------------------------------------------
 
-class Program;
-class OperationalManager {
-    const Program& _program;
-    public:
-        OperationalManager (const Program& program) : _program (program) {};
-        void collect (JsonDocument &doc) const;
-};
-
-// -----------------------------------------------------------------------------------------------
-
 class Program : public Component, public Diagnosticable {
-    friend class OperationalManager;
+
     const Config config;
 
     PidController fanControllingAlgorithm;
@@ -70,9 +43,15 @@ class Program : public Component, public Diagnosticable {
     PublishManager publish;
     StorageManager storage;
 
+    AlarmInterface_SinglePIN alarmInterface;
     AlarmManager alarms;
     DiagnosticManager diagnostics;
-    OperationalManager operational;
+    class OperationalManager {
+        const Program* _program;
+        public:
+            OperationalManager (const Program* program) : _program (program) {};
+            void collect (JsonDocument &doc) const;
+    } operational;
 
     Uptime uptime;
     ActivationTracker cycles;
@@ -148,8 +127,8 @@ public:
         fanInterface (config.fanInterface), fanManager (config.fanManager, fanInterface, temperatureManagerBatterypack, fanControllingAlgorithm, fanSmoothingAlgorithm),
         network (config.network), nettime (config.nettime, network),
         deliver (config.deliver), publish (config.publish, network), storage (config.storage),
-        alarms (config.alarm, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage }),
-        diagnostics (config.diagnostic, { &temperatureInterface, &fanInterface, &network, &nettime, &deliver, &publish, &storage, &alarms, this }), operational (*this),
+        alarmInterface (config.alarmInterface), alarms (config.alarmManager, alarmInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage }),
+        diagnostics (config.diagnosticManager, { &temperatureInterface, &fanInterface, &network, &nettime, &deliver, &publish, &storage, &alarms, this }), operational (this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
         components ({ &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager,
             &alarms, &network, &nettime, &deliver, &publish, &storage, &diagnostics, this }) {
@@ -173,18 +152,18 @@ protected:
 
 // -----------------------------------------------------------------------------------------------
 
-void OperationalManager::collect (JsonDocument &doc) const {
+void Program::OperationalManager::collect (JsonDocument &doc) const {
     JsonObject tmp = doc ["tmp"].to <JsonObject> ();
-    tmp ["env"] = _program.temperatureManagerEnvironment.getTemperature ();
+    tmp ["env"] = _program->temperatureManagerEnvironment.getTemperature ();
     JsonObject bat = tmp ["bat"].to <JsonObject> ();
-    bat ["avg"] = _program.temperatureManagerBatterypack.avg ();
-    bat ["min"] = _program.temperatureManagerBatterypack.min ();
-    bat ["max"] = _program.temperatureManagerBatterypack.max ();
+    bat ["avg"] = _program->temperatureManagerBatterypack.avg ();
+    bat ["min"] = _program->temperatureManagerBatterypack.min ();
+    bat ["max"] = _program->temperatureManagerBatterypack.max ();
     JsonArray val = bat ["val"].to <JsonArray> ();
-    for (const auto& v : _program.temperatureManagerBatterypack.getTemperatures ())
+    for (const auto& v : _program->temperatureManagerBatterypack.getTemperatures ())
         val.add (v);
-    doc ["fan"] = _program.fanInterface.getSpeed ();
-    doc ["alm"] = _program.alarms.getAlarmsAsString ();
+    doc ["fan"] = _program->fanInterface.getSpeed ();
+    doc ["alm"] = _program->alarms.getAlarmsAsString ();
 }
 
 // -----------------------------------------------------------------------------------------------

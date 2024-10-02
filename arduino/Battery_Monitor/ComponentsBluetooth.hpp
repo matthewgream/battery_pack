@@ -68,18 +68,16 @@ private:
 
     void onConnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override {
         DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CONNECTED, %s (conn_id=%d, role=%s)\n",
-            __ble_address_to_string (param->connect.remote_bda).c_str (), param->connect.conn_id,
-            __ble_linkrole_to_string (param->connect.link_role).c_str ());
+            __ble_address_to_string (param->connect.remote_bda).c_str (), param->connect.conn_id, __ble_linkrole_to_string (param->connect.link_role).c_str ());
         _connected = true; _connections ++;
-        advertisingStop ();
+        advertise (false);
     }
     void onDisconnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override {
         const String reason = __ble_disconnect_reason ((esp_gatt_conn_reason_t) param->disconnect.reason);
         DEBUG_PRINTF ("BluetoothNotifier::events: BLE_DISCONNECTED, %s (conn_id=%d, reason=%s)\n",
-            __ble_address_to_string (param->disconnect.remote_bda).c_str (), param->disconnect.conn_id,
-            reason.c_str ());
+            __ble_address_to_string (param->disconnect.remote_bda).c_str (), param->disconnect.conn_id, reason.c_str ());
         _connected = false; _disconnections += reason;
-        advertisingStart ();
+        advertise (true);
     }
     void onMtuChanged (BLEServer *, esp_ble_gatts_cb_param_t *param) override {
         DEBUG_PRINTF ("BluetoothNotifier::events: BLE_MTU_CHANGED, (conn_id=%d, mtu=%u)\n", param->mtu.conn_id, param->mtu.mtu);
@@ -95,18 +93,15 @@ private:
         DEBUG_PRINTF  ("BluetoothNotifier::events: BLE_CHARACTERISTIC_STATUS, (uuid=%s, status=%s. code=%lu)\n", characteristic->getUUID ().toString ().c_str (), __ble_status_to_string (s).c_str (), code);
     }
 
-    void advertisingStart () {
-        if (!_advertising) {
+    void advertise (const bool enable) {
+        if (enable && !_advertising) {
             _server->getAdvertising ()->start ();
             _advertising = true;
-            DEBUG_PRINTF ("BluetoothNotifier::advertisingStart\n");
-        }
-    }
-    void advertisingStop () {
-        if (_advertising) {
+            DEBUG_PRINTF ("BluetoothNotifier::advertising start\n");
+        } else if (!enable && _advertising) {
             _server->getAdvertising ()->stop ();
             _advertising = false;
-            DEBUG_PRINTF ("BluetoothNotifier::advertisingStop\n");
+            DEBUG_PRINTF ("BluetoothNotifier::advertising stop\n");
         }
     }
 
@@ -129,7 +124,7 @@ public:
         advertising->setScanResponse (true);
         advertising->setMinPreferred (0x06);
         advertising->setMinPreferred (0x12);
-        advertisingStart ();
+        advertise (true);
     }
     // json only
     void notify (const String& data) {
@@ -161,11 +156,11 @@ public:
     }
     void reset () {
         DEBUG_PRINTF ("BluetoothNotifier::reset\n");
-        advertisingStop ();
+        advertise (false);
         _server->disconnect (0);
         delay (500);
         _connected = false;
-        advertisingStart ();
+        advertise (true);
     }
     void check () {
         if (!_connected && !_advertising) {

@@ -15,32 +15,41 @@
 // -----------------------------------------------------------------------------------------------
 
 /*
-C3-ZERO -- https://www.waveshare.com/esp32-c3-zero.htm
-OPENSMART -- https://www.aliexpress.com/item/1005003356486895.html
-CD74HC4067 -- https://deepbluembedded.com/arduino-cd74hc4067-analog-multiplexer-library-code/
+    C3-ZERO
+        https://www.waveshare.com/esp32-c3-zero.htm, https://www.waveshare.com/wiki/ESP32-C3-Zero
 
-+-----+---------------+-----------+------------+
-| DIR | C3-ZERO       | OPENSMART | CD74HC4067 |
-+-----+---------------+-----------+------------+
-| GND | 1  GND        | 8  GND    | 8  GND     |
-| VCC | 2  5V         | 7  VCC    | 7  VCC     |
-| N/C | 3  3V3        |           |            |
-| OUT | 4  GP0  (I2C) | 6  SCL    |            |
-| OUT | 5  GP1  (I2C) | 5  SDA    |            |
-| OUT | 6  GP2  (PWM) | 4  PWMA   |            |
-| OUT | 7  GP3  (PWM) | 3  PWMB   |            |
-| OUT | 8  GP4  (PWM) | 2  PWMC   |            |
-| OUT | 9  GP5  (PWM) | 1  PWMD   |            |
-| OUT | 10 GP6  (ADC) |           | 1  SIG     |
-| OUT | 11 GP7  (TTL) |           | 2  S3      |
-| OUT | 12 GP8  (TTL) |           | 3  S2      |
-| OUT | 13 GP9  (TTL) |           | 4  S1      |
-| OUT | 14 GP10 (TTL) |           | 5  S0      |
-| IN  | 15 GP18 (TTL) |           | 6  EN      |
-| N/C | 16 GP19       |           |            |
-| N/C | 17 GP20       |           |            |
-| N/C | 18 GP21       |           |            |
-+-----+---------------+-----------+------------+
+    OPENSMART
+        https://www.aliexpress.com/item/1005003356486895.html
+
+    CD74HC4067
+        https://deepbluembedded.com/arduino-cd74hc4067-analog-multiplexer-library-code/
+
+    +-----+---------------+-----------+------------+
+    | DIR | C3-ZERO       | OPENSMART | CD74HC4067 |
+    +-----+---------------+-----------+------------+
+    | GND | 1  GND        | 8  GND    | 8  GND     |
+    | VCC | 2  5V         | 7  VCC    | 7  VCC     |
+    | N/C | 3  3V3        |           |            |
+    | OUT | 4  GP0  (I2C) | 6  SCL    |            |
+    | OUT | 5  GP1  (I2C) | 5  SDA    |            |
+    | OUT | 6  GP2  (PWM) | 4  PWMA   |            |
+    | OUT | 7  GP3  (PWM) | 3  PWMB   |            |
+    | OUT | 8  GP4  (PWM) | 2  PWMC   |            |
+    | OUT | 9  GP5  (PWM) | 1  PWMD   |            |
+    | OUT | 10 GP6  (ADC) |           | 1  SIG     |
+    | OUT | 11 GP7  (TTL) |           | 2  S3      |
+    | OUT | 12 GP8  (TTL) |           | 3  S2      |
+    | OUT | 13 GP9  (TTL) |           | 4  S1      |
+    | OUT | 14 GP10 (TTL) |           | 5  S0      |
+    | IN  | 15 GP18 [USB] |           |            |
+    | N/C | 16 GP19 [USB] |           |            |
+    | N/C | 17 GP20 (TTL) |           | 6  EN      |
+    | N/C | 18 GP21       |           |            |
+    +-----+---------------+-----------+------------+
+
+    https://github.com/mikedotalmond/Arduino-MuxInterface-CD74HC4067
+    https://github.com/ugurakas/Esp32-C3-LP-Project
+    https://github.com/ClaudeMarais/ContinousAnalogRead_ESP32-C3
 */
 
 // -----------------------------------------------------------------------------------------------
@@ -49,7 +58,7 @@ struct Config {
 
     // hardware interfaces
     TemperatureInterface::Config temperatureInterface = {
-        .mux = { .PIN_EN = 18, .PIN_SIG = 6, .PIN_ADDR = { 10, 9, 8, 7 } },
+        .mux = { .PIN_EN = 20, .PIN_SIG = 6, .PIN_ADDR = { 10, 9, 8, 7 } },
         .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
     };
     FanInterface::Config fanInterface = {
@@ -89,8 +98,9 @@ struct Config {
     };
 
     // program
-    AlarmManager::Config alarm = { .PIN_ALARM = -1 };
-    DiagnosticManager::Config diagnostic = { }; 
+    AlarmInterface_SinglePIN::Config alarmInterface = { .PIN_ALARM = -1 };
+    AlarmManager::Config alarmManager = { };
+    DiagnosticManager::Config diagnosticManager = { }; 
     interval_t intervalProcess = 5*1000, intervalDeliver = 15*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;
 };
 

@@ -39,8 +39,8 @@ public:
         DEBUG_PRINTF ("TemperatureManagerBatterypack::process: temps=[");
         for (int num = 0; num < config.PROBE_NUMBER; num ++) {
             if (num != config.PROBE_ENVIRONMENT) {
-                float val = _temperature.get (num);
-                float tmp = _filters [cnt].update (val);
+                const float val = std::round (_temperature.get (num) * 100.0) / 100.0;
+                const float tmp = std::round (_filters [cnt].update (val) * 100.0) / 100.0;
                 _values [cnt ++] = tmp;
                 sum += tmp;
                 if (tmp < _min) _min = tmp;
@@ -48,7 +48,7 @@ public:
                 DEBUG_PRINTF ("%.2f/%.2f%s", val, tmp, (num + 1 != config.PROBE_NUMBER) ? ", " : "");
             }
         }
-        _avg = sum / (1.0 * cnt);
+        _avg = std::round ((sum / (1.0 * cnt)) * 100.0) / 100.0;
         DEBUG_PRINTF ("], avg=%.2f, min=%.2f, max=%.2f\n", _avg, _min, _max);
     }
     inline float min () const { return _min; }
@@ -74,7 +74,8 @@ class TemperatureManagerEnvironment : public TemperatureManager, public Alarmabl
 public:
     TemperatureManagerEnvironment (const TemperatureManager::Config& cfg, TemperatureInterface& temperature) : TemperatureManager (cfg, temperature) {};
     void process () override {
-        _value = _filter.update (_temperature.get (config.PROBE_ENVIRONMENT));
+        const float val = std::round (_temperature.get (config.PROBE_ENVIRONMENT) * 100.0) / 100.0;
+        _value = std::round (_filter.update (val) * 100.0) / 100.0;
         DEBUG_PRINTF ("TemperatureManagerEnvironment::process: temp=%.2f\n", _value);
     }
     inline float getTemperature () const { return _value; }
