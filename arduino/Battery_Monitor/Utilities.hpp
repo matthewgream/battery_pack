@@ -27,10 +27,12 @@ typedef unsigned long counter_t;
 
 // -----------------------------------------------------------------------------------------------
 
-inline String IntToString (const long n) {
-    char s [32 + 1];
-    return String (ltoa (n, s, sizeof (s) - 1));
-}
+template <typename T>
+inline String IntToString (const T n) {
+    static_assert (std::is_integral_v <T>, "T must be an integral type");
+    char s [64 + 1];
+    return String (ltoa (static_cast <long> (n), s, 10));
+};
 
 // -----------------------------------------------------------------------------------------------
 
@@ -61,22 +63,65 @@ public:
 };
 
 template <typename T, int WINDOW = 16>
-class MovingAverageValue: public MovingAverage <T, WINDOW> {
+class MovingAverageWithValue: public MovingAverage <T, WINDOW> {
     T val = T (0);
     std::function <T(T)> process;
 public:
-    MovingAverageValue (std::function <T(T)> proc = [] (T x) { return x; }): process (proc) {}
+    MovingAverageWithValue (std::function <T(T)> proc = [] (T x) { return x; }): process (proc) {}
     virtual T update (const T value) override {
         val = process (MovingAverage <T, WINDOW>::update (value));
         return val;
     }
-    inline MovingAverageValue& operator= (const T value) { update (value); return *this; }
+    inline MovingAverageWithValue& operator= (const T value) { update (value); return *this; }
     inline operator const T& () const { return val; }
 };
 
 inline float round2places (float value) {
     return std::round (value * 100.0f) / 100.0f;
 }
+
+// -----------------------------------------------------------------------------------------------
+
+#include <type_traits>
+
+template <typename T>
+class Stats {
+    static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
+    T _sum, _min, _max, _avg = T (0);
+    size_t _cnt = 0;
+public:
+    inline void reset () { _cnt = 0; _avg = T (0); }
+    inline Stats <T>& operator+= (const T& val) {
+        if (_cnt ++ == 0)
+            _sum = val, _min = val, _max = val;
+        else {
+            _sum += val;
+            if (val < _min) _min = val;
+            if (val > _max) _max = val;
+        }
+        return *this;
+    }
+    inline T min () const { return _min; }
+    inline T max () const { return _max; }
+    inline T avg () const { 
+        if (_cnt > 0) {
+            const_cast <Stats <T> *> (this)->_avg = _sum / static_cast <T> (_cnt);
+            const_cast <Stats <T> *> (this)->_cnt = 0;
+        }
+        return _avg;
+    }
+};
+template <typename T>
+class StatsWithValue: public Stats <T> {
+    T _val = T (0);
+public:
+    inline T val () const { return _val; }
+    inline StatsWithValue <T>& operator+= (const T& val) {
+        _val = val;
+        Stats <T>::operator+= (val);
+        return *this;
+    }
+};
 
 // -----------------------------------------------------------------------------------------------
 

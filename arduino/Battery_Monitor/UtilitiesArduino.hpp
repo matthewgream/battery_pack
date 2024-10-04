@@ -23,25 +23,30 @@ public:
     inline bool get (const char *name, String *value) const {
         size_t size;
         if (_okay && nvs_get_str (_handle, name, NULL, &size) == ESP_OK) {
-            char *str = (char *) malloc (size);
-            if (nvs_get_str (_handle, name, str, &size) == ESP_OK) {
-                (*value) = str;
-                free (str);
-                return true;
+            char *buffer = new char [size];
+            if (buffer) {
+              if (nvs_get_str (_handle, name, buffer, &size) == ESP_OK) {
+                  (*value) = buffer;
+                  delete [] buffer;
+                  return true;
+              }
+              delete [] buffer;
             }
-            free (str);
         }
         return false;
     }
     inline bool set (const char *name, const String &value) { return  (_okay && nvs_set_str (_handle, name, value.c_str ()) == ESP_OK); }
 
 };
+
 int PersistentData::_initialised = 0;
+
 template <typename T>
 class PersistentValue {
     PersistentData &_data;
     const String _name;
     const T _value_default;
+
 public:
     PersistentValue (PersistentData& data, const char *name, const T value_default): _data (data), _name (name), _value_default (value_default) {}
     inline operator T () const { T value; return _data.get (_name.c_str (), &value) ? value : _value_default; }
@@ -61,6 +66,17 @@ String mac_address (void) {
     uint8_t macaddr [6];
     esp_read_mac (macaddr, ESP_MAC_WIFI_STA);
     return __MAC_FORMAT_ADDRESS (macaddr);
+}
+
+// -----------------------------------------------------------------------------------------------
+
+String getTimeString (time_t timet = 0) {
+    struct tm timeinfo;
+    char timeString [sizeof ("yyyy-mm-ddThh:mm:ssZ") + 1] = { '\0' };
+    if (timet == 0) time (&timet);
+    if (gmtime_r (&timet, &timeinfo) != NULL)
+        strftime (timeString, sizeof (timeString), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    return String (timeString);  
 }
 
 // -----------------------------------------------------------------------------------------------

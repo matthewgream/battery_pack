@@ -67,8 +67,10 @@ public:
 
 private:
     const Config &config;
-    ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
+
     bool _available = false;
+    ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
+    
     WiFiEventId_t _eventsHandle = 0;
 
 public:
@@ -137,31 +139,37 @@ public:
         interval_t intervalUpdate, intervalAdjust;
         int failureLimit;
     } Config;
+    using BooleanFunc = std::function <bool ()>;
 
 private:
     const Config &config;
-    ConnectManager &_network;
+
+    const BooleanFunc _networkIsAvailable;
+
     NetworkTimeFetcher _fetcher;
+    ActivationTrackerWithDetail _fetches;
+
     PersistentData _persistentData;
     PersistentValue <long> _persistentDrift;
     TimeDriftCalculator _drifter;
-    ActivationTrackerWithDetail _fetches;
+    
     counter_t _failures = 0;
     interval_t _previousTimeUpdate = 0, _previousTimeAdjust = 0;
     time_t _previousTime = 0;
     PersistentValue <uint32_t> _persistentTime;
 
 public:
-    NettimeManager (const Config& cfg, ConnectManager &network) : config (cfg), _network (network), _fetcher (cfg.useragent, cfg.server), _persistentData ("nettime"), _persistentDrift (_persistentData, "drift", 0), _drifter (_persistentDrift), _persistentTime (_persistentData, "time", 0) {
-      if (_persistentTime > 0UL) {
-          struct timeval tv = { .tv_sec = _persistentTime, .tv_usec = 0 };
-          settimeofday (&tv, nullptr);
-      }
-      DEBUG_PRINTF ("NettimeManager::constructor: persistentTime=%lu, persistentDrift=%ld, time=%s\n", (unsigned long) _persistentTime, (long) _persistentDrift, getTimeString ().c_str ());
+    NettimeManager (const Config& cfg, const BooleanFunc networkIsAvailable) : config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _fetcher (cfg.useragent, cfg.server), 
+            _persistentData ("nettime"), _persistentDrift (_persistentData, "drift", 0), _drifter (_persistentDrift), _persistentTime (_persistentData, "time", 0) {
+        if (_persistentTime > 0UL) {
+            struct timeval tv = { .tv_sec = _persistentTime, .tv_usec = 0 };
+            settimeofday (&tv, nullptr);
+        }
+        DEBUG_PRINTF ("NettimeManager::constructor: persistentTime=%lu, persistentDrift=%ld, time=%s\n", (unsigned long) _persistentTime, (long) _persistentDrift, getTimeString ().c_str ());
     }
     void process () override {
         interval_t currentTime = millis ();
-        if (_network.isAvailable ()) {
+        if (_networkIsAvailable ()) {
           if (!_previousTimeUpdate || (currentTime - _previousTimeUpdate >= config.intervalUpdate)) {
               const time_t fetchedTime = _fetcher.fetch ();
               if (fetchedTime > 0) {
@@ -188,14 +196,6 @@ public:
             _previousTimeAdjust = currentTime;
         }
     }
-    String getTimeString () const {
-        struct tm timeinfo;
-        char timeString [sizeof ("yyyy-mm-ddThh:mm:ssZ") + 1] = { '\0' };
-        if (getLocalTime (&timeinfo))
-            strftime (timeString, sizeof (timeString), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
-        return String (timeString);
-    }
-    inline operator String () const { return getTimeString (); }
 
 protected:
     void collectAlarms (AlarmSet& alarms) const override {

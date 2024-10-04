@@ -30,7 +30,8 @@ public:
 
 private:
     const Config &config;
-    Diagnosticable::List _diagnosticables;
+
+    const Diagnosticable::List _diagnosticables;
 
 public:
     DiagnosticManager (const Config& cfg, const Diagnosticable::List diagnosticables) : config (cfg), _diagnosticables (diagnosticables) {}
@@ -55,11 +56,13 @@ typedef uint32_t _AlarmType;
 #define ALARM_STORAGE_SIZE          _ALARM_NUMB (7)
 #define ALARM_PUBLISH_FAIL          _ALARM_NUMB (8)
 #define ALARM_DELIVER_SIZE          _ALARM_NUMB (9)
-#define _ALARM_COUNT                 (10)
-static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_FAIL", "TEMP_MIN", "TEMP_WARN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "DELIVER_SIZE" };
+#define ALARM_UPDATE_VERS           _ALARM_NUMB (10)
+#define _ALARM_COUNT                 (11)
+static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_FAIL", "TEMP_MIN", "TEMP_WARN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "DELIVER_SIZE", "UPDATE_VERS" };
 #define _ALARM_NAME(x)               (_ALARM_NAMES [x])
 
 class AlarmSet {
+
     _AlarmType _alarms = ALARM_NONE;
 
 public:
@@ -106,8 +109,10 @@ public:
 
 private:
     const Config &config;
+
     AlarmInterface_SinglePIN &_interface;
-    Alarmable::List _alarmables;
+    const Alarmable::List _alarmables;
+
     AlarmSet _alarms;
     std::array <ActivationTracker, _ALARM_COUNT> _activations, _deactivations;
 
@@ -140,6 +145,101 @@ protected:
             alarm ["for"] = _alarms.isSet (number) ? _activations [number].seconds () : _deactivations [number].seconds ();
         }
     }
+};
+
+// -----------------------------------------------------------------------------------------------
+
+// #ifdef CFG_ENABLED
+// #include <ArduinoJson.h>
+// typedef std::map <String, String> Variables;
+// void __convert (Variables &vars, const JsonVariantConst& json, const String& path) {
+//     if (json.is <JsonObjectConst> ()) {
+//         for (const auto& obj : json.as <JsonObjectConst> ())
+//             __convert (vars, obj.value (), path.isEmpty () ? obj.key ().c_str () : path + "/" + obj.key ().c_str ());
+//     } else if (json.is <JsonArrayConst> ()) {
+//         int index = 0;
+//         for (const auto& obj : json.as <JsonArrayConst> ())
+//             __convert (vars, obj, path + "[" + String (index ++) + "]");
+//     } else {
+//         vars [path] = json.as <String> ();
+//     }
+// }
+// size_t convert (Variables &vars, const JsonVariantConst& json) {
+//     __convert (vars, json, "");
+//     return vars.size ();
+// }
+//     PersistentValue <String> cfg_storage (_program, "cfg", "");
+//     String cfg = static_cast <String> (cfg_storage);
+//     JsonDocument json;
+//     if (cfg.isEmpty ()) {
+//           _fetch (conf, conf.at ("config") + String ("?mac=") + mac_address (), json, [&] (JsonDocument& doc) { return serializeJson (doc, cfg); }); // XXX
+//           cfg_storage = cfg;
+//           DEBUG_PRINTF ("cfg downloaded: <<<%s>>>\n", cfg.c_str ());
+//         } else {
+//           DEBUG_PRINTF ("cfg persistent: <<<%s>>>\n", cfg.c_str ());
+//           deserializeJson (json, cfg);
+//       }
+//       return convert (sets, json.as <JsonVariant> ());
+//     }
+// #endif /*CFG_ENABLED*/
+
+
+#include <functional>
+
+extern String ota_image_check (const String& json, const String& type, const String& vers);
+
+class UpdateManager: public Component, public Alarmable, public Diagnosticable {
+
+public:
+    typedef struct {
+        interval_t intervalUpdate;
+        time_t intervalCheck;
+        String json, type, vers;
+    } Config;
+    using BooleanFunc = std::function <bool ()>;
+
+private:
+    const Config& config;
+
+    const BooleanFunc _networkIsAvailable;
+
+    PersistentData _persistent_data;
+    PersistentValue <uint32_t> _persistent_data_previous;
+    PersistentValue <String> _persistent_data_version;
+    
+    Intervalable _interval;
+
+    bool _available = false;
+
+public:
+    UpdateManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (std::move (networkIsAvailable)),
+        _persistent_data ("updates"), _persistent_data_previous (_persistent_data, "previous", 0), _persistent_data_version (_persistent_data, "version", String ("")),
+        _interval (config.intervalUpdate) {}
+    void process () override {
+        if (static_cast <bool> (_interval)) {
+            if (_networkIsAvailable ()) {
+                time_t previous = (time_t) static_cast <uint32_t> (_persistent_data_previous), current = time (NULL);
+                if ((current > 0 && (current - previous) > (config.intervalCheck / 1000)) || (previous > current)) {
+                    _persistent_data_version = ota_image_check (config.json, config.type, config.vers);
+                    _persistent_data_previous = current;
+                    _available = true;
+                }
+            }
+        }
+    }
+
+protected:
+    void collectAlarms (AlarmSet& alarms) const override {
+        if (_available) alarms += ALARM_UPDATE_VERS;
+    }
+    void collectDiagnostics (JsonDocument &obj) const override {
+        JsonObject updates = obj ["updates"].to <JsonObject> ();
+        updates ["current"] = config.vers;
+        updates ["available"] = static_cast <String> (_persistent_data_version);
+        const time_t time = (time_t) static_cast <uint32_t> (_persistent_data_previous);
+        if (time > 0)
+            updates ["checked"] = getTimeString (time);
+    }        
 };
 
 // -----------------------------------------------------------------------------------------------

@@ -59,11 +59,15 @@ public:
 
 private:
     const Config &config;
+
     BLEServer *_server = nullptr;
     BLECharacteristic *_characteristic = nullptr;
-    ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
+
     bool _advertising = false;
+
+    ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
     bool _connected = false;
+  
     int _maxpacket = 0;
 
     void onConnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override {
@@ -107,6 +111,7 @@ private:
 
 public:
     BluetoothNotifier (const Config& cfg) : config (cfg) {}
+
     void advertise ()  {
         BLEDevice::init (config.name);
         _server = BLEDevice::createServer ();

@@ -10,7 +10,9 @@ public:
 
 private:
     const Config &config;
+
     BluetoothNotifier _blue;
+
     ActivationTrackerWithDetail _delivers;
 
 public:
@@ -49,25 +51,29 @@ public:
         MQTTPublisher::Config mqtt;
         int failureLimit;
     } Config;
+    using BooleanFunc = std::function <bool ()>;
 
 private:
     const Config &config;
-    ConnectManager &_network;
+
+    const BooleanFunc _networkIsAvailable;
+
     MQTTPublisher _mqtt;
+
     ActivationTrackerWithDetail _publishes;
     counter_t _failures = 0;
 
 public:
-    PublishManager (const Config& cfg, ConnectManager &network) : config (cfg), _network (network), _mqtt (cfg.mqtt) {}
+    PublishManager (const Config& cfg, const BooleanFunc networkIsAvailable) : config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _mqtt (cfg.mqtt) {}
     void begin () override {
         _mqtt.setup ();
     }
     void process () override {
-        if (_network.isAvailable ())
+        if (_networkIsAvailable ())
             _mqtt.process ();
     }
     bool publish (const String& data) {
-        if (_network.isAvailable ()) {
+        if (_networkIsAvailable ()) {
           if (_mqtt.connected () && _mqtt.publish (config.mqtt.topic, data)) {
               _publishes += IntToString (data.length ()), _failures = 0;
               return true;
@@ -75,7 +81,7 @@ public:
         }
         return false;
     }
-    inline bool connected () { return _network.isAvailable () && _mqtt.connected (); }
+    inline bool connected () { return _networkIsAvailable () && _mqtt.connected (); }
 
 protected:
     void collectAlarms (AlarmSet& alarms) const override {
@@ -104,7 +110,9 @@ public:
 
 private:
     const Config &config;
+
     SPIFFSFile _file;
+
     ActivationTrackerWithDetail _appends;
     counter_t _failures = 0, _erasures = 0;
 

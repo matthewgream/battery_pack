@@ -2,6 +2,14 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+#define DEFAULT_SERIAL_BAUD 115200
+
+#define DEFAULT_NAME "BatteryMonitor"
+#define DEFAULT_VERS "0.9.9"
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
 #include <Arduino.h>
 
 #include "Utilities.hpp"
@@ -20,6 +28,8 @@
 #include "ProgramNetworkManage.hpp"
 #include "ProgramDataManage.hpp"
 
+#include "UtilitiesOTA.hpp" // because breaks if included earlier
+
 #include "Config.hpp"
 
 // -----------------------------------------------------------------------------------------------
@@ -28,6 +38,7 @@ class Program : public Component, public Diagnosticable {
 
     const Config config;
 
+    FanInterfaceStrategy_motorMap fanInterfaceSetrategyMotorMap;
     PidController fanControllingAlgorithm;
     AlphaSmoothing fanSmoothingAlgorithm;
 
@@ -43,8 +54,10 @@ class Program : public Component, public Diagnosticable {
     PublishManager publish;
     StorageManager storage;
 
+    UpdateManager updater;
     AlarmInterface_SinglePIN alarmInterface;
     AlarmManager alarms;
+
     DiagnosticManager diagnostics;
     class OperationalManager {
         const Program* _program;
@@ -58,8 +71,9 @@ class Program : public Component, public Diagnosticable {
 
     //
 
-    String doCollect (const String& name, const std::function<void (JsonDocument& doc)> func) const {
-        JsonCollector collector (name, nettime);
+    using JsonDocumentFunc = std::function <void (JsonDocument& doc)>;
+    String doCollect (const String& name, const JsonDocumentFunc func) const {
+        JsonCollector collector (name, getTimeString ());
         func (collector.document ());
         return collector;
     }
@@ -123,15 +137,19 @@ class Program : public Component, public Diagnosticable {
 public:
     Program () :
         fanControllingAlgorithm (FAN_CONTROL_P, FAN_CONTROL_I, FAN_CONTROL_D), fanSmoothingAlgorithm (FAN_SMOOTH_A),
-        temperatureInterface (config.temperatureInterface), temperatureManagerBatterypack (config.temperatureManager, temperatureInterface), temperatureManagerEnvironment (config.temperatureManager, temperatureInterface),
-        fanInterface (config.fanInterface), fanManager (config.fanManager, fanInterface, temperatureManagerBatterypack, fanControllingAlgorithm, fanSmoothingAlgorithm),
-        network (config.network), nettime (config.nettime, network),
-        deliver (config.deliver), publish (config.publish, network), storage (config.storage),
+        temperatureInterface (config.temperatureInterface), 
+        temperatureManagerBatterypack (config.temperatureManagerBatterypack, temperatureInterface), temperatureManagerEnvironment (config.temperatureManagerEnvironment, temperatureInterface),
+        fanInterface (config.fanInterface, fanInterfaceSetrategyMotorMap), fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, 
+            [&] () { return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ()); }),
+        network (config.network), nettime (config.nettime, [&] () { return network.isAvailable (); }),
+        deliver (config.deliver), publish (config.publish, [&] () { return network.isAvailable (); }), storage (config.storage),
+        updater (config.updateManager, [&] () { return network.isAvailable (); }),
         alarmInterface (config.alarmInterface), alarms (config.alarmManager, alarmInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage }),
-        diagnostics (config.diagnosticManager, { &temperatureInterface, &fanInterface, &network, &nettime, &deliver, &publish, &storage, &alarms, this }), operational (this),
+        diagnostics (config.diagnosticManager, { &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &network, &nettime, &deliver, &publish, &storage, &updater, &alarms, this }),
+        operational (this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
         components ({ &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager,
-            &alarms, &network, &nettime, &deliver, &publish, &storage, &diagnostics, this }) {
+            &alarms, &network, &nettime, &deliver, &publish, &storage, &updater, &diagnostics, this }) {
         DEBUG_PRINTF ("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
 

@@ -12,13 +12,13 @@
 #define BUILD_D ((__DATE__[4] == ' ') ? (__DATE__[5] - '0') : (__DATE__[4] - '0') * 10 + (__DATE__[5] - '0'))
 #define BUILD_T __TIME__
 
-static inline constexpr const char __build_name [] = "battery monitor";
-static inline constexpr const char __build_vers [] = "0.99" ;
+static inline constexpr const char __build_name [] = DEFAULT_NAME;
+static inline constexpr const char __build_vers [] = DEFAULT_VERS;
 static inline constexpr const char __build_time [] = {
     BUILD_Y/1000 + '0', (BUILD_Y%1000)/100 + '0', (BUILD_Y%100)/10 + '0', BUILD_Y%10 + '0',  BUILD_M/10 + '0', BUILD_M%10 + '0',  BUILD_D/10 + '0', BUILD_D%10 + '0',
     BUILD_T [0], BUILD_T [1], BUILD_T [3], BUILD_T [4], BUILD_T [6], BUILD_T [7],
     '\0'
-};
+};  
 
 const String build_info (String (__build_name) + " V" + String (__build_vers) + "-" + String (__build_time));
 
@@ -26,16 +26,49 @@ const String build_info (String (__build_name) + " V" + String (__build_vers) + 
 
 Program *program;
 
+#ifdef TESTING
+static void test_fanInterface () {
+    FanInterface::Config config = { .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 0, .PIN_PWMS = { 2, 3, 4, 5 }, .frequency = 20000 }, .MIN_SPEED = 192, .MAX_SPEED = 255 };
+    FanInterfaceStrategy_motorAll strategy;
+    FanInterface driver (config, strategy);
+    driver.begin ();
+    FanInterface::FanSpeedType speed = 0;
+    while (1) {
+        DEBUG_PRINTF ("speed=%d\n", speed);
+        driver.setSpeed (speed);
+        delay (15*1000);
+        speed += 16;
+        if (speed > 255) speed = 0;
+   }
+}
+static void test_muxInterface () {
+    typedef uint16_t AdcValueType;
+    MuxInterface_CD74HC4067 <AdcValueType>::Config config = { .PIN_EN = 20, .PIN_SIG = 6, .PIN_ADDR = { 10, 9, 8, 7 } };
+    MuxInterface_CD74HC4067 <AdcValueType> interface (config);
+
+    interface.enable (true);
+    while (1) {
+        AdcValueType value = interface.get (15);
+        DEBUG_PRINTF ("value=%x\n", value);
+        delay (5*1000);
+    }
+}
+#endif
+
 void setup () {
     DEBUG_START ();
     DEBUG_PRINTF ("\n*** %s ***\n\n", build_info.c_str ());
-    program = new Program ();
-    exception_catcher ([&] () { program->setup (); });
+    exception_catcher ([&] () { 
+        program = new Program ();
+        program->setup (); 
+    });
 }
 
 void loop () {
-    exception_catcher ([&] () { program->loop (); });
-    program->sleep ();
+    exception_catcher ([&] () { 
+        program->loop ();
+        program->sleep ();
+    });
 }
 
 // -----------------------------------------------------------------------------------------------

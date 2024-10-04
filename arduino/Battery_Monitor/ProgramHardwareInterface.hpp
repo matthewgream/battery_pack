@@ -3,11 +3,14 @@
 
 class TemperatureInterface : public Component, public Diagnosticable {
 
-    static inline constexpr int ADC_RESOLUTION = 12, ADC_MINVALUE = 0, ADC_MAXVALUE = (1 << ADC_RESOLUTION) - 1;
-
 public:
+    using AdcValueType = uint16_t;
+    static inline constexpr int AdcResolution = 12;
+    static inline constexpr AdcValueType AdcValueMin = 0, AdcValueMax = (1 << AdcResolution) - 1;
+    using AdcHardware = MuxInterface_CD74HC4067 <AdcValueType>;
+
     typedef struct {
-        MuxInterface_CD74HC4067::Config mux;
+        AdcHardware::Config hardware;
         struct Thermister {
             float REFERENCE_RESISTANCE, NOMINAL_RESISTANCE, NOMINAL_TEMPERATURE;
         } thermister;
@@ -15,87 +18,146 @@ public:
 
 private:
     const Config &config;
-    typedef struct { uint16_t v_now, v_min, v_max; } ValueSet;
-    MuxInterface_CD74HC4067 _muxInterface;
-    std::array <ValueSet, MuxInterface_CD74HC4067::CHANNELS> _muxValues;
-    void updateValues (const int channel, const uint16_t value) {
-        ValueSet &valueSet = _muxValues [channel];
-        valueSet.v_now = value;
-        if (value > valueSet.v_min) valueSet.v_min = value;
-        if (value < valueSet.v_max) valueSet.v_max = value;
+
+    AdcHardware _hardware;
+
+    std::array <StatsWithValue <AdcValueType>, AdcHardware::CHANNELS> _stats;
+    inline void updateStats (const int channel, const AdcValueType value) {
+        _stats [channel] += value;
     }
 
 public:
-    TemperatureInterface (const Config& cfg) : config (cfg), _muxInterface (cfg.mux) {
-        for (int channel = 0; channel < MuxInterface_CD74HC4067::CHANNELS; channel ++)
-            _muxValues [channel] = { .v_now = ADC_MINVALUE, .v_min = ADC_MAXVALUE, .v_max = ADC_MINVALUE };
-    }
+    TemperatureInterface (const Config& cfg) : config (cfg), _hardware (cfg.hardware) {}
     void begin () override {
-        analogReadResolution (ADC_RESOLUTION);
-        _muxInterface.enable ();
+        analogReadResolution (AdcResolution);
+        _hardware.enable ();
     }
     float getTemperature (const int channel) const {
-        assert (channel >= 0 && channel < MuxInterface_CD74HC4067::CHANNELS && "Channel out of range");
-        uint16_t value = _muxInterface.get (channel);
-        const_cast <TemperatureInterface*> (this)->updateValues (channel, value);
-        return steinharthart_calculator (value, ADC_MAXVALUE, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
+        assert (channel >= 0 && channel < AdcHardware::CHANNELS && "Channel out of range");
+        AdcValueType value = _hardware.get (channel);
+        const_cast <TemperatureInterface*> (this)->updateStats (channel, value);
+        return steinharthart_calculator (value, AdcValueMax, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
     }
 
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject tmp = obj ["tmp"].to <JsonObject> ();
-        for (int channel = 0; channel < MuxInterface_CD74HC4067::CHANNELS; channel ++)
-            tmp [IntToString (channel)] = IntToString (_muxValues [channel].v_now) + "," + IntToString (_muxValues [channel].v_min) + "," + IntToString (_muxValues [channel].v_max);
+        for (int channel = 0; channel < AdcHardware::CHANNELS; channel ++)
+            tmp [IntToString (channel)] = IntToString (_stats [channel].val ()) + "," + IntToString (_stats [channel].min ()) + "," + IntToString (_stats [channel].max ());
     }
 };
 
 // -----------------------------------------------------------------------------------------------
 
+class FanInterface;
+class FanInterfaceStrategy {
+public:  
+    virtual String name () const = 0;
+    virtual void begin (const FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) = 0;
+    virtual bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeedType speed) = 0;
+};
+
 class FanInterface : public Component, public Diagnosticable {
 
-    static inline constexpr int PWM_RESOLUTION = 8;
-    static inline constexpr uint8_t PWM_MINVALUE = 0, PWM_MAXVALUE = ((1 << PWM_RESOLUTION) - 1);
-
 public:
+    using FanSpeedType = OpenSmart_QuadMotorDriver::MotorSpeedType;
+    static inline constexpr FanSpeedType FanSpeedMin = 0, FanSpeedMax = (1 << OpenSmart_QuadMotorDriver::MotorSpeedResolution) - 1;
+    static inline constexpr size_t FanSpeedRange = (1 << OpenSmart_QuadMotorDriver::MotorSpeedResolution);
+
     typedef struct  {
-        OpenSmart_QuadMotorDriver::Config qmd;
-        uint8_t MIN_SPEED, MAX_SPEED;
+        OpenSmart_QuadMotorDriver::Config hardware;
+        FanSpeedType MIN_SPEED, MAX_SPEED;
     } Config;
 
 private:
     const Config &config;
-    uint8_t _speed = PWM_MINVALUE, _speedMin = PWM_MAXVALUE, _speedMax = PWM_MINVALUE;
-    OpenSmart_QuadMotorDriver _driver;
+
+    FanInterfaceStrategy& _strategy;
+    OpenSmart_QuadMotorDriver _hardware;
+
+    FanSpeedType _speed = 0;
+    bool _active = false;
+    Stats <FanSpeedType> _stats;
     ActivationTracker _sets;
 
 public:
-    FanInterface (const Config& cfg) : config (cfg), _driver (config.qmd) {}
+    FanInterface (const Config& cfg, FanInterfaceStrategy& strategy) : config (cfg), _strategy (strategy), _hardware (config.hardware) {}
     void begin () override {
-        _driver.setDirection (OpenSmart_QuadMotorDriver::MOTOR_CLOCKWISE); // all 4 fans, for now
-        _driver.setSpeed (_speed);
+        DEBUG_PRINTF ("FanInterface::begin: strategy=%s\n", _strategy.name ().c_str ());
+        _hardware.setDirection (OpenSmart_QuadMotorDriver::MOTOR_CLOCKWISE);
+        _hardware.setSpeed (static_cast <OpenSmart_QuadMotorDriver::MotorSpeedType> (0), OpenSmart_QuadMotorDriver::MOTOR_ALL);
+        _strategy.begin (*this, _hardware);
     }
 
-    void setSpeed (const uint8_t speed) {
-        const uint8_t speedNew = std::clamp (speed, PWM_MINVALUE, PWM_MAXVALUE);
+    void setSpeed (const FanSpeedType speed) {
+        const FanSpeedType speedNew = std::clamp (speed, FanSpeedMin, FanSpeedMax);
         if (speedNew != _speed) {
             DEBUG_PRINTF ("FanInterface::setSpeed: %d\n", speedNew);
-            if (speedNew > config.MIN_SPEED && _speed <= config.MIN_SPEED) _sets ++;
-            _driver.setSpeed (_speed = speedNew); // all 4 fans, for now
-            if (_speed < _speedMin) _speedMin = _speed;
-            if (_speed > _speedMax) _speedMax = _speed;
+            bool active = _strategy.setSpeed (_speed = speedNew);
+            if (!_active && active)
+                _sets ++, _active = active;
+            _stats += _speed;
         }
     }
-   inline uint8_t getSpeed () const {
+    inline FanSpeedType getSpeed () const {
         return _speed;
     }
+
+    inline const Config &getConfig () const { return config; } // yuck
 
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject fan = obj ["fan"].to <JsonObject> ();
-        fan ["speed"] = IntToString (_speed) + "," + IntToString (_speedMin) + "," + IntToString (_speedMax);
+        fan ["speed"] = IntToString (_speed) + "," + IntToString (_stats.min ()) + "," + IntToString (_stats.max ());
         _sets.serialize (fan);
         // % duty
     }
 };
+
+// -----------------------------------------------------------------------------------------------
+
+class FanInterfaceStrategy_motorAll: public FanInterfaceStrategy {
+    OpenSmart_QuadMotorDriver* _hardware;
+    OpenSmart_QuadMotorDriver::MotorSpeedType _min_speed;
+public:  
+    String name () const override { return "motorAll(" + IntToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
+    void begin (const FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
+        _hardware = &hardware; _min_speed = interface.getConfig ().MIN_SPEED;
+    }
+    bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeedType speed) override {
+        _hardware->setSpeed (speed, OpenSmart_QuadMotorDriver::MOTOR_ALL);
+        return speed > _min_speed;
+    }
+};
+
+using FanInterfaceStrategy_default = FanInterfaceStrategy_motorAll;
+
+class FanInterfaceStrategy_motorMap: public FanInterfaceStrategy {
+    OpenSmart_QuadMotorDriver* _hardware;
+    OpenSmart_QuadMotorDriver::MotorSpeedType _min_speed, _max_speed;
+    std::array <OpenSmart_QuadMotorDriver::MotorSpeedType, OpenSmart_QuadMotorDriver::MotorCount> _motorSpeeds;
+
+public:
+    String name () const override { return "motorMap(" + IntToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
+    void begin (const FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
+        _hardware = &hardware; _min_speed = interface.getConfig ().MIN_SPEED; _max_speed = interface.getConfig ().MAX_SPEED;
+        for (int motorId = 0; motorId < OpenSmart_QuadMotorDriver::MotorCount; motorId ++) _motorSpeeds [motorId] = static_cast <OpenSmart_QuadMotorDriver::MotorSpeedType> (0);
+    }
+    bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeedType speed) override { // each time they go to zero, randomise order to even out wear
+        int activated = 0;
+        for (int motorId = 0, currentThreshold = 0, totalSpeed = speed * OpenSmart_QuadMotorDriver::MotorCount; motorId < OpenSmart_QuadMotorDriver::MotorCount; motorId ++, currentThreshold += FanInterface::FanSpeedRange) {
+            OpenSmart_QuadMotorDriver::MotorSpeedType motorSpeed = 0;
+            if (totalSpeed >= (currentThreshold + FanInterface::FanSpeedRange))
+                motorSpeed = _max_speed;
+            else if (totalSpeed > currentThreshold && totalSpeed < (currentThreshold + FanInterface::FanSpeedRange))
+                motorSpeed = map (totalSpeed - currentThreshold, 0, FanInterface::FanSpeedRange, _min_speed, _max_speed);
+            if (motorSpeed != _motorSpeeds [motorId])
+                _hardware->setSpeed (motorSpeed, static_cast<OpenSmart_QuadMotorDriver::MotorID> (motorId)), _motorSpeeds [motorId] = motorSpeed;
+            if (motorSpeed > 0) activated ++;
+        }
+        return activated > 0;
+    }
+};
+
 
 // -----------------------------------------------------------------------------------------------

@@ -5,6 +5,7 @@
 #include <ctime>
 
 class NetworkTimeFetcher {
+  
     const String _useragent, _server;
 
 public:
@@ -116,6 +117,7 @@ public:
 
 private:
     const Config &config;
+
     WiFiClient _wifiClient;
     PubSubClient _mqttClient;
 

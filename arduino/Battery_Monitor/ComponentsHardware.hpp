@@ -12,6 +12,7 @@ public:
 
 private:
     const Config &config;
+
     bool _enabled = false;
 
 public:
@@ -37,15 +38,16 @@ public:
 #include <array>
 
 // https://deepbluembedded.com/arduino-cd74hc4067-analog-multiplexer-library-code/
+template <typename ADC_VALUE_TYPE>
 class MuxInterface_CD74HC4067 { // technically this is ADC as well due to PIN_SIG
 
 public:
-    static inline constexpr int AddrWidth = 4;
-    static inline constexpr int CHANNELS = 16;
+    static inline constexpr int ADDRESS_WIDTH = 4;
+    static inline constexpr int CHANNELS = (1 << ADDRESS_WIDTH);
 
     typedef struct {
         int PIN_EN, PIN_SIG;
-        std::array <int, AddrWidth> PIN_ADDR;
+        std::array <int, ADDRESS_WIDTH> PIN_ADDR;
     } Config;
 
 private:
@@ -61,11 +63,11 @@ public:
         pinMode (config.PIN_ADDR [3], OUTPUT);
         pinMode (config.PIN_SIG, INPUT);
     }
-    uint16_t get (const int channel) const {
-        digitalWrite (config.PIN_ADDR [0], channel & 1);
-        digitalWrite (config.PIN_ADDR [1], (channel >> 1) & 1);
-        digitalWrite (config.PIN_ADDR [2], (channel >> 2) & 1);
-        digitalWrite (config.PIN_ADDR [3], (channel >> 3) & 1);
+    ADC_VALUE_TYPE get (const int channel) const {
+        digitalWrite (config.PIN_ADDR [0], channel & 1 ? HIGH : LOW);
+        digitalWrite (config.PIN_ADDR [1], (channel >> 1) & 1 ? HIGH : LOW);
+        digitalWrite (config.PIN_ADDR [2], (channel >> 2) & 1 ? HIGH : LOW);
+        digitalWrite (config.PIN_ADDR [3], (channel >> 3) & 1 ? HIGH : LOW);
         delay (10);
         return analogRead (config.PIN_SIG);
     }
@@ -92,6 +94,7 @@ static String __osqmd_motorid_to_string (const int motorId) {
 }
 
 // https://www.aliexpress.com/item/1005002430639515.html
+// max frequency 5kHz
 class OpenSmart_QuadMotorDriver {
 
 public:
@@ -103,6 +106,7 @@ public:
         uint8_t I2C_ADDR;
         int PIN_I2C_SDA, PIN_I2C_SCL;
         MotorSpeedPins PIN_PWMS;
+        int frequency;
     } Config;
 
     enum MotorID {
@@ -116,10 +120,14 @@ public:
         MOTOR_CLOCKWISE = 0,
         MOTOR_ANTICLOCKWISE = 1
     };
-    typedef uint8_t MotorSpeed;
+
+    static inline constexpr int MotorSpeedResolution = 8;
+    typedef uint8_t MotorSpeedType;
 
 private:
     const Config &config;
+
+    int _status;
     uint8_t _directions;
 
     enum MotorControl {
@@ -128,19 +136,20 @@ private:
         MOTOR_CONTROL_CLOCKWISE = 0x02
     };
     static constexpr uint8_t controlvalue_alloff = 0x00;
-    static constexpr uint8_t encode_controlvalue (const int motorID, const uint8_t directions, const uint8_t value) {
-        return (directions & (~(0x03 << (2 * motorID)))) | (value << (2 * motorID));
+    
+    static constexpr uint8_t encodeControlValue (const int motorID, const uint8_t directions, const uint8_t value) {
+        return (directions & ~(0x03 << (2 * motorID))) | (value << (2 * motorID));
     }
 
-    void directions_update (const int motorID, const MotorControl value) {
+    void applyDirections (const int motorID, const MotorControl value) {
         for (int id = 0; id < MotorCount; id ++)
             if (motorID == MOTOR_ALL || motorID == id)
-                _directions = encode_controlvalue (_directions, id, value);
+                _directions = encodeControlValue (id, _directions, value);
         Wire.beginTransmission (config.I2C_ADDR);
         Wire.write (_directions);
         Wire.endTransmission ();
     }
-    void speed_update (const int motorID, const MotorSpeed value) {
+    void applySpeed (const int motorID, const MotorSpeedType value) {
         for (int id = 0; id < MotorCount; id ++)
             if (motorID == MOTOR_ALL || motorID == id)
                 analogWrite (config.PIN_PWMS [id], value);
@@ -148,25 +157,29 @@ private:
 
 public:
     OpenSmart_QuadMotorDriver (const Config& cfg) : config (cfg), _directions (0x00) {
-        Wire.setPins (config.PIN_I2C_SDA, config.PIN_I2C_SCL);
-        Wire.begin ();
+        Wire.begin (config.PIN_I2C_SDA, config.PIN_I2C_SCL);
         Wire.beginTransmission (config.I2C_ADDR);
         Wire.write (controlvalue_alloff);
-        Wire.endTransmission ();
-        for (uint8_t pin : config.PIN_PWMS)
-            pinMode (pin, OUTPUT), analogWrite (pin, 0);
+        _status = Wire.endTransmission ();
+        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::init: device %s i2c (address=0x%x, sda=%d, scl=%d, status=%d), pwm (resolution=%d, frequency=%d) \n", (_status == 0 ? "connected" : "unresponsive"), config.I2C_ADDR, config.PIN_I2C_SDA, config.PIN_I2C_SCL, _status, MotorSpeedResolution, config.frequency);
+        for (uint8_t pin : config.PIN_PWMS) {
+            analogWriteResolution (pin, MotorSpeedResolution);
+            analogWriteFrequency (pin, config.frequency);
+            pinMode (pin, OUTPUT);
+            analogWrite (pin, 0);
+        }
     }
-    void setSpeed (const MotorSpeed speed, const int motorID = MOTOR_ALL) {
+    void setSpeed (const MotorSpeedType speed, const int motorID = MOTOR_ALL) {
         DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setSpeed: %s -> %d\n", __osqmd_motorid_to_string (motorID).c_str (), speed);
-        speed_update (motorID, speed);
+        applySpeed (motorID, speed);
     }
     void setDirection (const MotorDirection direction, const int motorID = MOTOR_ALL) {
         DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setDirection: %s -> %s\n", __osqmd_motorid_to_string (motorID).c_str (), (direction == MOTOR_CLOCKWISE) ? "CLOCKWISE" : "ANTICLOCKWISE");
-        directions_update (motorID, (direction == MOTOR_CLOCKWISE) ? MOTOR_CONTROL_CLOCKWISE : MOTOR_CONTROL_ANTICLOCKWISE);
+        applyDirections (motorID, (direction == MOTOR_CLOCKWISE) ? MOTOR_CONTROL_CLOCKWISE : MOTOR_CONTROL_ANTICLOCKWISE);
     }
     void stop (const int motorID = MOTOR_ALL) {
         DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::stop: %s\n", __osqmd_motorid_to_string (motorID).c_str ());
-        directions_update (motorID, MOTOR_CONTROL_OFF);
+        applyDirections (motorID, MOTOR_CONTROL_OFF);
     }
 };
 
