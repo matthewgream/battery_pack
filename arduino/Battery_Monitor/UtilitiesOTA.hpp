@@ -2,6 +2,22 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+#include <utility>
+
+String __encodeUrlWithParameters (const String& result) {
+    return result;
+}
+template <typename K, typename V, typename... R>
+String __encodeUrlWithParameters (const String& result, K&& key, V&& value, R&&... rest) {
+    return __encodeUrlWithParameters (result + (result.isEmpty () ? "?" : "&") + String (key) + "=" + String (value), std::forward <R> (rest)...);
+}
+template <typename... A>
+String encodeUrlWithParameters (const String& url, A&&... args) {
+    return url +  __encodeUrlWithParameters ("", std::forward <A> (args)...);
+}
+
+// -----------------------------------------------------------------------------------------------
+
 #include <flashz.hpp>
 #include <esp32fota.h>
 #include <WiFi.h>
@@ -17,7 +33,7 @@ static void __ota_image_update_success (const int partition, const bool restart)
 }
 static bool __ota_image_update_check (esp32FOTA& ota, const char *json, const char *type, const char *vers, const char *addr, char *newr) {
     DEBUG_PRINTF ("OTA_IMAGE_CHECK: fetch json=%s, type=%s, vers=%s, addr=%s ...", json, type, vers, addr);
-    ota.setManifestURL (String (String (json) + String ("?vers=") + String (vers) + String ("&addr=") + String (addr)).c_str ());
+    ota.setManifestURL (encodeUrlWithParameters (json, "type", type, "vers", vers, "addr", addr).c_str ());
     const bool update = ota.execHTTPcheck ();
     if (update) {
         ota.getPayloadVersion (newr);
