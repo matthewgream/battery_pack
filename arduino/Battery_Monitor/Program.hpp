@@ -153,6 +153,24 @@ public:
         DEBUG_PRINTF ("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
 
+    void calibration () {
+        //float resistance = Config.temperatureInterface.thermister.REFERENCE_RESISTANCE / ((TemperatureInterface::AdcValueMax / value) - 1.0f);
+        const Config config;
+        TemperatureInterface::AdcHardware driver_CD74HC4067 (config.temperatureInterface.hardware);
+        TemperatureSensor_DS18B20 driver_DS18B20 (config.DS18B20_PIN);
+
+// As a general guideline, for many applications, an error threshold between 0.1°C and 1°C might be appropriate. For example:
+
+// High-precision applications: 0.1°C to 0.3°C
+// General-purpose applications: 0.3°C to 0.7°C
+// Less critical applications: 0.7°C to 1°C
+
+// In the example code, I've used 0.4°C as the error threshold, which would be suitable for many general-purpose applications. You should adjust this based on your specific requirements and the results of your calibration process.
+
+
+
+    }
+
     Component::List components;
     void setup () { for (const auto& component : components) component->begin (); }
     void loop () { for (const auto& component : components) component->process (); }

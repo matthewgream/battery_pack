@@ -60,6 +60,7 @@
 struct Config {
 
     // hardware interfaces
+    int DS18B20_PIN = 21;
     TemperatureInterface::Config temperatureInterface = {
         .hardware = { .PIN_EN = 20, .PIN_SIG = 6, .PIN_ADDR = { 10, 9, 8, 7 } },
         // calibration

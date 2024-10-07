@@ -34,6 +34,35 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+//    https://github.com/matmunk/DS18B20/blob/master/src/DS18B20.cpp
+//    https://github.com/matmunk/DS18B20/blob/master/src/DS18B20.h
+
+
+class TemperatureSensor_DS18B20 {
+    static inline constexpr int DS1820_INDEX = 0;
+    OneWire oneWire;
+    DallasTemperature sensors;
+
+public:
+    TemperatureSensor_DS18B20 (const int pin) : oneWire (pin), sensors (&oneWire) {
+        sensors.begin ();
+    }
+    float getTemperature () {
+        sensors.requestTemperatures ();
+        const float temp = sensors.getTempCByIndex (DS1820_INDEX);
+        if (temp == DEVICE_DISCONNECTED_C) {
+            DEBUG_PRINTF ("TemperatureSensor_DS18B20::getTemperature: device is disconnected\n");
+            return -273.15;
+        }
+        return temp;
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+
 #include <Arduino.h>
 #include <array>
 
