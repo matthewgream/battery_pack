@@ -35,7 +35,7 @@ void setup () {
     // must be a more elegant way
     // Tester_HardwareInterfaces tester;
     // tester.run ();
-    // temperatureCalibration ();
+    temperatureCalibration ();
 
     watchdog.start ();
     exception_catcher ([&] () { 

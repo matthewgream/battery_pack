@@ -24,21 +24,32 @@ public:
     using ResistanceReadFunc = std::function <uint16_t (size_t)>;
 
     bool collect (Collection &collection, const TemperatureReadFunc readTemperature, const ResistanceReadFunc readResistance) {
-        static constexpr int DELAY = 100;
+        static constexpr int DELAY = 100, COUNT = 5*1000/DELAY;
 
         if (readTemperature () > (TEMP_START - TEMP_STEP)) {
-            DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to reach %.2f°C ... ", TEMP_START - TEMP_STEP);
-            while (readTemperature () > (TEMP_START - TEMP_STEP))
+            float temperatureActual = readTemperature ();
+            DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to reach %.2f°C .. (at %.2f°C) ", TEMP_START - TEMP_STEP, temperatureActual);
+            int where = 0;
+            while (temperatureActual > (TEMP_START - TEMP_STEP)) {
+                if (++ where > COUNT)
+                    DEBUG_PRINTF ("(at %.2f°C) ", temperatureActual), where = 0;
                 delay (DELAY);
+                temperatureActual = readTemperature ();
+            }
             DEBUG_PRINTF ("done\n");
         }
 
         DEBUG_PRINTF ("TemperatureCalibrationCollector: collecting from %.2f°C to %.2f°C in %.2f°C steps (%d total) for %d NTC resistances\n", TEMP_START, TEMP_END, TEMP_STEP, Definitions::TEMP_SIZE, SENSOR_SIZE);
         for (size_t step = 0; step < Definitions::TEMP_SIZE; step ++) {
-            float temperatureTarget = TEMP_START + (step * TEMP_STEP), temperatureActual;
-            DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to reach %.2f°C ... ", temperatureTarget);
-            while ((temperatureActual = readTemperature ()) < temperatureTarget)
+            float temperatureTarget = TEMP_START + (step * TEMP_STEP), temperatureActual = readTemperature ();
+            DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to reach %.2f°C ... (at %.2f°C) ", temperatureTarget, temperatureActual);
+            int where = 0;
+            while (temperatureActual < temperatureTarget) {
+                if (++ where > COUNT)
+                    DEBUG_PRINTF ("(at %.2f°C) ", temperatureActual), where = 0;
                 delay (DELAY);
+                temperatureActual = readTemperature ();
+            }
             DEBUG_PRINTF ("reached %.2f°C, collecting %d NTC resistances ... ", temperatureActual, SENSOR_SIZE);
             for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++)
                 collection.resistances [sensor] [step] = readResistance (sensor);
@@ -283,6 +294,7 @@ public:
             return false;
         }
         serializeJson (doc, file);
+        serializeJson (doc, Serial);
         file.close ();
         //
      
