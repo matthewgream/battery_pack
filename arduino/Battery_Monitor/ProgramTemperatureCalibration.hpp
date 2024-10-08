@@ -24,37 +24,49 @@ public:
     using ResistanceReadFunc = std::function <uint16_t (size_t)>;
 
     bool collect (Collection &collection, const TemperatureReadFunc readTemperature, const ResistanceReadFunc readResistance) {
-        static constexpr int DELAY = 100, COUNT = 5*1000/DELAY;
+        static constexpr int DELAY = 100, COUNT = 5*1000/DELAY, AVERAGING = 5;
+        MovingAverageWithValue <float, 8> temperature;
 
-        if (readTemperature () > (TEMP_START - TEMP_STEP)) {
-            float temperatureActual = readTemperature ();
-            DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to reach %.2f°C .. (at %.2f°C) ", TEMP_START - TEMP_STEP, temperatureActual);
+        float temperatureTarget = (TEMP_START - TEMP_STEP);
+        if ((temperature = readTemperature ()) > temperatureTarget) {
+            DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to reduce to %.2f°C ... \n", temperatureTarget);
             int where = 0;
-            while (temperatureActual > (TEMP_START - TEMP_STEP)) {
-                if (++ where > COUNT)
-                    DEBUG_PRINTF ("(at %.2f°C) ", temperatureActual), where = 0;
+            while (temperature > temperatureTarget) {
+                if (-- where < 0)
+                    DEBUG_PRINTF ("(at %.2f°C)\n", static_cast <float> (temperature)), where = COUNT;
                 delay (DELAY);
-                temperatureActual = readTemperature ();
+                temperature = readTemperature ();
             }
             DEBUG_PRINTF ("done\n");
         }
 
         DEBUG_PRINTF ("TemperatureCalibrationCollector: collecting from %.2f°C to %.2f°C in %.2f°C steps (%d total) for %d NTC resistances\n", TEMP_START, TEMP_END, TEMP_STEP, Definitions::TEMP_SIZE, SENSOR_SIZE);
         for (size_t step = 0; step < Definitions::TEMP_SIZE; step ++) {
-            float temperatureTarget = TEMP_START + (step * TEMP_STEP), temperatureActual = readTemperature ();
-            DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to reach %.2f°C ... (at %.2f°C) ", temperatureTarget, temperatureActual);
+            temperatureTarget = TEMP_START + (step * TEMP_STEP);
+            DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to increase to %.2f°C ... \n", temperatureTarget);
             int where = 0;
-            while (temperatureActual < temperatureTarget) {
-                if (++ where > COUNT)
-                    DEBUG_PRINTF ("(at %.2f°C) ", temperatureActual), where = 0;
+            while (temperature < temperatureTarget) {
+                if (-- where < 0)
+                    DEBUG_PRINTF ("(at %.2f°C)\n", static_cast <float> (temperature)), where = COUNT;
                 delay (DELAY);
-                temperatureActual = readTemperature ();
+                temperature = readTemperature ();
             }
-            DEBUG_PRINTF ("reached %.2f°C, collecting %d NTC resistances ... ", temperatureActual, SENSOR_SIZE);
-            for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++)
-                collection.resistances [sensor] [step] = readResistance (sensor);
-            collection.temperatures [step] = temperatureActual;
+            DEBUG_PRINTF ("... reached %.2f°C, collecting %d NTC resistances ...\n", static_cast <float> (temperature), SENSOR_SIZE);
+            collection.temperatures [step] = temperature;
+            std::array <uint32_t, Definitions::TEMP_SIZE> resistances;
+            resistances.fill (static_cast <uint32_t> (0));
+            for (int count = 0; count < AVERAGING; count ++)
+              for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++)
+                  resistances [sensor] += static_cast <uint32_t> (readResistance (sensor));
+            for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++)                  
+                collection.resistances [sensor] [step] = static_cast <uint16_t> (resistances [sensor] / static_cast <uint32_t> (AVERAGING));
             DEBUG_PRINTF ("done\n");
+            
+            //
+            DEBUG_PRINTF ("= %d,%.2f", step, collection.temperatures [step]);
+            for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++)
+                DEBUG_PRINTF (",%u", collection.resistances [sensor] [step]);
+            DEBUG_PRINTF ("\n");
         }
         return true;
     }
@@ -134,67 +146,127 @@ public:
     using Definitions = TemperatureCalibrationDefinitions <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
 
 private:
-    float A, B, C;
+    float A, B, C, D;
+
+    inline bool isResistanceReasonable (const uint16_t resistance) const { return resistance > 0 && resistance < 100*1000; }
+    inline bool isTemperatureReasonable (const float temperature) const { return temperature > -273.15f && temperature < 200.0f; }
+
+    bool gaussian_solve_size4 (std::array <std::array <double, 4>, 4>& matrix, std::array <double, 4>& vector) {
+
+        const double det = matrix [0][0] * (
+            matrix [1][1] * matrix [2][2] * matrix [3][3] + 
+            matrix [1][2] * matrix [2][3] * matrix [3][1] + 
+            matrix [1][3] * matrix [2][1] * matrix [3][2] - 
+            matrix [1][3] * matrix [2][2] * matrix [3][1] - 
+            matrix [1][2] * matrix [2][1] * matrix [3][3] - 
+            matrix [1][1] * matrix [2][3] * matrix [3][2]
+        );
+        if (std::abs (det) < 1e-10)
+            return false;
+
+        for (size_t i = 0; i < 4; i ++)
+            for (size_t j = i + 1; j < 4; j ++) {
+                const double factor = matrix [j][i] / matrix [i][i];
+                for (size_t k = i; k < 4; k ++)
+                    matrix [j][k] -= factor * matrix [i][k];
+                vector [j] -= factor * vector [i];
+            }
+
+        for (int i = 4 - 1; i >= 0; i --) {
+            for (int j = i + 1; j < 4; j ++)
+                vector [i] -= matrix [i][j] * vector [j];
+            vector [i] /= matrix [i][i];
+        }
+
+        return true;
+    }
 
 public:
     TemperatureCalibrationAdjustmentStrategy_Steinhart (const float a = 0.0, const float b = 0.0, const float c = 0.0): A (a), B (b), C (c) {}
 
     bool calibrate (const Definitions::Temperatures& t, const Definitions::Resistances& r) override {
-        if (t.size () < 3 || r.size () < 3 || t.size () != r.size ()) {
-            DEBUG_PRINTF ("calibrateSteinhartHart: at least 3 matching temperature-resistance pairs are required for calibration.\n");
+      
+        if (t.size () < 4 || t.size () != r.size ()) {
+            DEBUG_PRINTF ("calibrateSteinhartHart: at least 4 matching temperature-resistance pairs are required for calibration.\n");
             return false;
         }
 
-        std::array <double, Definitions::TEMP_SIZE> T, Y, L;
-        for (size_t i = 0; i < t.size (); i ++) {
-            T [i] = t [i] + 273.15;
-            Y [i] = 1.0 / T [i];
-            L [i] = log (r [i]);
+        const size_t cnt = t.size ();
+        std::array <double, Definitions::TEMP_SIZE> Y, L, L2, L3;
+        for (size_t i = 0; i < cnt; i ++) {
+            if (!isResistanceReasonable (r [i]) || !isTemperatureReasonable (t [i])) {
+                DEBUG_PRINTF ("calibrateSteinhartHart: invalid input data.\n");
+                return false;
+            }
+            Y  [i] = 1.0 / (t [i] + 273.15);
+            L  [i] = std::log (static_cast <double> (1.0 * r [i]));
+            L2 [i] = L [i] * L [i];
+            L3 [i] = L2 [i] * L [i];
         }
 
-        double sum_L = 0, sum_Y = 0, sum_L2 = 0, sum_L3 = 0, sum_LY = 0, sum_L2Y = 0;
-        for (size_t i = 0; i < L.size (); i ++) {
-            sum_L   += L [i];
-            sum_Y   += Y [i];
-            sum_L2  += L [i] * L [i];
-            sum_L3  += L [i] * L [i] * L [i];
-            sum_LY  += L [i] * Y [i];
-            sum_L2Y += L [i] * L [i] * Y [i];
+        double sum_Y = 0, sum_L = 0, sum_L2 = 0, sum_L3 = 0, sum_L4 = 0, sum_L5 = 0, sum_L6 = 0;
+        double sum_YL = 0, sum_YL2 = 0, sum_YL3 = 0;
+        for (size_t i = 0; i < cnt; i ++) {
+            sum_Y   += Y  [i];
+            sum_L   += L  [i];
+            sum_L2  += L2 [i];
+            sum_L3  += L3 [i];
+            sum_L4  += L2 [i] * L2 [i];
+            sum_L5  += L2 [i] * L3 [i];
+            sum_L6  += L3 [i] * L3 [i];
+            sum_YL  += Y  [i] * L  [i];
+            sum_YL2 += Y  [i] * L2 [i];
+            sum_YL3 += Y  [i] * L3 [i];
         }
+        std::array <std::array <double, 4>, 4> matrix = {{
+            { cnt*1.0,sum_L,  sum_L2, sum_L3},
+            { sum_L,  sum_L2, sum_L3, sum_L4},
+            { sum_L2, sum_L3, sum_L4, sum_L5},
+            { sum_L3, sum_L4, sum_L5, sum_L6}
+        }};
+        std::array <double, 4> vector = { sum_Y, sum_YL, sum_YL2, sum_YL3 };
 
-        const double num = static_cast <double> (L.size ());
-        const double det   = num   * (sum_L2 * sum_L2  - sum_L  * sum_L3)  - sum_L * (sum_L  * sum_L2  - sum_L  * sum_L3)  + sum_L2 * (sum_L  * sum_L  - num    * sum_L2);
-        const double det_A = sum_Y * (sum_L2 * sum_L2  - sum_L  * sum_L3)  - sum_L * (sum_LY * sum_L2  - sum_L  * sum_L2Y) + sum_L2 * (sum_LY * sum_L  - sum_Y  * sum_L2);
-        const double det_B = num   * (sum_LY * sum_L2  - sum_L  * sum_L2Y) - sum_Y * (sum_L  * sum_L2  - sum_L  * sum_L3)  + sum_L2 * (sum_L  * sum_LY - num    * sum_L2Y);
-        const double det_C = num   * (sum_L2 * sum_L2Y - sum_LY * sum_L3)  - sum_L * (sum_L  * sum_L2Y - sum_LY * sum_L2)  + sum_Y  * (sum_L  * sum_L3 - sum_L2 * sum_L2);
-
-        constexpr double epsilon = 1e-10;
-        if (std::abs (det) < epsilon) {
-            DEBUG_PRINTF ("calibrateSteinhartHart: determinant is too close to zero, solution may be unstable.\n");
+        if (!gaussian_solve_size4 (matrix, vector)) {
+            DEBUG_PRINTF ("calibrateSteinhartHart: matrix is ill-conditioned.\n");
             return false;
         }
-        A = static_cast <float> (det_A / det);
-        B = static_cast <float> (det_B / det);
-        C = static_cast <float> (det_C / det);
+        
+        A = static_cast <float> (vector [0]);
+        B = static_cast <float> (vector [1]);
+        C = static_cast <float> (vector [2]);
+        D = static_cast <float> (vector [3]);
+
+        for (size_t i = 0; i < cnt; i ++) {
+            float temperature;
+            if (!calculate (temperature, r [i]) || !isTemperatureReasonable (temperature) || std::abs (temperature - t [i]) > 5.0f) {  // Allow 5 degrees of error
+                DEBUG_PRINTF ("calibrateSteinhartHart: calibration produced unreliable results.\n");
+                return false;
+            }
+        }
+
         return true;
     }
     bool calculate (float& temperature, const uint16_t resistance) const override {
-        const float logR = log (resistance);
-        temperature = 1.0f / (A + B * logR + C * logR * logR * logR) - 273.15f;
-        return true;
+        if (!isResistanceReasonable (resistance)) {
+            DEBUG_PRINTF ("calculateSteinhartHart: invalid resistance value.\n");
+            return false;
+        }      
+        const double lnR = std::log (static_cast <double> (resistance));
+        temperature = static_cast <float> (1.0 / (A + B*lnR + C*lnR*lnR + D*lnR*lnR*lnR) - 273.15);
+        return isTemperatureReasonable (temperature);
     }
     //
     void serialize (JsonObject& obj) const override {
-        obj ["A"] = A, obj ["B"] = B, obj ["C"] = C;
+        obj ["A"] = A, obj ["B"] = B, obj ["C"] = C, obj ["D"] = D;
     }
     void deserialize (JsonObject& obj) override {
-        A = obj ["A"], B = obj ["B"], C = obj ["C"];
+        A = obj ["A"], B = obj ["B"], C = obj ["C"], D = obj ["D"];
     }
     String getName () const override {
         return "Steinhart";
     }
     String getDetails () const override {
-        return "Steinhart (A=" + FloatToString (A) + ", B=" + FloatToString (B) + ", C=" + FloatToString (C) + ")";
+        return "Steinhart (A=" + FloatToString (A) + ", B=" + FloatToString (B) + ", C=" + FloatToString (C) + ", D=" + FloatToString (D) + ")";
     }
 };
 
