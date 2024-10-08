@@ -27,32 +27,29 @@
     CD74HC4067
         https://deepbluembedded.com/arduino-cd74hc4067-analog-multiplexer-library-code/
 
-    +-----+---------------+-----------+------------+
-    | DIR | C3-ZERO       | OPENSMART | CD74HC4067 |
-    +-----+---------------+-----------+------------+
-    | GND | 1  GND        | 8  GND    | 8  GND     |
-    | VCC | 2  5V         | 7  VCC    |            |
-    | N/C | 3  3V3        |           | 7  VCC     | output only
-    | OUT | 4  GP0  (I2C) | 6  SCL    |            |
-    | OUT | 5  GP1  (I2C) | 5  SDA    |            |
-    | OUT | 6  GP2  (PWM) | 4  PWMA   |            |
-    | OUT | 7  GP3  (PWM) | 3  PWMB   |            |
-    | OUT | 8  GP4  (PWM) | 2  PWMC   |            |
-    | OUT | 9  GP5  (PWM) | 1  PWMD   |            |
-    | OUT | 10 GP6  (ADC) |           | 1  SIG     |
-    | OUT | 11 GP7  (TTL) |           | 2  S3      |
-    | OUT | 12 GP8  (TTL) |           | 3  S2      |
-    | OUT | 13 GP9  (TTL) |           | 4  S1      |
-    | OUT | 14 GP10 (TTL) |           | 5  S0      |
-    | IN  | 15 GP18 [USB] |           |            | don't use or will interfere with develop/debug
-    | N/C | 16 GP19 [USB] |           |            | don't use or will interfere with develop/debug
-    | N/C | 17 GP20 (TTL) |           | 6  EN      |
-    | N/C | 18 GP21       |           |            |
-    +-----+---------------+-----------+------------+
+    +-----+---------------+-----------+------------+----------+
+    | DIR | C3-ZERO       | OPENSMART | CD74HC4067 | DS18B20  |
+    +-----+---------------+-----------+------------+----------+
+    | GND | 1  GND        | 8 GND     | 8 GND      | 3 GND    | input/output (power,   gnd)
+    | VCC | 2  5V         | 7 VCC     |            |          | input/output (power,   5v0)
+    | N/C | 3  3V3        |           | 7 VCC      | 2 VCC    | output       (power,   3v3)
+    | OUT | 4  GP0  (ADC) |           | 1 SIG      |          | input        (analog,  ADC, 12 bit)
+    | OUT | 5  GP1  (I2C) | 6 SDA     |            |          | input/output (digital, I2C)
+    | OUT | 6  GP2  (I2C) | 5 SDL     |            |          | input/output (digital, I2C)
+    | OUT | 7  GP3  (PWM) | 4 PWMA    |            |          | output       (digital, PWM, 8 bit)
+    | OUT | 8  GP4  (PWM) | 3 PWMB    |            |          | output       (digital, PWM, 8 bit)
+    | OUT | 9  GP5  (PWM) | 2 PWMC    |            |          | output       (digital, PWM, 8 bit)
+    | OUT | 10 GP6  (PWM) | 1 PWMD    |            |          | output       (digital, PWM, 8 bit)
+    | OUT | 11 GP7  (TTL) |           | 2 S3       |          | output       (digital)
+    | OUT | 12 GP8  (TTL) |           | 3 S2       |          | output       (digital)
+    | OUT | 13 GP9  (TTL) |           | 4 S1       |          | output       (digital)
+    | OUT | 14 GP10 (TTL) |           | 5 S0       |          | output       (digital)
+    | IN  | 15 GP18 [USB] |           |            |          | -            (don't use or will interfere with USB develop/debug)
+    | N/C | 16 GP19 [USB] |           |            |          | -            (don't use or will interfere with USB develop/debug)
+    | N/C | 17 GP20 (TTL) |           | 6 EN       |          | output       (digital, active low)
+    | N/C | 18 GP21 (TTL) |           |            | 1 DATA   | input/output (digital, one-wire)
+    +-----+---------------+-----------+------------+----------+
 
-    https://github.com/mikedotalmond/Arduino-MuxInterface-CD74HC4067
-    https://github.com/ugurakas/Esp32-C3-LP-Project
-    https://github.com/ClaudeMarais/ContinousAnalogRead_ESP32-C3
 */
 
 // -----------------------------------------------------------------------------------------------
@@ -60,15 +57,17 @@
 struct Config {
 
     // hardware interfaces
-    int DS18B20_PIN = 21;
     TemperatureInterface::Config temperatureInterface = {
-        .hardware = { .PIN_EN = 20, .PIN_SIG = 6, .PIN_ADDR = { 10, 9, 8, 7 } },
-        // calibration
-        .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
+        .hardware = { .PIN_EN = 20, .PIN_SIG = 0, .PIN_ADDR = { 10, 9, 8, 7 } },
+        // .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
+    };
+    TemperatureCalibrator::Config temperatureCalibrator = {
+        .filename = "/tempcali.json",
+        .steinhartDefault = { .A = 1.0, .B = 1.0, .C = 1.0 }
     };
     FanInterface::Config fanInterface = {
-        .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 0, .PIN_PWMS = { 2, 3, 4, 5 }, .frequency = 5000 }, 
-        .MIN_SPEED = 85, .MAX_SPEED = 255 // duplicated, not ideal
+        .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 2, .PIN_PWMS = { 3, 4, 5, 6 }, .frequency = 5000 }, 
+        .MIN_SPEED = 192, .MAX_SPEED = 255 // duplicated, not ideal
     };
     // hardware managers
     TemperatureManagerBatterypack::Config temperatureManagerBatterypack = {
@@ -113,6 +112,8 @@ struct Config {
     DiagnosticManager::Config diagnosticManager = { }; 
     UpdateManager::Config updateManager = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = "http://ota.local:8090/images/images.json", .type = "batterymonitor-custom-esp32", .vers = DEFAULT_VERS };
     interval_t intervalProcess = 5*1000, intervalDeliver = 15*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;
+
+    int DS18B20_PIN = 21;
 };
 
 // -----------------------------------------------------------------------------------------------

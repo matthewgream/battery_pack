@@ -34,35 +34,6 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
-#include <OneWire.h>
-#include <DallasTemperature.h>
-
-//    https://github.com/matmunk/DS18B20/blob/master/src/DS18B20.cpp
-//    https://github.com/matmunk/DS18B20/blob/master/src/DS18B20.h
-
-
-class TemperatureSensor_DS18B20 {
-    static inline constexpr int DS1820_INDEX = 0;
-    OneWire oneWire;
-    DallasTemperature sensors;
-
-public:
-    TemperatureSensor_DS18B20 (const int pin) : oneWire (pin), sensors (&oneWire) {
-        sensors.begin ();
-    }
-    float getTemperature () {
-        sensors.requestTemperatures ();
-        const float temp = sensors.getTempCByIndex (DS1820_INDEX);
-        if (temp == DEVICE_DISCONNECTED_C) {
-            DEBUG_PRINTF ("TemperatureSensor_DS18B20::getTemperature: device is disconnected\n");
-            return -273.15;
-        }
-        return temp;
-    }
-};
-
-// -----------------------------------------------------------------------------------------------
-
 #include <Arduino.h>
 #include <array>
 
@@ -84,6 +55,7 @@ private:
 
 public:
     MuxInterface_CD74HC4067 (const Config& cfg) : config (cfg) {
+        DEBUG_PRINTF ("MuxInterface_CD74HC4067::init: (EN=%d,S0=%d,S1=%d,S1=%d,S2=%d,S3=%d,SIG=%d)\n", config.PIN_EN, config.PIN_ADDR [0], config.PIN_ADDR [1], config.PIN_ADDR [2], config.PIN_ADDR [3], config.PIN_SIG);
         pinMode (config.PIN_EN, OUTPUT);
         digitalWrite (config.PIN_EN, HIGH); // OFF
         pinMode (config.PIN_ADDR [0], OUTPUT);
@@ -93,10 +65,10 @@ public:
         pinMode (config.PIN_SIG, INPUT);
     }
     ADC_VALUE_TYPE get (const int channel) const {
-        digitalWrite (config.PIN_ADDR [0], channel & 1 ? HIGH : LOW);
-        digitalWrite (config.PIN_ADDR [1], (channel >> 1) & 1 ? HIGH : LOW);
-        digitalWrite (config.PIN_ADDR [2], (channel >> 2) & 1 ? HIGH : LOW);
-        digitalWrite (config.PIN_ADDR [3], (channel >> 3) & 1 ? HIGH : LOW);
+        digitalWrite (config.PIN_ADDR [0], channel & 0x01 ? HIGH : LOW);
+        digitalWrite (config.PIN_ADDR [1], channel & 0x02 ? HIGH : LOW);
+        digitalWrite (config.PIN_ADDR [2], channel & 0x04 ? HIGH : LOW);
+        digitalWrite (config.PIN_ADDR [3], channel & 0x08 ? HIGH : LOW);
         delay (10);
         return analogRead (config.PIN_SIG);
     }

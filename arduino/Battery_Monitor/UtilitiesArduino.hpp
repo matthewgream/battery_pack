@@ -79,4 +79,23 @@ String getTimeString (time_t timet = 0) {
     return String (timeString);  
 }
 
+
+// -----------------------------------------------------------------------------------------------
+
+#include "esp_task_wdt.h"
+class Watchdog {
+    const int _timeout;
+    bool _init, _active;
+    void init () {
+        esp_task_wdt_config_t wdt_config = { .timeout_ms = static_cast <uint32_t> (_timeout * 1000), .idle_core_mask = 0UL, .trigger_panic = true };
+        esp_task_wdt_init (&wdt_config);
+        _init = true;
+    }
+public:
+    Watchdog (const int timeout): _timeout (timeout), _init (false), _active (false) {};
+    void start () { if (!_init) init (); else if (!_active) esp_task_wdt_add (NULL), _active = true; }
+    void stop () { if (_active) esp_task_wdt_delete (NULL), _active = false; }
+    void reset () { esp_task_wdt_reset (); }
+};
+
 // -----------------------------------------------------------------------------------------------

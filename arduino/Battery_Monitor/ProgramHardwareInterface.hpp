@@ -8,18 +8,21 @@ public:
     static inline constexpr int AdcResolution = 12;
     static inline constexpr AdcValueType AdcValueMin = 0, AdcValueMax = (1 << AdcResolution) - 1;
     using AdcHardware = MuxInterface_CD74HC4067 <AdcValueType>;
+    using TemperatureCalculationFunc = std::function <float (const int channel, const AdcValueType resistance)>;
+    static inline constexpr int CHANNELS = MuxInterface_CD74HC4067 <AdcValueType>::CHANNELS;
 
     typedef struct {
         AdcHardware::Config hardware;
-        struct Thermister {
-            float REFERENCE_RESISTANCE, NOMINAL_RESISTANCE, NOMINAL_TEMPERATURE;
-        } thermister;
+        // struct Thermister {
+        //     float REFERENCE_RESISTANCE, NOMINAL_RESISTANCE, NOMINAL_TEMPERATURE;
+        // } thermister;
     } Config;
 
 private:
     const Config &config;
 
     AdcHardware _hardware;
+    const TemperatureCalculationFunc _calculator;
 
     std::array <StatsWithValue <AdcValueType>, AdcHardware::CHANNELS> _stats;
     inline void updateStats (const int channel, const AdcValueType value) {
@@ -27,7 +30,7 @@ private:
     }
 
 public:
-    TemperatureInterface (const Config& cfg) : config (cfg), _hardware (cfg.hardware) {}
+    TemperatureInterface (const Config& cfg, const TemperatureCalculationFunc calculator) : config (cfg), _hardware (cfg.hardware), _calculator (std::move (calculator)) {}
     void begin () override {
         analogReadResolution (AdcResolution);
         _hardware.enable ();
@@ -36,7 +39,8 @@ public:
         assert (channel >= 0 && channel < AdcHardware::CHANNELS && "Channel out of range");
         AdcValueType value = _hardware.get (channel);
         const_cast <TemperatureInterface*> (this)->updateStats (channel, value);
-        return steinharthart_calculator (value, AdcValueMax, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
+        return _calculator (channel, value);
+//        return steinharthart_calculator (value, AdcValueMax, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
     }
 
 protected:
@@ -82,11 +86,15 @@ private:
 
 public:
     FanInterface (const Config& cfg, FanInterfaceStrategy& strategy) : config (cfg), _strategy (strategy), _hardware (config.hardware) {}
+    ~FanInterface () { end (); }
     void begin () override {
         DEBUG_PRINTF ("FanInterface::begin: strategy=%s\n", _strategy.name ().c_str ());
         _hardware.setDirection (OpenSmart_QuadMotorDriver::MOTOR_CLOCKWISE);
         _hardware.setSpeed (static_cast <OpenSmart_QuadMotorDriver::MotorSpeedType> (0), OpenSmart_QuadMotorDriver::MOTOR_ALL);
         _strategy.begin (*this, _hardware);
+    }
+    void end () {
+        _hardware.setSpeed (static_cast <OpenSmart_QuadMotorDriver::MotorSpeedType> (0), OpenSmart_QuadMotorDriver::MOTOR_ALL);
     }
 
     void setSpeed (const FanSpeedType speed) {

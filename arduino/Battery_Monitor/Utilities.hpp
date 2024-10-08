@@ -28,10 +28,14 @@ typedef unsigned long counter_t;
 // -----------------------------------------------------------------------------------------------
 
 template <typename T>
-inline String IntToString (const T n) {
+inline String IntToString (const T n, const int b = 10) {
     static_assert (std::is_integral_v <T>, "T must be an integral type");
-    char s [64 + 1];
-    return String (ltoa (static_cast <long> (n), s, 10));
+    char s [64 + 1]; return String (ltoa (static_cast <long> (n), s, b));
+};
+template <typename T>
+inline String FloatToString (const T n, const int p = 2) {
+    static_assert (std::is_floating_point_v <T>, "T must be a floating point type");
+    char s [64 + 1]; snprintf (s, sizeof (s) - 1, "%.*f", p, n); return s;
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -101,6 +105,7 @@ public:
         }
         return *this;
     }
+    inline size_t cnt () const { return _cnt; }
     inline T min () const { return _min; }
     inline T max () const { return _max; }
     inline T avg () const { 

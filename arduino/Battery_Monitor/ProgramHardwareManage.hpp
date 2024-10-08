@@ -1,11 +1,10 @@
 
 // -----------------------------------------------------------------------------------------------
 
-class TemperatureManagerBatterypack: public Component, public Alarmable, public Diagnosticable {
+template <size_t PROBE_COUNT>
+class TemperatureManagerBatterypackTemplate: public Component, public Alarmable, public Diagnosticable {
 
 public:
-    static inline constexpr int PROBE_COUNT = 15; // config.temperature.PROBE_NUMBER - 1
-
     using ChannelList = std::array <int, PROBE_COUNT>;
     typedef struct {
         ChannelList channels;
@@ -24,7 +23,7 @@ private:
     Stats <float> _statsValueAvg, _statsValueMin, _statsValueMax;
 
 public:
-    TemperatureManagerBatterypack (const Config& cfg, TemperatureInterface& interface): config (cfg), _interface (interface), _values () {
+    TemperatureManagerBatterypackTemplate (const Config& cfg, TemperatureInterface& interface): config (cfg), _interface (interface), _values () {
         _values.fill (MovingAverageWithValue <float, 16> (round2places));      
     };
     void process () override {
@@ -72,11 +71,10 @@ protected:
 
 // -----------------------------------------------------------------------------------------------
 
-class TemperatureManagerEnvironment : public Component, public Alarmable, public Diagnosticable {
+template <size_t PROBE_COUNT>
+class TemperatureManagerEnvironmentTemplate : public Component, public Alarmable, public Diagnosticable {
 
 public:
-    static inline constexpr int PROBE_COUNT = 1;
-
     typedef struct {
         int channel;
         float FAILURE;
@@ -90,7 +88,7 @@ private:
     Stats <float> _stats;
 
 public:
-    TemperatureManagerEnvironment (const Config& cfg, TemperatureInterface& interface): config (cfg), _interface (interface), _value (round2places) {};
+    TemperatureManagerEnvironmentTemplate (const Config& cfg, TemperatureInterface& interface): config (cfg), _interface (interface), _value (round2places) {};
     void process () override {
         _value = _interface.getTemperature (config.channel);
         _stats += _value;

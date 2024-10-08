@@ -27,8 +27,18 @@
 #include "ProgramHardwareManage.hpp"
 #include "ProgramNetworkManage.hpp"
 #include "ProgramDataManage.hpp"
-
+#include "ProgramTemperatureCalibration.hpp"
 #include "UtilitiesOTA.hpp" // because breaks if included earlier
+
+static inline constexpr size_t HARDWARE_TEMP_SIZE = TemperatureInterface::CHANNELS;
+static inline constexpr float HARDWARE_TEMP_START = 5.0f, HARDWARE_TEMP_END = 60.0f, HARDWARE_TEMP_STEP = 0.5f;
+using TemperatureManagerBatterypack = TemperatureManagerBatterypackTemplate <HARDWARE_TEMP_SIZE - 1>;
+using TemperatureManagerEnvironment = TemperatureManagerEnvironmentTemplate <1>;
+using TemperatureCalibrator = TemperatureCalibrationManager <HARDWARE_TEMP_SIZE, HARDWARE_TEMP_START, HARDWARE_TEMP_END, HARDWARE_TEMP_STEP>;
+
+static inline constexpr float FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
+
+// -----------------------------------------------------------------------------------------------
 
 #include "Config.hpp"
 
@@ -42,6 +52,7 @@ class Program : public Component, public Diagnosticable {
     PidController fanControllingAlgorithm;
     AlphaSmoothing fanSmoothingAlgorithm;
 
+    TemperatureCalibrator temperatureCalibrator;
     TemperatureInterface temperatureInterface;
     TemperatureManagerBatterypack temperatureManagerBatterypack;
     TemperatureManagerEnvironment temperatureManagerEnvironment;
@@ -133,11 +144,11 @@ class Program : public Component, public Diagnosticable {
 
     }
 
-    static inline constexpr float FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
 public:
     Program () :
         fanControllingAlgorithm (FAN_CONTROL_P, FAN_CONTROL_I, FAN_CONTROL_D), fanSmoothingAlgorithm (FAN_SMOOTH_A),
-        temperatureInterface (config.temperatureInterface), 
+        temperatureCalibrator (config.temperatureCalibrator),
+        temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) { return temperatureCalibrator.calculateTemperature (channel, resistance); }), 
         temperatureManagerBatterypack (config.temperatureManagerBatterypack, temperatureInterface), temperatureManagerEnvironment (config.temperatureManagerEnvironment, temperatureInterface),
         fanInterface (config.fanInterface, fanInterfaceSetrategyMotorMap), fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, 
             [&] () { return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ()); }),
@@ -148,28 +159,28 @@ public:
         diagnostics (config.diagnosticManager, { &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &network, &nettime, &deliver, &publish, &storage, &updater, &alarms, this }),
         operational (this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
-        components ({ &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager,
+        components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager,
             &alarms, &network, &nettime, &deliver, &publish, &storage, &updater, &diagnostics, this }) {
         DEBUG_PRINTF ("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
 
-    void calibration () {
-        //float resistance = Config.temperatureInterface.thermister.REFERENCE_RESISTANCE / ((TemperatureInterface::AdcValueMax / value) - 1.0f);
-        const Config config;
-        TemperatureInterface::AdcHardware driver_CD74HC4067 (config.temperatureInterface.hardware);
-        TemperatureSensor_DS18B20 driver_DS18B20 (config.DS18B20_PIN);
+//     void calibration () {
+//         //float resistance = Config.temperatureInterface.thermister.REFERENCE_RESISTANCE / ((TemperatureInterface::AdcValueMax / value) - 1.0f);
+//         const Config config;
+//         TemperatureInterface::AdcHardware driver_CD74HC4067 (config.temperatureInterface.hardware);
+//         TemperatureSensor_DS18B20 driver_DS18B20 (config.DS18B20_PIN);
 
-// As a general guideline, for many applications, an error threshold between 0.1°C and 1°C might be appropriate. For example:
+// // As a general guideline, for many applications, an error threshold between 0.1°C and 1°C might be appropriate. For example:
 
-// High-precision applications: 0.1°C to 0.3°C
-// General-purpose applications: 0.3°C to 0.7°C
-// Less critical applications: 0.7°C to 1°C
+// // High-precision applications: 0.1°C to 0.3°C
+// // General-purpose applications: 0.3°C to 0.7°C
+// // Less critical applications: 0.7°C to 1°C
 
-// In the example code, I've used 0.4°C as the error threshold, which would be suitable for many general-purpose applications. You should adjust this based on your specific requirements and the results of your calibration process.
+// // In the example code, I've used 0.4°C as the error threshold, which would be suitable for many general-purpose applications. You should adjust this based on your specific requirements and the results of your calibration process.
 
 
 
-    }
+//     }
 
     Component::List components;
     void setup () { for (const auto& component : components) component->begin (); }
