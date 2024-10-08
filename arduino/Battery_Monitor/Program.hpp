@@ -148,7 +148,10 @@ public:
     Program () :
         fanControllingAlgorithm (FAN_CONTROL_P, FAN_CONTROL_I, FAN_CONTROL_D), fanSmoothingAlgorithm (FAN_SMOOTH_A),
         temperatureCalibrator (config.temperatureCalibrator),
-        temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) { return temperatureCalibrator.calculateTemperature (channel, resistance); }), 
+        temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) { 
+            return steinharthart_calculator (resistance, TemperatureInterface::AdcValueMax, 10000.0f, 10000.0f, 25.0f);
+//            return temperatureCalibrator.calculateTemperature (channel, resistance); 
+        }), 
         temperatureManagerBatterypack (config.temperatureManagerBatterypack, temperatureInterface), temperatureManagerEnvironment (config.temperatureManagerEnvironment, temperatureInterface),
         fanInterface (config.fanInterface, fanInterfaceSetrategyMotorMap), fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, 
             [&] () { return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ()); }),

@@ -1,40 +1,6 @@
 
 // -----------------------------------------------------------------------------------------------
 
-#include <OneWire.h>
-#include <DallasTemperature.h>
-
-static String __ds1820_address_to_string (const uint8_t addr []) {
-#define __DS18_BYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
-#define __DS18_FORMAT_ADDRESS(addr) __DS18_BYTETOSTRING ((addr) [0]) + __DS18_BYTETOSTRING ((addr) [1]) +  __DS18_BYTETOSTRING ((addr) [2]) +  __DS18_BYTETOSTRING ((addr) [3]) +  __DS18_BYTETOSTRING ((addr) [4]) +  __DS18_BYTETOSTRING ((addr) [5]) +  __DS18_BYTETOSTRING ((addr) [6]) +  __DS18_BYTETOSTRING ((addr) [7])
-    return __DS18_FORMAT_ADDRESS (addr);
-}
-
-class TemperatureSensor_DS18B20 {
-    static inline constexpr int DS1820_INDEX = 0;
-    OneWire oneWire;
-    DallasTemperature sensors;
-    bool _found;
-    DeviceAddress _address;
-
-public:
-    TemperatureSensor_DS18B20 (const int pin) : oneWire (pin), sensors (&oneWire) {
-        sensors.begin ();
-        DEBUG_PRINTF ("TemperatureSensor_DS18B20::init: (DAT=%d) found %d devices on bus, %d are DS18", pin, sensors.getDeviceCount (), sensors.getDS18Count ());
-        if ((_found = sensors.getAddress (_address, DS1820_INDEX)))
-            DEBUG_PRINTF (" [0] = %s", __ds1820_address_to_string (_address).c_str ());
-        DEBUG_PRINTF ("\n");
-    }
-    float getTemperature () {
-        float temp = -273.15;
-        if (!_found || !sensors.requestTemperaturesByAddress (_address) || (temp = sensors.getTempC (_address)) == DEVICE_DISCONNECTED_C)
-            DEBUG_PRINTF ("TemperatureSensor_DS18B20::getTemperature: device is disconnected\n");
-        return temp;
-    }
-};
-
-// -----------------------------------------------------------------------------------------------
-
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationDefinitions {
 public:
@@ -56,7 +22,6 @@ public:
     using Collection = typename Definitions::Collection;
     using TemperatureReadFunc = std::function <float ()>;
     using ResistanceReadFunc = std::function <uint16_t (size_t)>;
-
 
     bool collect (Collection &collection, const TemperatureReadFunc readTemperature, const ResistanceReadFunc readResistance) {
         static constexpr int DELAY = 100;
@@ -104,8 +69,8 @@ public:
         StatsErrors stats;
         for (size_t index = 0; index < Definitions::TEMP_SIZE; index ++) { 
             float temperature;
-            if (calculate (temperature, r [index]) - t [index])
-                stats += std::abs (temperature);
+            if (calculate (temperature, r [index]))
+                stats += std::abs (temperature - t [index]);
         }
         return stats;
     }
@@ -113,8 +78,10 @@ public:
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationAdjustmentStrategy_Lookup : public TemperatureCalibrationAdjustmentStrategy <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP> {
-private:
+public:
     using Definitions = TemperatureCalibrationDefinitions <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
+
+private:    
     Definitions::Temperatures temperatures;
     Definitions::Resistances resistances;
 
@@ -152,26 +119,29 @@ public:
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationAdjustmentStrategy_Steinhart : public TemperatureCalibrationAdjustmentStrategy <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP> {
-private:
+public:
     using Definitions = TemperatureCalibrationDefinitions <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
+
+private:
     float A, B, C;
 
 public:
     TemperatureCalibrationAdjustmentStrategy_Steinhart (const float a = 0.0, const float b = 0.0, const float c = 0.0): A (a), B (b), C (c) {}
+
     bool calibrate (const Definitions::Temperatures& t, const Definitions::Resistances& r) override {
         if (t.size () < 3 || r.size () < 3 || t.size () != r.size ()) {
-            DEBUG_PRINTF ("calibrateSteinhartHart: at least 3 matching temperature-resistance pairs are required for calibration.");
+            DEBUG_PRINTF ("calibrateSteinhartHart: at least 3 matching temperature-resistance pairs are required for calibration.\n");
             return false;
         }
 
-        typename Definitions::Temperatures T, Y, L;
+        std::array <double, Definitions::TEMP_SIZE> T, Y, L;
         for (size_t i = 0; i < t.size (); i ++) {
-            T [i] = t [i] + 273.15f;
-            Y [i] = 1.0f / T [i];
+            T [i] = t [i] + 273.15;
+            Y [i] = 1.0 / T [i];
             L [i] = log (r [i]);
         }
 
-        float sum_L = 0, sum_Y = 0, sum_L2 = 0, sum_L3 = 0, sum_LY = 0, sum_L2Y = 0;
+        double sum_L = 0, sum_Y = 0, sum_L2 = 0, sum_L3 = 0, sum_LY = 0, sum_L2Y = 0;
         for (size_t i = 0; i < L.size (); i ++) {
             sum_L   += L [i];
             sum_Y   += Y [i];
@@ -181,14 +151,20 @@ public:
             sum_L2Y += L [i] * L [i] * Y [i];
         }
 
-        const float num = static_cast <float> (L.size ());
-        const float det   = num   * (sum_L2 * sum_L2  - sum_L  * sum_L3)  - sum_L * (sum_L  * sum_L2  - sum_L  * sum_L3)  + sum_L2 * (sum_L  * sum_L  - num    * sum_L2);
-        const float det_A = sum_Y * (sum_L2 * sum_L2  - sum_L  * sum_L3)  - sum_L * (sum_LY * sum_L2  - sum_L  * sum_L2Y) + sum_L2 * (sum_LY * sum_L  - sum_Y  * sum_L2);
-        const float det_B = num   * (sum_LY * sum_L2  - sum_L  * sum_L2Y) - sum_Y * (sum_L  * sum_L2  - sum_L  * sum_L3)  + sum_L2 * (sum_L  * sum_LY - num    * sum_L2Y);
-        const float det_C = num   * (sum_L2 * sum_L2Y - sum_LY * sum_L3)  - sum_L * (sum_L  * sum_L2Y - sum_LY * sum_L2)  + sum_Y  * (sum_L  * sum_L3 - sum_L2 * sum_L2);
-        A = det_A / det;
-        B = det_B / det;
-        C = det_C / det;
+        const double num = static_cast <double> (L.size ());
+        const double det   = num   * (sum_L2 * sum_L2  - sum_L  * sum_L3)  - sum_L * (sum_L  * sum_L2  - sum_L  * sum_L3)  + sum_L2 * (sum_L  * sum_L  - num    * sum_L2);
+        const double det_A = sum_Y * (sum_L2 * sum_L2  - sum_L  * sum_L3)  - sum_L * (sum_LY * sum_L2  - sum_L  * sum_L2Y) + sum_L2 * (sum_LY * sum_L  - sum_Y  * sum_L2);
+        const double det_B = num   * (sum_LY * sum_L2  - sum_L  * sum_L2Y) - sum_Y * (sum_L  * sum_L2  - sum_L  * sum_L3)  + sum_L2 * (sum_L  * sum_LY - num    * sum_L2Y);
+        const double det_C = num   * (sum_L2 * sum_L2Y - sum_LY * sum_L3)  - sum_L * (sum_L  * sum_L2Y - sum_LY * sum_L2)  + sum_Y  * (sum_L  * sum_L3 - sum_L2 * sum_L2);
+
+        constexpr double epsilon = 1e-10;
+        if (std::abs (det) < epsilon) {
+            DEBUG_PRINTF ("calibrateSteinhartHart: determinant is too close to zero, solution may be unstable.\n");
+            return false;
+        }
+        A = static_cast <float> (det_A / det);
+        B = static_cast <float> (det_B / det);
+        C = static_cast <float> (det_C / det);
         return true;
     }
     bool calculate (float& temperature, const uint16_t resistance) const override {
@@ -247,26 +223,24 @@ public:
     using CalibrationStrategies = std::array <__CalibrationStrategySet, SENSOR_SIZE>;
 
     bool compute (CalibrationStrategies& calibrations, const Definitions::Collection &collection, const StrategyFactories &factories) {
-        DEBUG_PRINTF ("TemperatureCalibrationCollector: calculating for %d NTC resistences from %.2fC to %.2fC in %.2fC steps\n", SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP);
+        DEBUG_PRINTF ("TemperatureCalibrationCollector: calculating from %.2f°C to %.2f°C in %.2f°C steps (%d total) for %d NTC resistances\n", TEMP_START, TEMP_END, TEMP_STEP, Definitions::TEMP_SIZE, SENSOR_SIZE);
         for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++) {
             DEBUG_PRINTF ("[%d/%d]: ", sensor + 1, SENSOR_SIZE);
             for (const auto& factory : factories) {
-                auto name = factory.first;
-                auto strategy = factory.second ();
+                auto name = factory.first, strategy = factory.second ();
                 if (strategy->calibrate (collection.temperatures, collection.resistances [sensor])) {
-                    calibrations [sensor].push_back (std::move (strategy));
+                    calibrations [sensor].push_back (strategy);
                     auto stats = strategy->calculateStatsErrors (collection.temperatures, collection.resistances [sensor]);
                     DEBUG_PRINTF ("%s%s (avg_error=%.2f,max_error=%.2f,min_error=%.2f)", calibrations [sensor].size () > 0 ? ", ": "", name.c_str (), stats.avg (), stats.max (), stats.min ());
                 } else {
                     DEBUG_PRINTF ("%s%s (failed)", calibrations [sensor].size () > 0 ? ", ": "", name.c_str ());
-                    return false;
+                    //return false;
                 }
             }
             DEBUG_PRINTF ("\n");
         }
         return true;
     }
-
     bool computeDefault (StrategyDefault& strategyDefault, const Definitions::Collection& collection) {
         return strategyDefault.calibrate (collection);
     }
@@ -299,17 +273,17 @@ public:
         defaultStrategy.serialize (strategyDefault);
         
         //
-        if (!SPIFFS.begin(true)) {
-            Serial.println("An error occurred while mounting SPIFFS");
+        if (!SPIFFS.begin (true)) {
+            Serial.println ("SPIFFS: failed to mount");
             return false;
         }
-        File file = SPIFFS.open(filename, FILE_WRITE);
+        File file = SPIFFS.open (filename, FILE_WRITE);
         if (!file) {
-            Serial.println("Failed to open file for writing");
+            Serial.printf ("SPIFFS: Failed to open file (%s) for writing\n", filename.c_str ());
             return false;
         }
-        serializeJson(doc, file);
-        file.close();
+        serializeJson (doc, file);
+        file.close ();
         //
      
         return true;
@@ -318,13 +292,13 @@ public:
     static bool deserialize (const String& filename, StrategyDefault& defaultStrategy, CalibrationStrategies& calibrationStrategies, const StrategyFactories& strategyFactories) {
 
         //
-        if (!SPIFFS.begin(true)) {
-            Serial.println("An error occurred while mounting SPIFFS");
+        if (!SPIFFS.begin (true)) {
+            Serial.println ("SPIFFS: failed to mount");
             return false;
         }
-        File file = SPIFFS.open(filename, FILE_READ);
+        File file = SPIFFS.open (filename, FILE_READ);
         if (!file) {
-            Serial.println("Failed to open file for reading");
+            Serial.printf ("SPIFFS: Failed to open file (%s) for reading\n", filename.c_str ());
             return false;
         }
         JsonDocument doc;
@@ -349,10 +323,8 @@ public:
             }
         }
         JsonObject details = doc ["default"].as <JsonObject> ();
-        if (details) {
-            defaultStrategy.deserialize (details);
-            count ++;
-        }
+        if (details)
+            defaultStrategy.deserialize (details), count ++;
 
         return count > 0;
     }

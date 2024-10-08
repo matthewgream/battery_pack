@@ -56,6 +56,10 @@
 
 struct Config {
 
+    TemperatureSensor_DS18B20::Config ds18b20 = {
+        .PIN_DAT = 21
+    };
+
     // hardware interfaces
     TemperatureInterface::Config temperatureInterface = {
         .hardware = { .PIN_EN = 20, .PIN_SIG = 0, .PIN_ADDR = { 10, 9, 8, 7 } },
@@ -63,7 +67,7 @@ struct Config {
     };
     TemperatureCalibrator::Config temperatureCalibrator = {
         .filename = "/tempcali.json",
-        .steinhartDefault = { .A = 1.0, .B = 1.0, .C = 1.0 }
+        .steinhartDefault = { .A = 0.00111556f, .B = 0.000237211f, .C = 9.92378e-8f }
     };
     FanInterface::Config fanInterface = {
         .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 2, .PIN_PWMS = { 3, 4, 5, 6 }, .frequency = 5000 }, 
@@ -112,8 +116,6 @@ struct Config {
     DiagnosticManager::Config diagnosticManager = { }; 
     UpdateManager::Config updateManager = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = "http://ota.local:8090/images/images.json", .type = "batterymonitor-custom-esp32", .vers = DEFAULT_VERS };
     interval_t intervalProcess = 5*1000, intervalDeliver = 15*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;
-
-    int DS18B20_PIN = 21;
 };
 
 // -----------------------------------------------------------------------------------------------

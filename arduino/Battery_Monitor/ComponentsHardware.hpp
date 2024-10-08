@@ -34,6 +34,49 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+class TemperatureSensor_DS18B20 {
+public:
+    typedef struct {
+        int PIN_DAT;
+    } Config;
+
+private:
+    const Config& config;
+
+    static inline constexpr int DS1820_INDEX = 0;
+    OneWire oneWire;
+    DallasTemperature sensors;
+    bool _found;
+    DeviceAddress _address;
+
+public:
+    TemperatureSensor_DS18B20 (const Config& cfg): config (cfg), oneWire (config.PIN_DAT), sensors (&oneWire) {
+        sensors.begin ();
+        DEBUG_PRINTF ("TemperatureSensor_DS18B20::init: (DAT=%d) found %d devices on bus, %d are DS18", config.PIN_DAT, sensors.getDeviceCount (), sensors.getDS18Count ());
+        if ((_found = sensors.getAddress (_address, DS1820_INDEX)))
+            DEBUG_PRINTF (" [0] = %s", __ds1820_address_to_string (_address).c_str ());
+        DEBUG_PRINTF ("\n");
+    }
+    float getTemperature () {
+        float temp = -273.15;
+        if (!_found || !sensors.requestTemperaturesByAddress (_address) || (temp = sensors.getTempC (_address)) == DEVICE_DISCONNECTED_C)
+            DEBUG_PRINTF ("TemperatureSensor_DS18B20::getTemperature: device is disconnected\n");
+        return temp;
+    }
+
+private:
+    static String __ds1820_address_to_string (const DeviceAddress& addr) {
+        #define __DS18_BYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
+        #define __DS18_FORMAT_ADDRESS(addr) __DS18_BYTETOSTRING ((addr) [0]) + __DS18_BYTETOSTRING ((addr) [1]) +  __DS18_BYTETOSTRING ((addr) [2]) +  __DS18_BYTETOSTRING ((addr) [3]) +  __DS18_BYTETOSTRING ((addr) [4]) +  __DS18_BYTETOSTRING ((addr) [5]) +  __DS18_BYTETOSTRING ((addr) [6]) +  __DS18_BYTETOSTRING ((addr) [7])
+        return __DS18_FORMAT_ADDRESS (addr);
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+
 #include <Arduino.h>
 #include <array>
 
@@ -55,7 +98,7 @@ private:
 
 public:
     MuxInterface_CD74HC4067 (const Config& cfg) : config (cfg) {
-        DEBUG_PRINTF ("MuxInterface_CD74HC4067::init: (EN=%d,S0=%d,S1=%d,S1=%d,S2=%d,S3=%d,SIG=%d)\n", config.PIN_EN, config.PIN_ADDR [0], config.PIN_ADDR [1], config.PIN_ADDR [2], config.PIN_ADDR [3], config.PIN_SIG);
+        DEBUG_PRINTF ("MuxInterface_CD74HC4067::init: (EN=%d,S0=%d,S1=%d,S2=%d,S3=%d,SIG=%d)\n", config.PIN_EN, config.PIN_ADDR [0], config.PIN_ADDR [1], config.PIN_ADDR [2], config.PIN_ADDR [3], config.PIN_SIG);
         pinMode (config.PIN_EN, OUTPUT);
         digitalWrite (config.PIN_EN, HIGH); // OFF
         pinMode (config.PIN_ADDR [0], OUTPUT);
@@ -162,13 +205,13 @@ public:
         Wire.beginTransmission (config.I2C_ADDR);
         Wire.write (controlvalue_alloff);
         _status = Wire.endTransmission ();
-        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::init: device %s i2c (address=0x%x, sda=%d, scl=%d, status=%d), pwm (resolution=%d, frequency=%d) \n", (_status == 0 ? "connected" : "unresponsive"), config.I2C_ADDR, config.PIN_I2C_SDA, config.PIN_I2C_SCL, _status, MotorSpeedResolution, config.frequency);
         for (uint8_t pin : config.PIN_PWMS) {
             analogWriteResolution (pin, MotorSpeedResolution);
             analogWriteFrequency (pin, config.frequency);
             pinMode (pin, OUTPUT);
             analogWrite (pin, 0);
         }
+        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::init: device %s i2c (address=0x%x, sda=%d, scl=%d, status=%d), pwm (resolution=%d, frequency=%d) \n", (_status == 0 ? "connected" : "unresponsive"), config.I2C_ADDR, config.PIN_I2C_SDA, config.PIN_I2C_SCL, _status, MotorSpeedResolution, config.frequency);
     }
     void setSpeed (const MotorSpeedType speed, const int motorID = MOTOR_ALL) {
         DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setSpeed: %s -> %d\n", __osqmd_motorid_to_string (motorID).c_str (), speed);

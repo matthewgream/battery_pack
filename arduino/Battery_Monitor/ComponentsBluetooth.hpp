@@ -10,44 +10,6 @@
 
 // -----------------------------------------------------------------------------------------------
 
-static String __ble_disconnect_reason (const esp_gatt_conn_reason_t reason) {
-    switch (reason) {
-      case ESP_GATT_CONN_UNKNOWN: return "UNKNOWN";
-      case ESP_GATT_CONN_L2C_FAILURE: return "L2C_FAILURE";
-      case ESP_GATT_CONN_TIMEOUT: return "TIMEOUT";
-      case ESP_GATT_CONN_TERMINATE_PEER_USER: return "PEER_USER";
-      case ESP_GATT_CONN_TERMINATE_LOCAL_HOST: return "LOCAL_HOST";
-      case ESP_GATT_CONN_FAIL_ESTABLISH: return "FAIL_ESTABLISH";
-      case ESP_GATT_CONN_LMP_TIMEOUT: return "LMP_TIMEOUT";
-      case ESP_GATT_CONN_CONN_CANCEL: return "CANCELLED";
-      case ESP_GATT_CONN_NONE: return "NONE";
-      default: return "UNDEFINED";
-    }
-}
-
-static String __ble_address_to_string (const uint8_t bleaddr []) {
-#define __BLE_MACBYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
-#define __BLE_FORMAT_ADDRESS(addr) __BLE_MACBYTETOSTRING ((addr) [0]) + ":" + __BLE_MACBYTETOSTRING ((addr) [1]) + ":" + __BLE_MACBYTETOSTRING ((addr) [2]) + ":" + __BLE_MACBYTETOSTRING ((addr) [3]) + ":" + __BLE_MACBYTETOSTRING ((addr) [4]) + ":" + __BLE_MACBYTETOSTRING ((addr) [5])
-    return __BLE_FORMAT_ADDRESS (bleaddr);
-}
-static String __ble_linkrole_to_string (const int linkrole) {
-    return String (linkrole == 0 ? "master" : "slave");
-}
-static String __ble_status_to_string (const BLECharacteristicCallbacks::Status status) {
-    switch (status) {
-      case BLECharacteristicCallbacks::Status::ERROR_NO_CLIENT: return "NO_CLIENT";
-      case BLECharacteristicCallbacks::Status::ERROR_NOTIFY_DISABLED: return "NOTIFY_DISABLED";
-      case BLECharacteristicCallbacks::Status::SUCCESS_NOTIFY: return "NOTIFY_SUCCESS";
-      case BLECharacteristicCallbacks::Status::ERROR_INDICATE_DISABLED: return "INDICATE_DISABLED";
-      case BLECharacteristicCallbacks::Status::ERROR_INDICATE_TIMEOUT: return "INDICATE_TIMEOUT";
-      case BLECharacteristicCallbacks::Status::ERROR_INDICATE_FAILURE: return "INDICATE_FAILURE";
-      case BLECharacteristicCallbacks::Status::SUCCESS_INDICATE: return "INDICATE_SUCCESS";
-      default: return "UNDEFINED";
-    }
-}
-
-// -----------------------------------------------------------------------------------------------
-
 class BluetoothNotifier: public JsonSerializable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks {
 
 public:
@@ -184,6 +146,42 @@ public:
         bluetooth ["maxpacket"] = _maxpacket;
         _connections.serialize (bluetooth ["connects"].to <JsonObject> ());
         _disconnections.serialize (bluetooth ["disconnects"].to <JsonObject> ());
+    }
+
+private:
+    static String __ble_disconnect_reason (const esp_gatt_conn_reason_t reason) {
+        switch (reason) {
+          case ESP_GATT_CONN_UNKNOWN: return "UNKNOWN";
+          case ESP_GATT_CONN_L2C_FAILURE: return "L2C_FAILURE";
+          case ESP_GATT_CONN_TIMEOUT: return "TIMEOUT";
+          case ESP_GATT_CONN_TERMINATE_PEER_USER: return "PEER_USER";
+          case ESP_GATT_CONN_TERMINATE_LOCAL_HOST: return "LOCAL_HOST";
+          case ESP_GATT_CONN_FAIL_ESTABLISH: return "FAIL_ESTABLISH";
+          case ESP_GATT_CONN_LMP_TIMEOUT: return "LMP_TIMEOUT";
+          case ESP_GATT_CONN_CONN_CANCEL: return "CANCELLED";
+          case ESP_GATT_CONN_NONE: return "NONE";
+          default: return "UNDEFINED";
+        }
+    }
+    static String __ble_address_to_string (const uint8_t bleaddr []) {
+        #define __BLE_MACBYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
+        #define __BLE_FORMAT_ADDRESS(addr) __BLE_MACBYTETOSTRING ((addr) [0]) + ":" + __BLE_MACBYTETOSTRING ((addr) [1]) + ":" + __BLE_MACBYTETOSTRING ((addr) [2]) + ":" + __BLE_MACBYTETOSTRING ((addr) [3]) + ":" + __BLE_MACBYTETOSTRING ((addr) [4]) + ":" + __BLE_MACBYTETOSTRING ((addr) [5])
+        return __BLE_FORMAT_ADDRESS (bleaddr);
+    }
+    static String __ble_linkrole_to_string (const int linkrole) {
+        return String (linkrole == 0 ? "master" : "slave");
+    }
+    static String __ble_status_to_string (const BLECharacteristicCallbacks::Status status) {
+        switch (status) {
+          case BLECharacteristicCallbacks::Status::ERROR_NO_CLIENT: return "NO_CLIENT";
+          case BLECharacteristicCallbacks::Status::ERROR_NOTIFY_DISABLED: return "NOTIFY_DISABLED";
+          case BLECharacteristicCallbacks::Status::SUCCESS_NOTIFY: return "NOTIFY_SUCCESS";
+          case BLECharacteristicCallbacks::Status::ERROR_INDICATE_DISABLED: return "INDICATE_DISABLED";
+          case BLECharacteristicCallbacks::Status::ERROR_INDICATE_TIMEOUT: return "INDICATE_TIMEOUT";
+          case BLECharacteristicCallbacks::Status::ERROR_INDICATE_FAILURE: return "INDICATE_FAILURE";
+          case BLECharacteristicCallbacks::Status::SUCCESS_INDICATE: return "INDICATE_SUCCESS";
+          default: return "UNDEFINED";
+        }
     }
 };
 
