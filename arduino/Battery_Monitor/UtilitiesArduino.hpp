@@ -1,5 +1,6 @@
 
 // -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
 
 #include <nvs_flash.h>
 
@@ -57,6 +58,7 @@ public:
 };
 
 // -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
 
 #include <esp_mac.h>
 
@@ -68,6 +70,7 @@ String mac_address (void) {
     return __MAC_FORMAT_ADDRESS (macaddr);
 }
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
 String getTimeString (time_t timet = 0) {
@@ -81,21 +84,35 @@ String getTimeString (time_t timet = 0) {
 
 
 // -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
 
-#include "esp_task_wdt.h"
+#include <esp_task_wdt.h>
+
 class Watchdog {
     const int _timeout;
-    bool _init, _active;
-    void init () {
-        esp_task_wdt_config_t wdt_config = { .timeout_ms = static_cast <uint32_t> (_timeout * 1000), .idle_core_mask = 0UL, .trigger_panic = true };
-        esp_task_wdt_init (&wdt_config);
-        _init = true;
-    }
+    bool _started;
 public:
-    Watchdog (const int timeout): _timeout (timeout), _init (false), _active (false) {};
-    void start () { if (!_init) init (); else if (!_active) esp_task_wdt_add (NULL), _active = true; }
-    void stop () { if (_active) esp_task_wdt_delete (NULL), _active = false; }
-    void reset () { esp_task_wdt_reset (); }
+    Watchdog (const int timeout): _timeout (timeout), _started (false) {};
+    void start () { 
+        if (!_started) {
+            esp_task_wdt_deinit ();
+            esp_task_wdt_config_t wdt_config = {
+                .timeout_ms = static_cast <uint32_t> (_timeout * 1000),
+                .idle_core_mask = 1,
+                .trigger_panic = true
+            };
+            esp_task_wdt_init (&wdt_config);
+            esp_task_wdt_add (NULL);
+            if (esp_task_wdt_status (NULL) == ESP_OK) {
+                _started = true;
+                esp_task_wdt_reset ();
+            }
+        }
+    }
+    void reset () {
+        esp_task_wdt_reset (); 
+    }
 };
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------

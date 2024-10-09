@@ -1,5 +1,6 @@
 
 // -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
 
 #include "Secrets.hpp"
 
@@ -66,8 +67,8 @@ struct Config {
         // .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
     };
     TemperatureCalibrator::Config temperatureCalibrator = {
-        .filename = "/tempcali.json",
-        .strategyDefault = { .A = 0.00111556, .B = 0.000237211, .C = 9.92378e-8, .D = 0.0 }
+        .filename = "/temperaturecalibrations.json",
+        .strategyDefault = { .A = -0.012400427786, .B = 0.006860769298, .C = -0.001057743719, .D = 0.000056166727 } // XXX populate from calibration data
     };
     FanInterface::Config fanInterface = {
         .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 2, .PIN_PWMS = { 3, 4, 5, 6 }, .frequency = 5000 }, 
@@ -118,4 +119,5 @@ struct Config {
     interval_t intervalProcess = 5*1000, intervalDeliver = 15*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;
 };
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------

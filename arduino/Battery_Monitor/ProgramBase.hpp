@@ -1,5 +1,6 @@
 
 // -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
 
 class Component {
 protected:
@@ -11,6 +12,7 @@ public:
     virtual void process () {}
 };
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
 class Diagnosticable {
@@ -41,6 +43,7 @@ public:
     }
 };
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
 typedef uint32_t _AlarmType;
@@ -148,41 +151,7 @@ protected:
 };
 
 // -----------------------------------------------------------------------------------------------
-
-// #ifdef CFG_ENABLED
-// #include <ArduinoJson.h>
-// typedef std::map <String, String> Variables;
-// void __convert (Variables &vars, const JsonVariantConst& json, const String& path) {
-//     if (json.is <JsonObjectConst> ()) {
-//         for (const auto& obj : json.as <JsonObjectConst> ())
-//             __convert (vars, obj.value (), path.isEmpty () ? obj.key ().c_str () : path + "/" + obj.key ().c_str ());
-//     } else if (json.is <JsonArrayConst> ()) {
-//         int index = 0;
-//         for (const auto& obj : json.as <JsonArrayConst> ())
-//             __convert (vars, obj, path + "[" + String (index ++) + "]");
-//     } else {
-//         vars [path] = json.as <String> ();
-//     }
-// }
-// size_t convert (Variables &vars, const JsonVariantConst& json) {
-//     __convert (vars, json, "");
-//     return vars.size ();
-// }
-//     PersistentValue <String> cfg_storage (_program, "cfg", "");
-//     String cfg = static_cast <String> (cfg_storage);
-//     JsonDocument json;
-//     if (cfg.isEmpty ()) {
-//           _fetch (conf, conf.at ("config") + String ("?mac=") + mac_address (), json, [&] (JsonDocument& doc) { return serializeJson (doc, cfg); }); // XXX
-//           cfg_storage = cfg;
-//           DEBUG_PRINTF ("cfg downloaded: <<<%s>>>\n", cfg.c_str ());
-//         } else {
-//           DEBUG_PRINTF ("cfg persistent: <<<%s>>>\n", cfg.c_str ());
-//           deserializeJson (json, cfg);
-//       }
-//       return convert (sets, json.as <JsonVariant> ());
-//     }
-// #endif /*CFG_ENABLED*/
-
+// -----------------------------------------------------------------------------------------------
 
 #include <functional>
 
@@ -242,4 +211,5 @@ protected:
     }        
 };
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 
 // -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationDefinitions {
@@ -13,6 +14,7 @@ public:
     };
 };
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
@@ -55,18 +57,18 @@ public:
 
             DEBUG_PRINTF ("... reached %.2f°C, collecting %d NTC resistances ...\n", static_cast <float> (temperature), SENSOR_SIZE);
             collection.temperatures [step] = temperature;
-            std::array <uint32_t, Definitions::TEMP_SIZE> resistances;
+            std::array <uint32_t, SENSOR_SIZE> resistances;
             resistances.fill (static_cast <uint32_t> (0));
             for (int count = 0; count < AVG_SAMPLE; count ++)
-              for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++)
+              for (size_t sensor = 0; sensor < resistances.size (); sensor ++)
                   resistances [sensor] += static_cast <uint32_t> (readResistance (sensor));
-            for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++)                  
+            for (size_t sensor = 0; sensor < resistances.size (); sensor ++)                  
                 collection.resistances [sensor] [step] = static_cast <uint16_t> (resistances [sensor] / static_cast <uint32_t> (AVG_SAMPLE));
             DEBUG_PRINTF ("done\n");
             
             //
             DEBUG_PRINTF ("= %d,%.2f", step, collection.temperatures [step]);
-            for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++)
+            for (size_t sensor = 0; sensor < collection.resistances.size (); sensor ++)
                 DEBUG_PRINTF (",%u", collection.resistances [sensor] [step]);
             DEBUG_PRINTF ("\n");
         }
@@ -74,6 +76,7 @@ public:
     }
 };
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
@@ -90,21 +93,25 @@ public:
     virtual String getName () const = 0;
     virtual String getDetails () const = 0;
 
-    StatsErrors calculateStatsErrors (const Definitions::Temperatures& t, const Definitions::Resistances& r) const {
+    StatsErrors calculateStatsErrors (const Definitions::Temperatures& temperatures, const Definitions::Resistances& resistances) const {
         StatsErrors stats;
-        for (size_t index = 0; index < Definitions::TEMP_SIZE; index ++) { 
+        assert (temperatures.size () == resistances.size ());
+        for (size_t index = 0; index < temperatures.size (); index ++) { 
             float temperature;
-            if (calculate (temperature, r [index]))
-                stats += std::abs (temperature - t [index]);
+            if (calculate (temperature, resistances [index]))
+                stats += std::abs (temperature - temperatures [index]);
         }
         return stats;
     }
 };
 
+// -----------------------------------------------------------------------------------------------
+
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationAdjustmentStrategy_Lookup : public TemperatureCalibrationAdjustmentStrategy <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP> {
 public:
     using Definitions = TemperatureCalibrationDefinitions <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
+    static constexpr const char * NAME = "lookup";
 
 private:    
     Definitions::Temperatures temperatures;
@@ -126,26 +133,25 @@ public:
     //
     void serialize (JsonObject& obj) const override {
         JsonArray t = obj ["T"].to <JsonArray> (), r = obj ["R"].to <JsonArray> ();
-        for (size_t i = 0; i < Definitions::TEMP_SIZE; i ++)
-            t.add (temperatures [i]), r.add (resistances [i]);
+        for (size_t index = 0; index < temperatures.size (); index ++)
+            t.add (temperatures [index]), r.add (resistances [index]);
     }
     void deserialize (JsonObject& obj) override {
         JsonArray t = obj ["T"], r = obj ["R"];
-        for (size_t i = 0; i < Definitions::TEMP_SIZE; i ++)
-            temperatures [i] = t [i], resistances [i] = r [i];
+        for (size_t index = 0; index < temperatures.size (); index ++)
+            temperatures [index] = t [index], resistances [index] = r [index];
     }
-    String getName () const override {
-        return "lookup"; 
-    }
-    String getDetails () const override {
-        return "lookup (N=" + IntToString (temperatures.size ()) + ")";
-    }
+    String getName () const override { return NAME; }
+    String getDetails () const override { return "lookup (N=" + IntToString (temperatures.size ()) + ")"; }
 };
+
+// -----------------------------------------------------------------------------------------------
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationAdjustmentStrategy_Steinhart : public TemperatureCalibrationAdjustmentStrategy <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP> {
 public:
     using Definitions = TemperatureCalibrationDefinitions <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
+    static constexpr const char * NAME = "steinhart";
     typedef struct {
         double A, B, C, D;
     } Config;
@@ -156,94 +162,119 @@ private:
     inline bool isResistanceReasonable (const uint16_t resistance) const { return resistance > 0 && resistance < 100*1000; }
     inline bool isTemperatureReasonable (const float temperature) const { return temperature > -273.15f && temperature < 200.0f; }
 
-    bool gaussian_solve_size4 (std::array <std::array <double, 4>, 4>& matrix, std::array <double, 4>& vector) {
-
-        const double det = matrix [0][0] * (
-            matrix [1][1] * matrix [2][2] * matrix [3][3] + 
-            matrix [1][2] * matrix [2][3] * matrix [3][1] + 
-            matrix [1][3] * matrix [2][1] * matrix [3][2] - 
-            matrix [1][3] * matrix [2][2] * matrix [3][1] - 
-            matrix [1][2] * matrix [2][1] * matrix [3][3] - 
-            matrix [1][1] * matrix [2][3] * matrix [3][2]
-        );
-        if (std::abs (det) < 1e-10)
-            return false;
-
-        for (size_t i = 0; i < 4; i ++)
-            for (size_t j = i + 1; j < 4; j ++) {
-                const double factor = matrix [j][i] / matrix [i][i];
-                for (size_t k = i; k < 4; k ++)
-                    matrix [j][k] -= factor * matrix [i][k];
-                vector [j] -= factor * vector [i];
-            }
-
-        for (int i = 4 - 1; i >= 0; i --) {
-            for (int j = i + 1; j < 4; j ++)
-                vector [i] -= matrix [i][j] * vector [j];
-            vector [i] /= matrix [i][i];
-        }
-
-        return true;
-    }
-
 public:
     TemperatureCalibrationAdjustmentStrategy_Steinhart (const double a = 0.0, const double b = 0.0, const double c = 0.0, const double d = 0.0): A (a), B (b), C (c), D (d) {}
     TemperatureCalibrationAdjustmentStrategy_Steinhart (const Config& config): A (config.A), B (config.B), C (config.C), D (config.D) {}
 
-    String calibrate (const Definitions::Temperatures& t, const Definitions::Resistances& r) override {
-      
-        if (t.size () < 4 || t.size () != r.size ())
-            return String ("at least 4 pairs required");
+    String calibrate (const Definitions::Temperatures& temperatures, const Definitions::Resistances& resistances) override {
+        assert (temperatures.size () >= 4 && temperatures.size () == resistances.size ());
 
-        const size_t cnt = t.size ();
-        std::array <double, Definitions::TEMP_SIZE> Y, L, L2, L3;
-        for (size_t i = 0; i < cnt; i ++) {
-            if (!isResistanceReasonable (r [i]) || !isTemperatureReasonable (t [i]))
-                return String ("invalid data at index ") + IntToString (i);
-            Y  [i] = 1.0 / (t [i] + 273.15);
-            L  [i] = std::log (static_cast <double> (1.0 * r [i]));
-            L2 [i] = L [i] * L [i];
-            L3 [i] = L2 [i] * L [i];
+        // build matrices
+        double siz = static_cast <double> (temperatures.size ());
+        double sum_Y = 0;
+        double sum_L1 = 0, sum_L2 = 0, sum_L3 = 0, sum_L4 = 0, sum_L5 = 0, sum_L6 = 0;
+        double sum_YL1 = 0, sum_YL2 = 0, sum_YL3 = 0;
+        for (size_t index = 0; index < temperatures.size (); index ++) {
+              if (!isTemperatureReasonable (temperatures [index]))
+                  return String ("invalid temperature at index ") + IntToString (index);
+              if (!isResistanceReasonable (resistances [index]))
+                  return String ("invalid resistance at index ") + IntToString (index);
+              const double Y = 1.0 / (temperatures [index] + 273.15);
+              const double L1 = std::log (static_cast <double> (resistances [index])), L2 = L1 * L1, L3 = L2 * L1;
+              sum_Y   +=  Y;
+              sum_L1  += L1;
+              sum_L2  += L2;
+              sum_L3  += L3;
+              sum_L4  += L2 * L2;
+              sum_L5  += L2 * L3;
+              sum_L6  += L3 * L3;
+              sum_YL1 +=  Y * L1;
+              sum_YL2 +=  Y * L2;
+              sum_YL3 +=  Y * L3;
         }
-
-        double sum_Y = 0, sum_L = 0, sum_L2 = 0, sum_L3 = 0, sum_L4 = 0, sum_L5 = 0, sum_L6 = 0;
-        double sum_YL = 0, sum_YL2 = 0, sum_YL3 = 0;
-        for (size_t i = 0; i < cnt; i ++) {
-            sum_Y   += Y  [i];
-            sum_L   += L  [i];
-            sum_L2  += L2 [i];
-            sum_L3  += L3 [i];
-            sum_L4  += L2 [i] * L2 [i];
-            sum_L5  += L2 [i] * L3 [i];
-            sum_L6  += L3 [i] * L3 [i];
-            sum_YL  += Y  [i] * L  [i];
-            sum_YL2 += Y  [i] * L2 [i];
-            sum_YL3 += Y  [i] * L3 [i];
-        }
-        std::array <std::array <double, 4>, 4> matrix = {{
-            { cnt*1.0,sum_L,  sum_L2, sum_L3},
-            { sum_L,  sum_L2, sum_L3, sum_L4},
-            { sum_L2, sum_L3, sum_L4, sum_L5},
-            { sum_L3, sum_L4, sum_L5, sum_L6}
+        matrix4 <double> matrix = {{
+            { siz,    sum_L1, sum_L2, sum_L3 },
+            { sum_L1, sum_L2, sum_L3, sum_L4 },
+            { sum_L2, sum_L3, sum_L4, sum_L5 },
+            { sum_L3, sum_L4, sum_L5, sum_L6 }
         }};
-        std::array <double, 4> vector = { sum_Y, sum_YL, sum_YL2, sum_YL3 };
+        // solve matrices
+        vector4 <double> result = { sum_Y, sum_YL1, sum_YL2, sum_YL3 };
+        const String faults = gaussian_solve (matrix, result);
+        if (!faults.isEmpty ())
+            return faults;
+        A = result [0];
+        B = result [1];
+        C = result [2];
+        D = result [3];
 
-        if (!gaussian_solve_size4 (matrix, vector))
-            return String ("ill-conditioned matrix");
-        
-        A = vector [0];
-        B = vector [1];
-        C = vector [2];
-        D = vector [3];
-
-        for (size_t i = 0; i < cnt; i ++) {
+        // check result and errors
+        for (size_t index = 0; index < temperatures.size (); index ++) {
             float temperature;
-            if (!calculate (temperature, r [i]) || !isTemperatureReasonable (temperature) || std::abs (temperature - t [i]) > 5.0f)  // Allow 5 degrees of error
-                return String ("unreliable result");
+            if (!calculate (temperature, resistances [index]) || std::abs (temperature - temperatures [index]) > 5.0f)  // Allow 5 degrees of error
+                return String ("unreliable result, error = ") + FloatToString (std::abs (temperature - temperatures [index]));
         }
 
         return String ();
     }
+    String calibrate (const Definitions::Collection& collection) {
+        assert (collection.temperatures.size () >= 4);
+
+        // build matrices
+        matrix4 <double> XtX = { 0 };
+        vector4 <double> XtY = { 0 };
+        for (size_t index = 0; index < collection.temperatures.size (); index ++) {
+            if (!isTemperatureReasonable (collection.temperatures [index]))
+                return String ("invalid temperature at index ") + IntToString (index);
+            const double T = 1.0 / (collection.temperatures [index] + 273.15);
+            for (size_t sensor = 0; sensor < collection.resistances.size (); sensor ++) {
+                if (!isResistanceReasonable (collection.resistances [sensor][index]))
+                    return String ("invalid resistance at index ") + IntToString (index);
+                const double lnR = std::log (static_cast <double> (collection.resistances [sensor][index]));
+                const std::array <double, 4> row = { 1, lnR, lnR * lnR, lnR * lnR * lnR };
+                for (int j = 0; j < 4; j ++) {
+                    for (int k = 0; k < 4; k ++)
+                        XtX [j][k] += row [j] * row [k];
+                    XtY [j] += row [j] * T;
+                }
+            }
+        }
+        // solve matrices
+        vector4 <double> result;
+        const String faults = gaussian_solve (XtX, XtY, result);
+        if (!faults.isEmpty ())
+            return faults;
+        A = result [0];
+        B = result [1];
+        C = result [2];
+        D = result [3];
+
+        // check result and errors
+        for (size_t index = 0; index < collection.temperatures.size (); index ++) {
+            for (size_t sensor = 0; sensor < collection.resistances.size (); sensor ++) {
+                float temperature;
+                if (!calculate (temperature, collection.resistances [sensor] [index]) || std::abs (temperature - collection.temperatures [index]) > 10.0f)  // Allow 10 degrees of error
+                    return String ("unreliable result, error = ") + FloatToString (std::abs (temperature - collection.temperatures [index]));
+            }
+        }
+         
+        return String ();
+    }
+    //
+    bool calculate (uint16_t& resistance, const float temperature) const {
+        if (!isTemperatureReasonable (temperature)) {
+            DEBUG_PRINTF ("calculateSteinhartHart: invalid temperature value.\n");
+            return false;
+        }      
+        double lnR = std::log (10000.0);
+        for (int i = 0; i < 10; i ++) {
+            const double delta = (A + B * lnR + C * lnR * lnR + D * lnR * lnR * lnR - (1.0 / (temperature + 273.15))) / (B + 2 * C * lnR + 3 * D * lnR * lnR);
+            lnR -= delta;
+            if (std::abs (delta) < 1e-9) break;
+        }
+        resistance = static_cast <uint16_t> (std::exp (lnR));
+        return isResistanceReasonable (resistance);
+    };
     bool calculate (float& temperature, const uint16_t resistance) const override {
         if (!isResistanceReasonable (resistance)) {
             DEBUG_PRINTF ("calculateSteinhartHart: invalid resistance value.\n");
@@ -260,14 +291,11 @@ public:
     void deserialize (JsonObject& obj) override {
         A = obj ["A"], B = obj ["B"], C = obj ["C"], D = obj ["D"];
     }
-    String getName () const override {
-        return "steinhart";
-    }
-    String getDetails () const override {
-        return "steinhart (A=" + FloatToString (A) + ", B=" + FloatToString (B) + ", C=" + FloatToString (C) + ", D=" + FloatToString (D) + ")";
-    }
+    String getName () const override { return NAME; }
+    String getDetails () const override { return "steinhart (A=" + FloatToString (A, 12) + ", B=" + FloatToString (B, 12) + ", C=" + FloatToString (C, 12) + ", D=" + FloatToString (D, 12) + ")"; }
 };
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
@@ -288,10 +316,10 @@ public:
             DEBUG_PRINTF ("[%d/%d]: ", sensor, SENSOR_SIZE);
             for (const auto& factory : factories) {
                 auto name = factory.first, strategy = factory.second ();
-                String faults = strategy->calibrate (collection.temperatures, collection.resistances [sensor]);
+                const String faults = strategy->calibrate (collection.temperatures, collection.resistances [sensor]);
                 if (faults.isEmpty ()) {
                     auto stats = strategy->calculateStatsErrors (collection.temperatures, collection.resistances [sensor]);
-                    DEBUG_PRINTF ("%s%s (okay, error_avg=%.2f,max=%.2f,min=%.2f)", calibrations [sensor].size () > 0 ? ", ": "", name.c_str (), stats.avg (), stats.max (), stats.min ());
+                    DEBUG_PRINTF ("%s%s (okay, error avg=%.4f,max=%.4f,min=%.4f)", calibrations [sensor].size () > 0 ? ", ": "", name.c_str (), stats.avg (), stats.max (), stats.min ());
                     calibrations [sensor].push_back (strategy);
                 } else {
                     DEBUG_PRINTF ("%s%s (fail, %s)", calibrations [sensor].size () > 0 ? ", ": "", name.c_str (), faults.c_str ());
@@ -302,18 +330,26 @@ public:
         }
         return true;
     }
+
     bool computeDefault (StrategyDefault& strategyDefault, const Definitions::Collection& collection) {
-        typename Definitions::Resistances resistances;
-        for (size_t index = 0; index < Definitions::TEMP_SIZE; index ++) {
-            uint32_t average = 0;
-            for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++)
-                average += static_cast <uint32_t> (collection.resistances [sensor] [index]);
-            resistances [index] = static_cast <uint16_t> (average / SENSOR_SIZE);
+        DEBUG_PRINTF ("TemperatureCalibrationCalculator::computeDefault: using %s\n", strategyDefault.getName ().c_str ());
+        const String faults = strategyDefault.calibrate (collection);
+        if (!faults.isEmpty ()) {
+            DEBUG_PRINTF ("TemperatureCalibrationCalculator::computeDefault: fail, %s\n", faults.c_str ());
+            return false;
         }
-        return strategyDefault.calibrate (collection.temperatures, resistances);
-    }
+        DEBUG_PRINTF ("TemperatureCalibrationCalculator::computeDefault: %s\n", strategyDefault.getDetails ().c_str ());
+        DEBUG_PRINTF ("(resistances [%.2f°C -> %.2f°C at %.2f°C]: ", TEMP_START, TEMP_END, TEMP_STEP);
+        for (float temperature = TEMP_START; temperature <= TEMP_END; temperature += TEMP_STEP) {
+            uint16_t resistance = 0; strategyDefault.calculate (resistance, temperature);
+            DEBUG_PRINTF ("%s%u", (temperature == TEMP_START) ? "" : ",", resistance);
+        }
+        DEBUG_PRINTF (")\n");
+        return true;
+    }    
 };
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
@@ -329,77 +365,62 @@ public:
 
     static bool serialize (const String& filename, const StrategyDefault& defaultStrategy, const CalibrationStrategies& calibrationStrategies) {
         JsonDocument doc;
-        for (size_t i = 0; i < SENSOR_SIZE; i ++) {
-            JsonObject sensor = doc ["sensor" + IntToString (i)].to <JsonObject> ();
-            for (const auto& strategy : calibrationStrategies [i]) {
-                JsonObject strategyDetails = sensor [String (strategy->getName ())].to <JsonObject> ();
+
+        for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++) {
+            JsonObject sensorObj = doc ["sensor" + IntToString (sensor)].to <JsonObject> ();
+            for (const auto& strategy : calibrationStrategies [sensor]) {
+                JsonObject strategyDetails = sensorObj [String (strategy->getName ())].to <JsonObject> ();
                 strategy->serialize (strategyDetails);
             }
         }
         JsonObject strategyDefault = doc ["default"].to <JsonObject> ();
         defaultStrategy.serialize (strategyDefault);
         
-        //
-        if (!SPIFFS.begin (true)) {
-            Serial.println ("SPIFFS: failed to mount");
+        SPIFFSFile file (filename); size_t size;
+        if (!file.begin () || !((size = file.write (doc)) > 0)) {
+            DEBUG_PRINTF ("TemperatureCalibrationStorage::serialize: could not write to '%s'\n", filename.c_str ());
             return false;
         }
-        File file = SPIFFS.open (filename, FILE_WRITE);
-        if (!file) {
-            Serial.printf ("SPIFFS: Failed to open file (%s) for writing\n", filename.c_str ());
-            return false;
-        }
-        size_t size = serializeJson (doc, file);
-        file.close ();
-        Serial.println ();
-        Serial.printf ("SPIFFS: Wrote %d bytes to file (%s)\n", size, filename.c_str ());
-      
-        //
-     
+        DEBUG_PRINTF ("TemperatureCalibrationStorage::serialize: wrote %d bytes to '%s'\n", size, filename.c_str ());
         return true;
     }
 
     static bool deserialize (const String& filename, StrategyDefault& defaultStrategy, CalibrationStrategies& calibrationStrategies, const StrategyFactories& strategyFactories) {
-
-        //
-        if (!SPIFFS.begin (true)) {
-            Serial.println ("SPIFFS: failed to mount");
-            return false;
-        }
-        File file = SPIFFS.open (filename, FILE_READ);
-        if (!file) {
-            Serial.printf ("SPIFFS: Failed to open file (%s) for reading\n", filename.c_str ());
-            return false;
-        }
         JsonDocument doc;
-        deserializeJson (doc, file);
-        file.close ();
-        //
+
+        SPIFFSFile file (filename); size_t size;
+        if (!file.begin () || !((size = file.read (doc)) > 0)) {
+            DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: could not read from '%s'\n", filename.c_str ());          
+            return false;
+        }
+        DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: read %d bytes from '%s'\n", size, filename.c_str ());
 
         int count = 0;
-        for (size_t i = 0; i < SENSOR_SIZE; i ++) {
-            JsonObject sensor = doc ["sensor" + IntToString (i)].as <JsonObject> ();
-            if (sensor) {
-                for (JsonPair kv : sensor) {
+        for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++) {
+            JsonObject sensorObj = doc ["sensor" + IntToString (sensor)].as <JsonObject> ();
+            if (sensorObj) {
+                for (JsonPair kv : sensorObj) {
                     auto factoryIt = strategyFactories.find (String (kv.key ().c_str ()));
                     if (factoryIt != strategyFactories.end ()) {
                         auto strategy = factoryIt->second ();
                         JsonObject details = kv.value ().as <JsonObject> ();
                         strategy->deserialize (details);
-                        calibrationStrategies [i].push_back (strategy);
+                        DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: sensor %d, installed %s\n", sensor, strategy->getDetails ().c_str ());
+                        calibrationStrategies [sensor].push_back (strategy);
                         count ++;
                     }
                 }
-            }
+            } else
+                DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: did not find sensor %d\n", sensor);
         }
         JsonObject details = doc ["default"].as <JsonObject> ();
         if (details)
             defaultStrategy.deserialize (details), count ++;
-
         return count > 0;
     }
 };
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
@@ -417,7 +438,15 @@ private:
     CalibrationStrategies calibrationStrategies;
 
 public:
-    TemperatureCalibrationRuntime (const StrategyDefault& defaultStrategy, const CalibrationStrategies& calibrationStrategies): defaultStrategy (defaultStrategy), calibrationStrategies (calibrationStrategies) {}
+    TemperatureCalibrationRuntime (const StrategyDefault& defaultStrategy, const CalibrationStrategies& calibrationStrategies): defaultStrategy (defaultStrategy), calibrationStrategies (calibrationStrategies) {
+        DEBUG_PRINTF ("TemperatureCalibrationRuntime::init: default [%s", defaultStrategy.getDetails ().c_str ());
+        for (int index = 0; index < calibrationStrategies.size (); index ++) {
+            DEBUG_PRINTF ("], %d [", index); int count = 0;
+            for (const auto& strategy : calibrationStrategies [index])
+                DEBUG_PRINTF ("%s%s", count ++ == 0 ? "" : ",", strategy->getName ().c_str ());
+        }
+        DEBUG_PRINTF ("]\n");
+    }
 
     float calculateTemperature (const size_t index, const uint16_t resistance) const {
         float temperature;
@@ -426,127 +455,128 @@ public:
                 return temperature;
         if (defaultStrategy.calculate (temperature, resistance))
             return temperature;
-        DEBUG_PRINTF ("TemperatureCalibrationRuntime::calculateTemperature: failed");
+        DEBUG_PRINTF ("TemperatureCalibrationRuntime::calculateTemperature: failed, sensor %d, resistance %u", index, resistance);
         return NAN;
     }
 };
 
 // -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
 
 //#define CALIBRATE_FROM_STATIC_DATA
 #ifdef CALIBRATE_FROM_STATIC_DATA
 static const char* temperatureCalibrationData_STATIC [] = {
-"0,5.05,3176,3041,3244,3265,3160,3107,3175,3123,3032,3058,3285,3143,2936,3241,3052,3138",
-"1,5.50,3122,3019,3208,3255,3162,3115,3162,3089,3031,3131,3204,3068,3246,3165,3048,3143",
-"2,6.00,3091,3116,3127,3264,3177,3148,3132,3105,2997,3117,3149,3138,3050,3149,3059,3147",
-"3,6.52,3108,3093,3126,3272,3093,3107,3121,3019,2913,3146,3182,3150,3219,3131,3001,3137",
-"4,7.03,3196,3095,3128,3243,3214,3130,3076,3128,3003,3165,3194,3154,3125,3134,3093,3085",
-"5,7.51,3180,3036,3139,3240,3208,3157,3103,3089,2967,3085,3196,3160,3004,3130,3104,3116",
-"6,8.02,3138,3050,3103,3175,3117,3061,3048,3029,2943,3085,3172,3127,3198,3109,3084,3113",
-"7,8.55,3041,3021,3058,3107,3017,3073,2988,2955,2852,3033,3111,3069,3158,3058,3009,3032",
-"8,9.00,3169,3048,2995,3056,3041,2992,2988,2951,2966,3104,3070,3086,2770,3036,3060,3062",
-"9,9.50,2997,2963,2971,3065,3021,3048,2972,2962,2891,3014,3016,2992,2763,2993,3021,3050",
-"10,10.02,2982,2970,2977,3014,2997,2911,2950,2948,2798,2999,3013,2971,2703,2986,3015,3007",
-"11,10.53,2963,2920,2972,2969,2971,2979,2939,2909,2813,2934,2988,2939,2721,2976,2990,3001",
-"12,11.00,2952,2905,2931,2929,2934,2955,2893,2909,2846,2928,2950,2908,2774,2930,2965,2953",
-"13,11.50,2926,2882,2899,2922,2912,2927,2870,2843,2778,2891,2923,2881,3001,2905,2945,2924",
-"14,12.00,2827,2811,2891,2885,2899,2870,2852,2824,2770,2857,2910,2857,3031,2885,2874,2907",
-"15,12.50,2889,2842,2862,2882,2871,2833,2832,2808,2707,2845,2897,2857,2945,2874,2857,2880",
-"16,13.02,2854,2830,2840,2843,2821,2840,2789,2810,2722,2801,2855,2810,2931,2827,2874,2850",
-"17,13.50,2830,2807,2815,2825,2811,2791,2787,2796,2711,2793,2812,2804,2587,2811,2844,2843",
-"18,14.01,2812,2786,2806,2812,2807,2803,2771,2757,2681,2762,2824,2805,2933,2798,2838,2825",
-"19,14.50,2744,2741,2762,2770,2730,2725,2718,2713,2618,2762,2765,2749,2454,2742,2805,2764",
-"20,15.00,2742,2716,2720,2729,2720,2697,2685,2714,2625,2710,2736,2695,2482,2729,2762,2751",
-"21,15.50,2708,2672,2732,2719,2676,2725,2648,2702,2622,2692,2717,2708,2633,2700,2723,2776",
-"22,16.02,2630,2764,2739,2726,2597,2719,2610,2644,2638,2662,2755,2600,2770,2673,2661,2620",
-"23,16.50,2680,2644,2682,2698,2646,2632,2649,2604,2566,2551,2692,2643,2768,2680,2666,2684",
-"24,17.01,2606,2620,2654,2680,2633,2610,2631,2562,2558,2584,2680,2636,2742,2641,2582,2672",
-"25,17.50,2604,2583,2622,2630,2515,2565,2587,2585,2516,2605,2640,2594,2494,2622,2619,2638",
-"26,18.00,2620,2566,2604,2594,2571,2575,2558,2557,2494,2577,2572,2538,2676,2590,2620,2602",
-"27,18.52,2546,2768,2497,2631,2508,2470,2634,2471,2476,2540,2583,2562,2282,2557,2592,2585",
-"28,19.02,2548,2538,2548,2554,2516,2519,2537,2485,2460,2574,2584,2552,2283,2542,2586,2548",
-"29,19.51,2504,2490,2528,2502,2501,2502,2478,2490,2438,2494,2515,2486,2288,2552,2509,2536",
-"30,20.00,2507,2476,2506,2506,2498,2427,2474,2486,2435,2493,2516,2477,2593,2506,2508,2507",
-"31,20.51,2462,2412,2475,2478,2389,2416,2448,2424,2384,2442,2498,2451,2592,2462,2468,2502",
-"32,21.03,2446,2428,2453,2444,2399,2437,2418,2378,2348,2412,2472,2434,2563,2437,2405,2450",
-"33,21.52,2385,2375,2398,2423,2405,2401,2394,2397,2357,2414,2438,2391,2311,2429,2438,2440",
-"34,22.00,2394,2392,2405,2407,2380,2368,2394,2368,2325,2405,2426,2395,2161,2412,2418,2481",
-"35,22.53,2344,2332,2375,2403,2345,2412,2385,2375,2287,2355,2423,2386,2066,2407,2430,2416",
-"36,23.00,2350,2340,2356,2361,2304,2334,2308,2282,2251,2342,2368,2335,2485,2337,2358,2360",
-"37,23.50,2302,2301,2315,2343,2316,2279,2329,2324,2276,2312,2349,2327,2429,2322,2368,2331",
-"38,24.00,2248,2246,2271,2294,2296,2263,2279,2279,2229,2254,2300,2260,2036,2298,2282,2291",
-"39,24.50,2254,2252,2259,2282,2266,2206,2262,2269,2238,2268,2278,2263,2421,2266,2293,2265",
-"40,25.00,2238,2222,2243,2239,2214,2228,2216,2210,2167,2228,2250,2219,2384,2246,2234,2253",
-"41,25.52,2143,2189,2241,2242,2214,2102,2208,2196,2194,2165,2234,2159,2346,2228,2222,2234",
-"42,26.02,2170,2185,2231,2212,2163,2177,2178,2155,2129,2200,2238,2180,2316,2222,2157,2229",
-"43,26.50,2154,2171,2182,2185,2129,2163,2155,2124,2129,2192,2196,2153,2289,2184,2162,2167",
-"44,27.00,2135,2124,2142,2154,2120,2138,2110,2135,2120,2146,2149,2122,1915,2139,2153,2143",
-"45,27.52,2088,2088,2097,2110,2073,2065,2066,2070,2095,2083,2107,2073,1893,2108,2084,2126",
-"46,28.01,2047,2059,2100,2086,2079,1993,2079,2090,2076,2088,2105,2077,1856,2089,2111,2105",
-"47,28.50,2061,2072,2090,2082,2047,2076,2053,2052,2038,2062,2104,2060,1911,2080,2093,2096",
-"48,29.02,2029,2046,2056,2064,2033,1986,2041,2051,2033,2064,2067,2037,2081,2050,2074,2054",
-"49,29.50,2001,2028,2050,2044,2004,2029,2023,2033,2022,2058,2044,2020,1797,2050,2060,2052",
-"50,30.00,1914,1950,1991,1987,1958,1880,1954,1985,1960,1992,1995,1960,2053,1989,1999,1984",
-"51,30.52,1937,1945,1975,1988,1942,1964,1952,1947,1956,1968,1991,1956,1757,1982,1945,1990",
-"52,31.00,1941,1932,1961,1967,1937,1915,1944,1947,1944,1934,1980,1951,1677,1970,1948,1977",
-"53,31.50,1898,1897,1919,1958,1860,1939,1919,1853,1909,1898,1962,1927,1786,1929,1940,1943",
-"54,32.03,1827,1883,1906,1908,1890,1841,1886,1899,1903,1902,1906,1889,2031,1912,1919,1905",
-"55,32.52,1881,1887,1891,1899,1880,1879,1882,1871,1842,1881,1901,1872,1637,1894,1887,1892",
-"56,33.00,1833,1851,1860,1865,1838,1851,1852,1854,1864,1862,1866,1846,1640,1841,1880,1862",
-"57,33.50,1801,1810,1818,1834,1816,1798,1815,1803,1849,1831,1848,1827,1955,1820,1810,1841",
-"58,34.00,1803,1812,1819,1820,1803,1818,1803,1808,1830,1830,1831,1813,1964,1823,1830,1819",
-"59,34.52,1758,1771,1766,1789,1754,1773,1772,1784,1804,1782,1789,1769,1574,1769,1787,1789",
-"60,35.00,1735,1752,1753,1740,1753,1726,1771,1773,1797,1763,1786,1768,1611,1753,1799,1764",
-"61,35.50,1676,1718,1724,1743,1713,1695,1704,1735,1769,1696,1751,1726,1907,1726,1712,1724",
-"62,36.02,1711,1686,1727,1746,1681,1706,1697,1688,1753,1734,1729,1696,1876,1738,1699,1723",
-"63,36.51,1681,1661,1668,1697,1685,1698,1672,1701,1724,1671,1708,1688,1692,1660,1731,1675",
-"64,37.01,1672,1677,1691,1691,1673,1695,1678,1690,1711,1684,1692,1675,1819,1676,1709,1688",
-"65,37.53,1646,1645,1685,1671,1651,1620,1669,1649,1670,1665,1686,1668,1773,1661,1664,1661",
-"66,38.00,1610,1590,1623,1641,1587,1541,1619,1550,1618,1617,1633,1610,1695,1627,1639,1628",
-"67,38.50,1597,1592,1599,1631,1589,1571,1612,1602,1602,1631,1630,1608,1351,1607,1644,1602",
-"68,39.03,1588,1586,1593,1598,1571,1558,1599,1567,1638,1594,1612,1595,1751,1594,1622,1604",
-"69,39.50,1527,1595,1610,1652,1585,1552,1559,1573,1685,1572,1599,1591,1404,1607,1613,1569",
-"70,40.03,1482,1510,1517,1546,1531,1506,1531,1530,1568,1534,1554,1529,1290,1515,1547,1515",
-"71,40.50,1527,1529,1532,1556,1514,1531,1536,1522,1596,1541,1530,1530,1664,1538,1548,1534",
-"72,41.00,1502,1507,1509,1515,1481,1484,1491,1499,1556,1534,1535,1494,1666,1518,1519,1523",
-"73,41.50,1477,1479,1482,1499,1466,1483,1484,1500,1540,1456,1498,1484,1338,1475,1507,1493",
-"74,42.04,1435,1442,1464,1473,1450,1394,1467,1474,1543,1429,1483,1436,1277,1466,1479,1476",
-"75,42.50,1453,1469,1469,1476,1422,1472,1464,1452,1488,1464,1480,1462,1193,1467,1489,1468",
-"76,43.00,1435,1430,1432,1447,1414,1350,1423,1433,1510,1435,1452,1437,1242,1433,1447,1442",
-"77,43.50,1401,1399,1399,1420,1387,1403,1405,1403,1486,1410,1433,1407,1169,1405,1414,1406",
-"78,44.00,1384,1397,1398,1389,1382,1384,1388,1361,1446,1381,1410,1391,1516,1400,1414,1402",
-"79,44.51,1360,1364,1371,1376,1352,1374,1355,1343,1435,1327,1388,1371,1473,1372,1386,1371",
-"80,45.00,1342,1348,1351,1361,1341,1339,1345,1354,1438,1358,1358,1342,1512,1353,1367,1341",
-"81,45.50,1336,1335,1345,1341,1319,1319,1340,1338,1416,1318,1348,1338,1508,1334,1347,1314",
-"82,46.02,1298,1321,1313,1334,1309,1293,1319,1315,1376,1317,1338,1321,1421,1321,1342,1304",
-"83,46.50,1283,1292,1298,1306,1286,1263,1291,1299,1389,1300,1307,1292,1425,1298,1308,1299",
-"84,47.02,1267,1277,1284,1289,1261,1257,1286,1257,1349,1272,1296,1289,1056,1284,1290,1277",
-"85,47.50,1273,1277,1284,1286,1272,1272,1281,1293,1374,1291,1295,1278,1070,1284,1292,1286",
-"86,48.00,1236,1251,1248,1259,1209,1258,1212,1216,1327,1240,1262,1225,1369,1249,1218,1267",
-"87,48.50,1224,1221,1227,1227,1209,1188,1225,1229,1322,1221,1242,1216,1394,1225,1240,1215",
-"88,49.02,1202,1213,1198,1225,1207,1189,1211,1220,1287,1213,1230,1216,1338,1205,1227,1200",
-"89,49.52,1182,1183,1195,1224,1189,1156,1202,1210,1305,1163,1204,1199,1349,1198,1207,1193",
-"90,50.00,1172,1177,1179,1191,1166,1150,1177,1181,1294,1185,1194,1166,1139,1176,1191,1184",
-"91,50.51,1179,1167,1172,1189,1177,1149,1175,1173,1246,1181,1189,1177,1184,1177,1190,1174",
-"92,51.02,1147,1156,1160,1156,1112,1117,1146,1154,1227,1142,1163,1138,918,1154,1158,1219",
-"93,51.50,1130,1143,1135,1153,1129,1112,1141,1136,1238,1139,1157,1132,1232,1141,1145,1121",
-"94,52.02,1116,1123,1120,1135,1113,1084,1126,1124,1201,1122,1145,1120,914,1129,1141,1136",
-"95,52.50,1070,1094,1111,1099,1085,1077,1093,1091,1187,1082,1122,1106,1232,1105,1099,1074",
-"96,53.00,1098,1097,1101,1104,1084,1086,1097,1103,1206,1094,1110,1086,1092,1100,1112,1099",
-"97,53.52,1053,1078,1067,1083,1049,1065,1069,1052,1167,1080,1086,1069,935,1080,1072,1063",
-"98,54.00,1033,1052,1055,1068,1038,1004,1049,1060,1167,1022,1067,1048,1172,1058,1056,1052",
-"99,54.50,1021,1030,1031,1048,1003,994,1033,1036,1156,1041,1051,1029,1016,1041,1049,1029",
-"100,55.02,1025,1027,1022,1032,1021,1008,1026,1034,1122,1011,1034,1020,814,1035,1036,1035",
-"101,55.52,1009,1004,1008,1003,990,978,998,1008,1114,1009,1019,998,815,1014,1019,1016",
-"102,56.02,985,996,999,1009,988,996,997,994,1118,999,1018,1000,1161,1002,1003,998",
-"103,56.50,974,982,990,1015,982,970,986,986,1095,995,1010,953,1104,1003,998,991",
-"104,57.03,963,972,979,990,953,960,981,973,1085,970,989,973,765,985,983,973",
-"105,57.55,949,951,953,953,934,948,947,938,1068,940,971,943,758,953,954,952",
-"106,58.02,950,950,943,955,943,937,943,951,1073,954,964,945,1081,953,956,910",
-"107,58.51,913,933,938,942,921,886,929,939,1059,927,948,932,818,939,944,925",
-"108,59.02,893,906,934,906,897,877,930,908,1035,917,914,910,1035,908,919,907",
-"109,59.52,890,897,905,906,905,878,895,905,1008,899,916,904,859,906,910,896",
-"110,60.02,864,879,895,908,879,830,891,891,1004,886,920,893,643,905,898,871"
+"0,5.01,3145,3078,3083,3081,3160,3084,3155,3168,3148,3094,2827,2925,2967,2924,3073,2991",
+"1,5.51,3133,3081,3079,3077,3156,3096,3160,3150,3126,3083,2864,2923,2960,2826,3064,2991",
+"2,6.04,3094,3055,3075,3069,3112,3123,3194,3138,3058,3031,2851,2911,2916,2824,3059,2987",
+"3,6.50,3122,3062,3064,3066,3134,3098,3170,3134,3092,3070,2869,2913,2884,2817,3058,2975",
+"4,7.00,3077,3073,3068,3071,3130,3077,3104,3113,3099,2981,2857,2888,2896,2786,2994,2941",
+"5,7.51,3069,3046,3079,3059,3104,3084,3117,3068,3086,3006,2854,2893,2887,2794,2958,2945",
+"6,8.02,3069,3009,3050,3055,3071,3099,3145,3011,3107,2998,2807,2903,2828,2830,2949,2952",
+"7,8.50,3067,3019,3084,3031,3092,3068,3113,3012,3063,3024,2877,2892,2828,2807,2957,2942",
+"8,9.00,3056,3014,3002,3001,3073,2985,2988,3031,3034,3023,2839,2819,2837,2746,2987,2898",
+"9,9.50,2997,2982,3050,2968,3038,2976,3054,3028,3002,2976,2824,2813,2878,2860,2937,2914",
+"10,10.03,2977,2971,2989,2967,3039,2959,3026,2991,3014,2981,2820,2814,2865,2848,2895,2868",
+"11,10.51,2966,2951,2938,2954,3010,2970,3004,2964,2981,2945,2796,2807,2833,2830,2887,2853",
+"12,11.00,2905,2916,2895,2903,2962,2921,2954,2918,2941,2897,2771,2777,2785,2765,2844,2807",
+"13,11.51,2886,2877,2883,2873,2940,2898,2932,2917,2906,2886,2730,2755,2743,2792,2825,2782",
+"14,12.00,2875,2904,2852,2874,2932,2901,2945,2894,2951,2859,2756,2701,2851,2842,2802,2756",
+"15,12.51,2799,2837,2846,2843,2886,2845,2874,2856,2854,2801,2688,2703,2749,2734,2735,2730",
+"16,13.00,2801,2823,2827,2825,2869,2833,2839,2823,2835,2813,2670,2679,2736,2741,2733,2740",
+"17,13.50,2750,2742,2984,2727,2801,2895,2748,2728,2799,2727,2643,2675,2585,2656,2778,2712",
+"18,14.01,2773,2735,2722,2734,2778,2746,2813,2805,2793,2745,2581,2631,2678,2642,2681,2651",
+"19,14.50,2759,2701,2660,2727,2745,2694,2765,2739,2737,2692,2581,2622,2627,2695,2669,2616",
+"20,15.00,2707,2687,2685,2688,2731,2705,2734,2722,2730,2679,2546,2609,2633,2631,2637,2615",
+"21,15.50,2713,2668,2678,2675,2721,2689,2763,2723,2720,2682,2547,2589,2626,2633,2637,2600",
+"22,16.00,2631,2699,2600,2706,2712,2623,2732,2652,2678,2744,2530,2539,2516,2571,2653,2569",
+"23,16.50,2641,2616,2621,2619,2653,2630,2693,2660,2661,2619,2510,2532,2580,2579,2570,2547",
+"24,17.00,2673,2627,2549,2583,2603,2603,2640,2633,2621,2565,2428,2534,2480,2597,2584,2504",
+"25,17.50,2563,2557,2568,2604,2659,2578,2640,2640,2616,2604,2491,2454,2570,2505,2521,2502",
+"26,18.00,2565,2552,2555,2570,2597,2577,2619,2573,2568,2565,2426,2448,2472,2490,2514,2498",
+"27,18.50,2560,2536,2532,2528,2570,2519,2599,2566,2563,2531,2412,2443,2461,2505,2499,2460",
+"28,19.00,2533,2491,2501,2510,2543,2505,2528,2537,2528,2504,2387,2433,2441,2476,2461,2438",
+"29,19.50,2507,2473,2475,2472,2515,2479,2546,2515,2508,2486,2378,2402,2412,2474,2445,2416",
+"30,20.00,2485,2457,2465,2469,2503,2464,2520,2491,2476,2471,2362,2395,2391,2449,2427,2410",
+"31,20.50,2449,2427,2434,2429,2449,2432,2468,2459,2458,2440,2349,2368,2357,2410,2394,2374",
+"32,21.00,2441,2403,2414,2424,2447,2410,2449,2431,2433,2435,2308,2342,2362,2372,2376,2362",
+"33,21.50,2402,2377,2382,2385,2414,2378,2435,2410,2410,2385,2298,2319,2342,2383,2360,2336",
+"34,22.00,2378,2355,2364,2366,2394,2359,2419,2393,2388,2365,2272,2320,2309,2363,2343,2325",
+"35,22.53,2360,2333,2353,2344,2376,2355,2384,2356,2360,2346,2250,2281,2295,2341,2318,2297",
+"36,23.00,2334,2311,2346,2322,2351,2310,2360,2352,2339,2311,2233,2251,2279,2294,2297,2258",
+"37,23.50,2301,2281,2273,2293,2331,2280,2322,2289,2289,2317,2198,2221,2236,2273,2251,2259",
+"38,24.01,2317,2269,2251,2299,2268,2283,2268,2288,2277,2226,2268,2196,2261,2248,2254,2195",
+"39,24.50,2245,2236,2261,2251,2280,2237,2284,2278,2259,2242,2168,2197,2218,2252,2229,2225",
+"40,25.01,2219,2209,2245,2227,2251,2208,2259,2252,2260,2191,2133,2188,2221,2221,2214,2209",
+"41,25.50,2176,2190,2206,2197,2221,2180,2231,2203,2203,2181,2124,2156,2173,2209,2187,2173",
+"42,26.01,2203,2170,2190,2185,2194,2174,2211,2204,2190,2188,2108,2156,2158,2120,2172,2156",
+"43,26.54,2183,2165,2169,2173,2186,2170,2193,2193,2189,2158,2108,2149,2194,2155,2159,2142",
+"44,27.00,2149,2126,2156,2134,2169,2140,2154,2136,2152,2137,2084,2109,2120,2112,2128,2121",
+"45,27.50,2120,2094,2114,2109,2135,2103,2139,2127,2125,2109,2052,2084,2102,2136,2103,2089",
+"46,28.01,2085,2078,2096,2088,2103,2086,2122,2095,2101,2072,2033,2073,2100,2125,2067,2065",
+"47,28.50,2061,2033,2056,2050,2086,2046,2090,2073,2074,2044,2000,2034,2042,2058,2038,2041",
+"48,29.01,2038,2021,2061,2027,2068,2048,2043,2049,2049,2026,2022,2074,2086,2065,2008,2037",
+"49,29.50,2026,1997,2027,2013,2019,1995,2001,2014,2000,2016,1963,1991,1998,2022,2017,2011",
+"50,30.00,1993,1969,1973,1988,1994,1994,2020,1999,1980,1970,1943,2005,1995,2018,1971,1971",
+"51,30.50,1948,1908,1986,1948,2002,1970,1947,1947,1934,1956,1921,1910,1927,2020,1921,1956",
+"52,31.00,1951,1931,1944,1930,1953,1935,1946,1939,1946,1943,1900,1945,1961,1963,1937,1937",
+"53,31.50,1923,1913,1929,1918,1953,1909,1961,1915,1918,1922,1893,1918,1936,1952,1915,1927",
+"54,32.01,1888,1870,1890,1885,1904,1881,1903,1888,1883,1876,1854,1890,1892,1916,1894,1897",
+"55,32.51,1858,1847,1866,1863,1893,1864,1890,1856,1881,1858,1848,1887,1896,1905,1865,1886",
+"56,33.01,1774,1840,1835,1857,1899,1898,1868,1851,1842,1838,1886,1862,1795,1946,1851,1881",
+"57,33.50,1820,1804,1833,1817,1837,1818,1834,1834,1840,1806,1806,1844,1836,1865,1845,1841",
+"58,34.00,1787,1776,1803,1787,1830,1788,1836,1811,1820,1790,1786,1831,1858,1846,1811,1820",
+"59,34.51,1769,1750,1773,1761,1788,1770,1802,1773,1797,1765,1757,1802,1821,1843,1795,1805",
+"60,35.01,1750,1751,1781,1749,1772,1750,1757,1740,1747,1740,1745,1789,1770,1802,1775,1802",
+"61,35.50,1722,1721,1760,1729,1765,1748,1781,1759,1779,1725,1744,1784,1789,1821,1779,1791",
+"62,36.00,1701,1705,1731,1714,1741,1713,1701,1726,1731,1707,1732,1760,1762,1799,1754,1771",
+"63,36.51,1703,1677,1737,1687,1690,1699,1691,1690,1718,1667,1689,1709,1753,1745,1701,1774",
+"64,37.00,1667,1654,1675,1670,1691,1659,1694,1680,1690,1658,1689,1714,1698,1741,1710,1721",
+"65,37.50,1543,1669,1617,1648,1722,1659,1638,1624,1654,1591,1601,1673,1734,1803,1743,1682",
+"66,38.00,1621,1604,1618,1612,1632,1591,1638,1628,1634,1611,1646,1673,1662,1708,1667,1678",
+"67,38.50,1604,1591,1607,1601,1630,1597,1627,1614,1623,1608,1645,1660,1650,1691,1662,1667",
+"68,39.01,1571,1578,1581,1575,1609,1570,1606,1579,1610,1550,1612,1646,1641,1658,1630,1654",
+"69,39.50,1551,1545,1574,1551,1577,1553,1576,1566,1576,1545,1606,1623,1613,1649,1613,1626",
+"70,40.00,1537,1531,1544,1532,1550,1527,1547,1549,1545,1519,1576,1612,1590,1624,1601,1607",
+"71,40.52,1511,1511,1516,1520,1532,1511,1517,1527,1539,1504,1541,1598,1572,1617,1580,1585",
+"72,41.00,1506,1474,1485,1493,1503,1477,1502,1498,1518,1466,1533,1621,1596,1582,1569,1579",
+"73,41.50,1476,1459,1469,1465,1490,1437,1498,1477,1497,1461,1515,1565,1550,1577,1542,1552",
+"74,42.02,1453,1456,1440,1495,1493,1507,1463,1461,1477,1417,1524,1492,1463,1584,1495,1502",
+"75,42.51,1431,1417,1437,1431,1475,1425,1470,1433,1440,1413,1483,1505,1496,1530,1488,1509",
+"76,43.00,1419,1403,1419,1403,1430,1422,1432,1419,1434,1399,1468,1503,1501,1522,1489,1500",
+"77,43.50,1399,1374,1402,1391,1418,1400,1434,1409,1418,1390,1461,1499,1493,1511,1479,1492",
+"78,44.01,1394,1371,1392,1386,1401,1392,1406,1399,1395,1383,1437,1486,1471,1489,1467,1472",
+"79,44.50,1364,1363,1370,1374,1385,1362,1383,1368,1388,1367,1419,1462,1460,1467,1443,1465",
+"80,45.00,1348,1335,1353,1342,1370,1335,1380,1355,1364,1346,1416,1451,1438,1459,1435,1443",
+"81,45.50,1326,1307,1326,1319,1346,1309,1337,1336,1337,1318,1386,1419,1410,1400,1420,1423",
+"82,46.00,1306,1294,1307,1304,1323,1302,1334,1308,1321,1298,1374,1405,1400,1421,1393,1400",
+"83,46.50,1287,1275,1301,1289,1307,1266,1289,1289,1288,1283,1364,1381,1369,1361,1385,1389",
+"84,47.00,1290,1233,1246,1264,1293,1250,1316,1251,1326,1275,1383,1390,1400,1293,1384,1427",
+"85,47.51,1248,1238,1281,1277,1272,1270,1269,1239,1284,1255,1327,1350,1360,1344,1349,1343",
+"86,48.01,1248,1229,1245,1244,1250,1240,1262,1257,1269,1245,1327,1367,1335,1306,1356,1348",
+"87,48.50,1228,1205,1233,1222,1242,1219,1226,1221,1244,1222,1308,1343,1332,1339,1317,1334",
+"88,49.00,1209,1194,1212,1206,1220,1209,1228,1208,1211,1199,1291,1336,1317,1271,1310,1321",
+"89,49.50,1180,1176,1188,1175,1191,1165,1203,1176,1196,1175,1268,1303,1292,1278,1284,1294",
+"90,50.00,1186,1129,1151,1178,1149,1204,1161,1168,1154,1148,1274,1301,1225,1264,1332,1309",
+"91,50.50,1161,1143,1155,1149,1176,1163,1185,1164,1170,1148,1257,1291,1277,1199,1278,1274",
+"92,51.00,1126,1114,1138,1137,1147,1113,1154,1127,1147,1128,1231,1253,1256,1196,1236,1261",
+"93,51.50,1148,1084,1115,1126,1146,1138,1165,1148,1136,1111,1240,1286,1244,1241,1258,1260",
+"94,52.00,1106,1109,1067,1094,1129,1091,1134,1107,1114,1094,1208,1250,1225,1207,1206,1218",
+"95,52.50,1104,1067,1099,1082,1068,1060,1111,1110,1147,1078,1174,1219,1236,1256,1226,1262",
+"96,53.00,1083,1065,1077,1076,1091,1096,1101,1088,1100,1070,1181,1227,1204,1150,1203,1197",
+"97,53.51,1054,1045,1062,1052,1074,1048,1068,1052,1060,1053,1163,1182,1206,1192,1174,1196",
+"98,54.00,1036,1054,1057,1053,1073,1044,1077,1063,1082,1053,1148,1165,1185,1188,1148,1163",
+"99,54.50,1034,1019,1036,1023,1039,1023,1054,1039,1055,1018,1157,1178,1159,1120,1149,1165",
+"100,55.00,1015,1005,1017,1018,1035,1003,1026,1015,1026,1017,1132,1157,1149,1113,1149,1162",
+"101,55.50,1001,997,1000,1002,1017,991,1008,1003,1010,1001,1119,1141,1129,1132,1120,1139",
+"102,56.01,1010,979,990,994,1007,997,1020,1005,1013,986,1115,1141,1129,1055,1136,1130",
+"103,56.52,964,960,984,969,993,972,973,961,975,965,1094,1115,1108,1129,1089,1119",
+"104,57.01,962,944,983,972,999,977,994,983,958,976,1055,1116,1089,1104,1130,1117",
+"105,57.50,949,925,943,947,957,943,956,944,953,939,1070,1082,1081,1096,1091,1086",
+"106,58.00,942,924,927,929,939,934,953,939,952,929,1062,1083,1075,1066,1073,1082",
+"107,58.50,914,919,924,942,934,924,916,921,934,918,1051,1058,1075,1049,1066,1104",
+"108,59.00,911,872,896,881,936,884,901,881,891,906,1018,1049,1018,1053,1022,1062",
+"109,59.50,884,880,876,887,912,867,891,882,870,880,992,1035,1030,1010,1025,1045",
+"110,60.00,880,841,871,864,900,876,880,870,894,893,981,1014,1047,957,1015,1036"
 };
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
@@ -554,7 +584,7 @@ class TemperatureCalibrationStaticDataLoader {
     using Definitions = TemperatureCalibrationDefinitions <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
     using Collector = TemperatureCalibrationCollector <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
 
-    bool parse_reading (const char* line, float& temperature, std::array <uint16_t, SENSOR_SIZE>& resistances) {
+    bool parse (const char* line, float& temperature, std::array <uint16_t, SENSOR_SIZE>& resistances) {
         const char* token = line, *next_token;
         if (!(token = strchr (token, ',')))
             return false;
@@ -574,9 +604,9 @@ class TemperatureCalibrationStaticDataLoader {
 
 public:
     bool load (Collector::Collection& collection) {
-        for (int index = 0; index < Definitions::TEMP_SIZE; index ++) {
+        for (int index = 0; index < collection.temperatures.size (); index ++) {
             std::array <uint16_t, SENSOR_SIZE> resistances; // need to be transposed
-            if (!parse_reading (temperatureCalibrationData_STATIC [index], collection.temperatures [index], resistances)) {
+            if (!parse (temperatureCalibrationData_STATIC [index], collection.temperatures [index], resistances)) {
                 DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - parsing failed\n");
                 return false;
             }
@@ -587,6 +617,9 @@ public:
     }
 };
 #endif
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationManager: public Component {
@@ -612,10 +645,15 @@ private:
     const Config &config;
     std::shared_ptr <Runtime> runtime;
 
-    StrategyFactories createStrategyFactories () const {
+    StrategyFactories createStrategyFactoriesForCalibration () const { // store the lookup tables, but don't use them
         return StrategyFactories {
-            { "Lookup", [] { return std::make_shared <StrategyLookup> (); } },
-            { "Steinhart", [] { return std::make_shared <StrategySteinhart> (); } }
+            { StrategyLookup::NAME, [] { return std::make_shared <StrategyLookup> (); } },
+            { StrategySteinhart::NAME, [] { return std::make_shared <StrategySteinhart> (); } }
+        };
+    }
+    StrategyFactories createStrategyFactoriesForOperation () const {
+        return StrategyFactories {
+            { StrategySteinhart::NAME, [] { return std::make_shared <StrategySteinhart> (); } }
         };
     }
 
@@ -623,11 +661,11 @@ public:
     TemperatureCalibrationManager (const Config& cfg) : config (cfg) {}
 
     void begin () override {
-        CalibrationStrategies calibrationStrategies;
+        std::unique_ptr <typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_unique <typename Calculator::CalibrationStrategies> ();
         StrategyDefault defaultStrategy (config.strategyDefault);
-        if (!Storage::deserialize (config.filename, defaultStrategy, calibrationStrategies, createStrategyFactories ()))
+        if (!Storage::deserialize (config.filename, defaultStrategy, *calibrationStrategies, createStrategyFactoriesForOperation ()))
             DEBUG_PRINTF ("TemperatureCalibrationManager:: no stored calibrations (filename = %s), will rely upon default\n", config.filename.c_str ());
-        runtime = std::make_shared <Runtime> (defaultStrategy, calibrationStrategies);
+        runtime = std::make_shared <Runtime> (defaultStrategy, *calibrationStrategies);
     }
 
     float calculateTemperature (const size_t index, const float resistance) const {
@@ -636,7 +674,6 @@ public:
     }
 
     bool calibrateTemperatures (const Collector::TemperatureReadFunc readTemperature, const Collector::ResistanceReadFunc readResistance) {
-
         std::unique_ptr <typename Collector::Collection> calibrationData = std::make_unique <typename Collector::Collection> ();
 #ifdef CALIBRATE_FROM_STATIC_DATA
         if (!TemperatureCalibrationStaticDataLoader <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP> ().load (*calibrationData)) {
@@ -648,28 +685,25 @@ public:
             DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - collector failed\n");
             return false;
         }
-#endif
-
-        for (int index = 0; index < Definitions::TEMP_SIZE; index ++) {
+        for (int index = 0; index < calibrationData->temperatures.size (); index ++) {
             DEBUG_PRINTF ("= %d,%.2f", index, calibrationData->temperatures [index]);
-            for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++)
+            for (size_t sensor = 0; sensor < calibrationData->resistances.size (); sensor ++)
                 DEBUG_PRINTF (",%u", calibrationData->resistances [sensor] [index]);
             DEBUG_PRINTF ("\n");
         }
-
+#endif
         Calculator calculator;
         std::unique_ptr <typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_unique <typename Calculator::CalibrationStrategies> ();
         StrategyDefault defaultStrategy;
-        if (!calculator.compute (*calibrationStrategies, *calibrationData, createStrategyFactories ()) || !calculator.computeDefault (defaultStrategy, *calibrationData)) {
+        if (!calculator.compute (*calibrationStrategies, *calibrationData, createStrategyFactoriesForCalibration ()) || !calculator.computeDefault (defaultStrategy, *calibrationData)) {
             DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - calculator failed\n");
             return false;
         }
-        DEBUG_PRINTF ("defaultStrategy: %s\n", defaultStrategy.getDetails ().c_str ());
-
         Storage::serialize (config.filename, defaultStrategy, *calibrationStrategies);
-        // runtime = std::make_shared <Runtime> (defaultStrategy, calibrationStrategies);
+        runtime = std::make_shared <Runtime> (defaultStrategy, *calibrationStrategies);
         return true;
     }
 };
 
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------

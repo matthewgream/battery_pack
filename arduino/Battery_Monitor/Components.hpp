@@ -1,5 +1,6 @@
 
 // -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
 
 #include <HTTPClient.h>
 #include <ctime>
@@ -83,7 +84,7 @@ public:
     }
 };
 
-
+// -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
 #include <ArduinoJson.h>
@@ -157,18 +158,9 @@ private:
 };
 
 // -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
 
 #include <SPIFFS.h>
-
-static String __file_mode_to_string (const int mode) {
-    switch (mode) {
-      case 0: return "ERROR";
-      case 1: return "CLOSED";
-      case 2: return "WRITING";
-      case 3: return "READING";
-      default: return "UNDEFINED";
-    }
-}
 
 // should be two classes
 class SPIFFSFile: public JsonSerializable  {
@@ -195,13 +187,13 @@ private:
 private:
     bool _init () {
         if (!SPIFFS.begin (true)) {
-            DEBUG_PRINTF ("SPIFFSFile::begin: failed on SPIFFS.begin (), file activity not available\n");
+            DEBUG_PRINTF ("SPIFFSFile[%s]::begin: failed on SPIFFS.begin (), file activity not available\n", _filename.c_str ());
             _mode = MODE_ERROR;
             return false;
         }        
         _totalBytes = SPIFFS.totalBytes ();
         _usedBytes = SPIFFS.usedBytes ();
-        DEBUG_PRINTF ("SPIFFSFile::begin: available=%.2f%% (totalBytes=%lu, usedBytes=%lu)\n", (float) ((_totalBytes - _usedBytes) * 100.0) / (float) _totalBytes, _totalBytes, _usedBytes);
+        DEBUG_PRINTF ("SPIFFSFile[%s]::begin: available=%.2f%% (totalBytes=%lu, usedBytes=%lu)\n", _filename.c_str (), (float) ((_totalBytes - _usedBytes) * 100.0) / (float) _totalBytes, _totalBytes, _usedBytes);
         _mode = MODE_CLOSED;
         return true;
     }
@@ -215,38 +207,55 @@ private:
         if (_file) {
             _size = _file.size ();
             _mode = mode;
-            DEBUG_PRINTF ("SPIFFSFile::_open: %s, size=%ld\n", mode == MODE_WRITING ? "WRITING" : "READING", _size);
+            DEBUG_PRINTF ("SPIFFSFile[%s]::_open: %s, size=%ld\n", _filename.c_str (), mode == MODE_WRITING ? "WRITING" : "READING", _size);
         } else {
             _size = -1;
             _mode = MODE_ERROR;
-            DEBUG_PRINTF ("SPIFFSFile::_open: %s, failed on SPIFFS.open (), file activity not available\n", mode == MODE_WRITING ? "WRITING" : "READING");
+            DEBUG_PRINTF ("SPIFFSFile[%s]::_open: %s, failed on SPIFFS.open (), file activity not available\n", _filename.c_str (), mode == MODE_WRITING ? "WRITING" : "READING");
         }
     }
-    bool _append (const String& data) {
-        if ((data.length () + 2) > (_totalBytes - _usedBytes)) {
-            DEBUG_PRINTF ("SPIFFSFile::_append: erasing, as size %ld would exceed %ld\n", _size + (data.length () + 1), _totalBytes);
+    size_t _append (const char * type, std::function <size_t ()> impl, size_t length) {
+        DEBUG_PRINTF ("SPIFFSFile[%s]::append[%s]: size=%ld, length=%u\n", _filename.c_str (), type, _size, length);
+        if (length > (_totalBytes - _usedBytes)) {
+            DEBUG_PRINTF ("SPIFFSFile[%s]::_append: erasing, as size %ld would exceed %ld\n", _filename.c_str (), _size + length, _totalBytes);
             _file.close ();
             SPIFFS.remove (_filename);
             _usedBytes = 0;
             _open (MODE_WRITING);
             if (_mode == MODE_ERROR)
-                return false;
+                return 0;
         }
-        _file.println (data);
-        _size += data.length () + 2; // \r\n
-        _usedBytes += (data.length () + 2); // probably is not 100% correct due to metadata (e.g. FAT)
-        return true;
+        length = impl ();
+        _size += length;
+        _usedBytes += length; // probably is not 100% correct due to metadata (e.g. FAT)
+        return length;
     }
-    bool _read (LineCallback& callback) {
-        while (_file.available ())
-            if (!callback.process (_file.readStringUntil ('\n')))
-                return false;
-        return true;
+    size_t _append (const String& data) { return _append ("String", [&] () { return _file.println (data); }, data.length () + 2); }
+    size_t _append (const JsonDocument& doc) { return _append ("JsonDocument", [&] () { return serializeJson (doc, _file); }, measureJson (doc)); }
+
+    size_t _read (LineCallback& callback) {
+        size_t size = 0;
+        while (_file.available ()) {
+            const String input = _file.readStringUntil ('\n');
+            if (!callback.process (input))
+                break;
+            size += input.length ();
+        }
+        return size;
     }
+    size_t _read (JsonDocument& doc) {
+        DeserializationError error;
+        if ((error = deserializeJson (doc, _file)) != DeserializationError::Ok) {
+            DEBUG_PRINTF ("SPIFFSFile[%s]::_read: deserializeJson fault: %s\n", _filename.c_str (), error.c_str ());
+            return 0;
+        }
+        return measureJson (doc);
+    }
+
     bool _erase () {
         _size = -1;
         _usedBytes = 0;
-        if (!SPIFFS.remove (_filename)) {
+        if (SPIFFS.exists (_filename) && !SPIFFS.remove (_filename)) {
             _mode = MODE_ERROR;
             return false;
         }
@@ -255,6 +264,7 @@ private:
 
 public:
     SPIFFSFile (const String& filename): _filename (filename) {}
+    ~SPIFFSFile () { close (); }
     bool begin () {
         return _init ();
     }
@@ -265,24 +275,41 @@ public:
     inline float remains () const {
         return (float) ((_totalBytes - _usedBytes) * 100.0) / (float) _totalBytes;
     }
-    bool append (const String& data) {
-        DEBUG_PRINTF ("SPIFFSFile::append: size=%ld, length=%u\n", _size, data.length ());
-        if (_mode == MODE_ERROR)    return false;
+    template <typename T>
+    size_t append (const T& data) {
+        if (_mode == MODE_ERROR)    return 0;
         if (_mode == MODE_READING)  _close ();
         if (_mode == MODE_CLOSED)   _open (MODE_WRITING);
-        if (_mode == MODE_ERROR)    return false;
+        if (_mode == MODE_ERROR)    return 0;
         return _append (data);
     }
-    bool read (LineCallback& callback) { // XXX const
-        DEBUG_PRINTF ("SPIFFSFile::read: size=%ld\n", _size);
-        if (_mode == MODE_ERROR)    return false;
+    template <typename T>
+    size_t write (const T& data) {
+        if (_mode == MODE_ERROR)    return 0;
+        if (_mode == MODE_READING)  _close ();
+        if (_mode == MODE_CLOSED)   if (_erase ()) _open (MODE_WRITING);
+        if (_mode == MODE_ERROR)    return 0;
+        return _append (data);
+    }
+    template <typename T>
+    size_t read (T& vessel) { // XXX const
+        DEBUG_PRINTF ("SPIFFSFile[%s]::read: size=%ld\n", _filename.c_str (), _size);
+        if (_mode == MODE_ERROR)    return 0;
         if (_mode == MODE_WRITING)  _close ();
         if (_mode == MODE_CLOSED)   _open (MODE_READING);
+        if (_mode == MODE_ERROR)    return 0;
+        return _read (vessel);
+    }
+    bool close () {
+        DEBUG_PRINTF ("SPIFFSFile[%s]::close\n", _filename.c_str ());
         if (_mode == MODE_ERROR)    return false;
-        return _read (callback);
+        if (_mode == MODE_WRITING)  _close ();
+        if (_mode == MODE_READING)  _close ();
+        if (_mode == MODE_ERROR)    return false;
+        return true;
     }
     bool erase () {
-        DEBUG_PRINTF ("SPIFFSFile::erase\n");
+        DEBUG_PRINTF ("SPIFFSFile[%s]::erase\n", _filename.c_str ());
         if (_mode == MODE_ERROR)    return false;
         if (_mode == MODE_WRITING)  _close ();
         if (_mode == MODE_READING)  _close ();
@@ -296,6 +323,17 @@ public:
         file ["size"] = size ();
         file ["left"] = _totalBytes - _usedBytes;
         file ["remains"] = remains ();
+    }
+
+private:
+    static String __file_mode_to_string (const int mode) {
+        switch (mode) {
+          case 0: return "ERROR";
+          case 1: return "CLOSED";
+          case 2: return "WRITING";
+          case 3: return "READING";
+          default: return "UNDEFINED";
+        }
     }
 };
 
