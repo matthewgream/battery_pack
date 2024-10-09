@@ -43,42 +43,53 @@ inline String FloatToString (const T n, const int p = 2) {
 #include <array>
 #include <type_traits>
 #include <cstddef>
+#include <functional>
+#include <numeric>
 
 template <typename T, int WINDOW = 16>
 class MovingAverage {
     static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
     static_assert (WINDOW > 0, "WINDOW size must be positive");
-    std::array <T, WINDOW> values {};
-    T sum = T (0);
+    using SumType = std::conditional_t <std::is_integral_v <T>, std::conditional_t <sizeof (T) < sizeof (int32_t), int32_t, int64_t>, double>;
+    std::array <T, WINDOW> values;
+    SumType sum = SumType (0);
     size_t count = 0;
 
 public:
     virtual T update (const T value) {
-        if (count < WINDOW)
-            values [count ++] = value;
-        else {
-            sum -= values [0];
-            std::rotate (values.begin (), values.begin () + 1, values.end ());
-            values.back () = value;
+        if (count < WINDOW) {
+            values [count] = value;
+            sum += static_cast <SumType> (value);
+            count ++;
+        } else {
+            sum -= static_cast <SumType> (values [0]);
+            for (size_t i = 1; i < WINDOW; i ++)
+                values [i - 1] = values [i];
+            values [WINDOW - 1] = value;
+            sum += static_cast <SumType> (value);
         }
-        sum += value;
-        return sum / static_cast<T> (count);
+        return static_cast <T> (sum / static_cast <SumType> (count));
     }
 };
 
-template <typename T, int WINDOW = 16>
-class MovingAverageWithValue: public MovingAverage <T, WINDOW> {
+template <template <typename, int> class BaseAverage, typename T = float, int WINDOW = 16>
+class WithValue: public BaseAverage <T, WINDOW> {
     T val = T (0);
-    std::function <T(T)> process;
+    std::function <T (T)> process;
 public:
-    MovingAverageWithValue (std::function <T(T)> proc = [] (T x) { return x; }): process (proc) {}
-    virtual T update (const T value) override {
-        val = process (MovingAverage <T, WINDOW>::update (value));
+    WithValue (std::function <T (T)> proc = [] (T x) { return x; }): process (proc) {}
+    T update (const T value) override {
+        val = process (BaseAverage <T, WINDOW>::update (value));
         return val;
     }
-    inline MovingAverageWithValue& operator= (const T value) { update (value); return *this; }
+    inline WithValue& operator= (const T value) { update (value); return *this; }
     inline operator const T& () const { return val; }
 };
+
+template <typename T = float, int WINDOW = 16>
+using MovingAverageWithValue = WithValue <MovingAverage, T, WINDOW>;
+
+// -----------------------------------------------------------------------------------------------
 
 inline float round2places (float value) {
     return std::round (value * 100.0f) / 100.0f;

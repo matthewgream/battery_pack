@@ -71,6 +71,7 @@ void temperatureCalibration () {
     TemperatureCalibrator calibrator (config.temperatureCalibrator);
 
     calibrator.calibrateTemperatures ([&] () { return ds18b20.getTemperature (); }, [&] (size_t channel) { return interface.get (channel); });
+    while (1) delay (100);
 }
 
 // -----------------------------------------------------------------------------------------------

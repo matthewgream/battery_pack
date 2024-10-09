@@ -67,7 +67,7 @@ struct Config {
     };
     TemperatureCalibrator::Config temperatureCalibrator = {
         .filename = "/tempcali.json",
-        .steinhartDefault = { .A = 0.00111556f, .B = 0.000237211f, .C = 9.92378e-8f }
+        .strategyDefault = { .A = 0.00111556, .B = 0.000237211, .C = 9.92378e-8, .D = 0.0 }
     };
     FanInterface::Config fanInterface = {
         .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 2, .PIN_PWMS = { 3, 4, 5, 6 }, .frequency = 5000 }, 
