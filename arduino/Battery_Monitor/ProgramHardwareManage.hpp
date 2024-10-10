@@ -24,7 +24,12 @@ private:
     Stats <float> _statsValueAvg, _statsValueMin, _statsValueMax;
 
 public:
-    TemperatureManagerBatterypackTemplate (const Config& cfg, TemperatureInterface& interface): config (cfg), _interface (interface), _values () {
+    TemperatureManagerBatterypackTemplate (const Config& cfg, TemperatureInterface& interface): Alarmable ({
+            AlarmCondition (ALARM_TEMPERATURE_FAILURE, [this] () { return _value.min () <= config.FAILURE; }),
+            AlarmCondition (ALARM_TEMPERATURE_MINIMAL, [this] () { return _value.min () > config.FAILURE && _value.min () <= config.MINIMAL; }),
+            AlarmCondition (ALARM_TEMPERATURE_MAXIMAL, [this] () { return _value.max () >= config.MAXIMAL; }),
+            AlarmCondition (ALARM_TEMPERATURE_WARNING, [this] () { return _value.max () < config.MAXIMAL && _value.max () >= config.WARNING; })
+        }), config (cfg), _interface (interface), _values () {
         _values.fill (MovingAverageWithValue <float, 16> (round2places));      
     };
     void process () override {
@@ -57,13 +62,6 @@ public:
     inline float current () const { return _value.max (); } // XXX think about this ... max, average, etc
 
 protected:
-    void collectAlarms (AlarmSet& alarms) const override {
-        const float _min = _value.min (), _max = _value.max ();
-        if (_min <= config.FAILURE) alarms += ALARM_TEMPERATURE_FAILURE;
-        else if (_min <= config.MINIMAL) alarms += ALARM_TEMPERATURE_MINIMAL;
-        if (_max >= config.MAXIMAL) alarms += ALARM_TEMPERATURE_MAXIMAL;
-        else if (_max >= config.WARNING) alarms += ALARM_TEMPERATURE_WARNING;
-    }
     void collectDiagnostics (JsonDocument &obj) const override {
 //        JsonObject bat = obj ["bat"].to <JsonObject> ();
 //        _statsValues, _statsValueAvg, _statsValueMin, _statsValueMax
@@ -90,7 +88,9 @@ private:
     Stats <float> _stats;
 
 public:
-    TemperatureManagerEnvironmentTemplate (const Config& cfg, TemperatureInterface& interface): config (cfg), _interface (interface), _value (round2places) {};
+    TemperatureManagerEnvironmentTemplate (const Config& cfg, TemperatureInterface& interface): Alarmable ({
+            AlarmCondition (ALARM_TEMPERATURE_FAILURE, [this] () { return _value <= config.FAILURE; })
+        }), config (cfg), _interface (interface), _value (round2places) {};
     void process () override {
         _value = _interface.getTemperature (config.channel);
         _stats += _value;
@@ -99,10 +99,7 @@ public:
     inline float getTemperature () const { return _value; }
 
 protected:
-    void collectAlarms (AlarmSet& alarms) const override {
-        if (_value <= config.FAILURE) alarms += ALARM_TEMPERATURE_FAILURE;
-    }
-    void collectDiagnostics (JsonDocument &obj) const override {
+   void collectDiagnostics (JsonDocument &obj) const override {
 //        JsonObject env = obj ["env"].to <JsonObject> ();    
 //        _stats
     }
@@ -124,13 +121,13 @@ private:
     const Config &config;
 
     FanInterface &_fan;
-    PidController &_controllerAlgorithm;
-    AlphaSmoothing &_smootherAlgorithm;
+    PidController <double> &_controllerAlgorithm;
+    AlphaSmoothing <double> &_smootherAlgorithm;
 
     const TargetSetFunc _targetValues;
 
 public:
-    FanManager (const Config& cfg, FanInterface& fan, PidController& controller, AlphaSmoothing& smoother, const TargetSetFunc targetValues): config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _targetValues (std::move (targetValues)) {}
+    FanManager (const Config& cfg, FanInterface& fan, PidController <double>& controller, AlphaSmoothing <double>& smoother, const TargetSetFunc targetValues): config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _targetValues (std::move (targetValues)) {}
     void process () override {
         const TargetSet targets (_targetValues ());
         const float &setpoint = targets.first, &current = targets.second;
@@ -138,11 +135,11 @@ public:
             _fan.setSpeed (config.NO_SPEED);
             DEBUG_PRINTF ("FanManager::process: setpoint=%.2f, current=%.2f\n", setpoint, current);
         } else {
-            const float speedCalculated = _controllerAlgorithm.apply (setpoint, current);
-            const float speedConstrained = std::clamp (map  <float> (speedCalculated, -100.0, 100.0, (float) config.MIN_SPEED, (float) config.MAX_SPEED), (float) config.MIN_SPEED, (float) config.MAX_SPEED);
-            const float speedSmoothed = _smootherAlgorithm.apply (speedConstrained);
-            _fan.setSpeed (speedSmoothed);
-            DEBUG_PRINTF ("FanManager::process: setpoint=%.2f, current=%.2f --> calculated=%.2f, constrained=%.2f, smoothed=%.2f\n", setpoint, current, speedCalculated, speedConstrained, speedSmoothed);
+            const double speedCalculated = _controllerAlgorithm.apply (setpoint, current);
+            const double speedConstrained = std::clamp (map  <double> (speedCalculated, -100.0, 100.0, static_cast <double> (config.MIN_SPEED), static_cast <double> (config.MAX_SPEED)), static_cast <double> (config.MIN_SPEED), static_cast <double> (config.MAX_SPEED));
+            const double speedSmoothed = _smootherAlgorithm.apply (speedConstrained);
+            _fan.setSpeed (static_cast <FanInterface::FanSpeedType> (speedSmoothed));
+            DEBUG_PRINTF ("FanManager::process: setpoint=%.2f, current=%.2f --> calculated=%.2e, constrained=%.2e, smoothed=%.2e\n", setpoint, current, speedCalculated, speedConstrained, speedSmoothed);
         }
     }
 };

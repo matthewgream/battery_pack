@@ -661,7 +661,7 @@ public:
     TemperatureCalibrationManager (const Config& cfg) : config (cfg) {}
 
     void begin () override {
-        std::unique_ptr <typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_unique <typename Calculator::CalibrationStrategies> ();
+        std::shared_ptr <typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_shared <typename Calculator::CalibrationStrategies> ();
         StrategyDefault defaultStrategy (config.strategyDefault);
         if (!Storage::deserialize (config.filename, defaultStrategy, *calibrationStrategies, createStrategyFactoriesForOperation ()))
             DEBUG_PRINTF ("TemperatureCalibrationManager:: no stored calibrations (filename = %s), will rely upon default\n", config.filename.c_str ());
@@ -674,7 +674,7 @@ public:
     }
 
     bool calibrateTemperatures (const Collector::TemperatureReadFunc readTemperature, const Collector::ResistanceReadFunc readResistance) {
-        std::unique_ptr <typename Collector::Collection> calibrationData = std::make_unique <typename Collector::Collection> ();
+        std::shared_ptr <typename Collector::Collection> calibrationData = std::make_shared <typename Collector::Collection> ();
 #ifdef CALIBRATE_FROM_STATIC_DATA
         if (!TemperatureCalibrationStaticDataLoader <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP> ().load (*calibrationData)) {
             DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - static load failed\n");
@@ -693,7 +693,7 @@ public:
         }
 #endif
         Calculator calculator;
-        std::unique_ptr <typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_unique <typename Calculator::CalibrationStrategies> ();
+        std::shared_ptr <typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_shared <typename Calculator::CalibrationStrategies> ();
         StrategyDefault defaultStrategy;
         if (!calculator.compute (*calibrationStrategies, *calibrationData, createStrategyFactoriesForCalibration ()) || !calculator.computeDefault (defaultStrategy, *calibrationData)) {
             DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - calculator failed\n");

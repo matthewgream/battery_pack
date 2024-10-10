@@ -95,13 +95,31 @@ inline bool operator!= (const AlarmSet &a, const AlarmSet &b) { return (_AlarmTy
 
 // -----------------------------------------------------------------------------------------------
 
+class AlarmCondition {
+public:
+    using CheckFunction = std::function <bool ()>;
+    AlarmCondition (_AlarmType type, CheckFunction checkFunc): _type (type), _checkFunc (std::move (checkFunc)) {}
+    inline bool check () const { return _checkFunc (); }
+    inline _AlarmType getType () const { return _type; }
+private:
+    _AlarmType _type;
+    CheckFunction _checkFunc;
+};
+
 class Alarmable {
 protected:
-    ~Alarmable () {};
+    const std::vector <AlarmCondition> _conditions;
 
 public:
     typedef std::vector <Alarmable*> List;
-    virtual void collectAlarms (AlarmSet& alarms) const = 0;
+    Alarmable (const std::initializer_list <AlarmCondition>& conditions): _conditions (conditions) {}
+    // Alarmable () {}
+    virtual ~Alarmable() {};
+    void collectAlarms (AlarmSet& alarms) const {
+        for (const auto& condition : _conditions)
+            if (condition.check ())
+                alarms += condition.getType ();
+    }
 };
 
 class AlarmManager : public Component, public Diagnosticable {
@@ -181,7 +199,9 @@ private:
     bool _available = false;
 
 public:
-    UpdateManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (std::move (networkIsAvailable)),
+    UpdateManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
+            AlarmCondition (ALARM_UPDATE_VERS, [this] () { return _available; })
+        }), config (cfg), _networkIsAvailable (std::move (networkIsAvailable)),
         _persistent_data ("updates"), _persistent_data_previous (_persistent_data, "previous", 0), _persistent_data_version (_persistent_data, "version", String ("")),
         _interval (config.intervalUpdate) {}
     void process () override {
@@ -198,9 +218,6 @@ public:
     }
 
 protected:
-    void collectAlarms (AlarmSet& alarms) const override {
-        if (_available) alarms += ALARM_UPDATE_VERS;
-    }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject updates = obj ["updates"].to <JsonObject> ();
         updates ["current"] = config.vers;

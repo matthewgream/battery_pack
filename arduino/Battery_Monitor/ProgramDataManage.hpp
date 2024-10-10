@@ -17,7 +17,9 @@ private:
     ActivationTrackerWithDetail _delivers;
 
 public:
-    DeliverManager (const Config& cfg) : config (cfg), _blue (cfg.blue) {}
+    DeliverManager (const Config& cfg): Alarmable ({
+            AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.maxpacket () > config.blue.mtu; })
+        }), config (cfg), _blue (cfg.blue) {}
     void begin () override {
         _blue.advertise ();
     }
@@ -33,9 +35,6 @@ public:
     }
 
 protected:
-    void collectAlarms (AlarmSet& alarms) const override {
-        if (_blue.maxpacket () > config.blue.mtu) alarms += ALARM_DELIVER_SIZE;
-    }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject deliver = obj ["deliver"].to <JsonObject> ();
         _delivers.serialize (deliver ["delivers"].to <JsonObject> ());
@@ -66,7 +65,9 @@ private:
     counter_t _failures = 0;
 
 public:
-    PublishManager (const Config& cfg, const BooleanFunc networkIsAvailable) : config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _mqtt (cfg.mqtt) {}
+    PublishManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
+            AlarmCondition (ALARM_PUBLISH_FAIL, [this] () { return _failures > config.failureLimit; })
+        }), config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _mqtt (cfg.mqtt) {}
     void begin () override {
         _mqtt.setup ();
     }
@@ -86,9 +87,6 @@ public:
     inline bool connected () { return _networkIsAvailable () && _mqtt.connected (); }
 
 protected:
-    void collectAlarms (AlarmSet& alarms) const override {
-        if (_failures > config.failureLimit) alarms += ALARM_PUBLISH_FAIL;
-    }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject publish = obj ["publish"].to <JsonObject> ();
         JsonObject failures = publish ["failures"].to <JsonObject> ();
@@ -121,7 +119,10 @@ private:
 
 public:
     typedef SPIFFSFile::LineCallback LineCallback;
-    StorageManager (const Config& cfg) : config (cfg), _file (config.filename) {}
+    StorageManager (const Config& cfg): Alarmable ({
+            AlarmCondition (ALARM_STORAGE_FAIL, [this] () { return _failures > config.failureLimit; }),
+            AlarmCondition (ALARM_STORAGE_SIZE, [this] () { return _file.remains () < config.remainLimit; })
+        }), config (cfg), _file (config.filename) {}
     void begin () override {
         _failures = _file.begin () ? 0 : _failures + 1;
     }
@@ -144,10 +145,6 @@ public:
     }
 
 protected:
-    void collectAlarms (AlarmSet& alarms) const override {
-        if (_failures > config.failureLimit) alarms += ALARM_STORAGE_FAIL;
-        if (_file.remains () < config.remainLimit) alarms += ALARM_STORAGE_SIZE;
-    }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject storage = obj ["storage"].to <JsonObject> ();
         storage ["critical"] = config.remainLimit;

@@ -36,7 +36,7 @@ using TemperatureManagerBatterypack = TemperatureManagerBatterypackTemplate <HAR
 using TemperatureManagerEnvironment = TemperatureManagerEnvironmentTemplate <1>;
 using TemperatureCalibrator = TemperatureCalibrationManager <HARDWARE_TEMP_SIZE, HARDWARE_TEMP_START, HARDWARE_TEMP_END, HARDWARE_TEMP_STEP>;
 
-static inline constexpr float FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
+static inline constexpr double FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
 
 // -----------------------------------------------------------------------------------------------
 
@@ -49,8 +49,8 @@ class Program : public Component, public Diagnosticable {
     const Config config;
 
     FanInterfaceStrategy_motorMap fanInterfaceSetrategyMotorMap;
-    PidController fanControllingAlgorithm;
-    AlphaSmoothing fanSmoothingAlgorithm;
+    PidController <double> fanControllingAlgorithm;
+    AlphaSmoothing <double> fanSmoothingAlgorithm;
 
     TemperatureCalibrator temperatureCalibrator;
     TemperatureInterface temperatureInterface;
@@ -148,10 +148,7 @@ public:
     Program () :
         fanControllingAlgorithm (FAN_CONTROL_P, FAN_CONTROL_I, FAN_CONTROL_D), fanSmoothingAlgorithm (FAN_SMOOTH_A),
         temperatureCalibrator (config.temperatureCalibrator),
-        temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) { 
-            // return steinharthart_calculator (resistance, TemperatureInterface::AdcValueMax, 10000.0f, 10000.0f, 25.0f);
-            return temperatureCalibrator.calculateTemperature (channel, resistance); 
-        }), 
+        temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) { return temperatureCalibrator.calculateTemperature (channel, resistance); }),
         temperatureManagerBatterypack (config.temperatureManagerBatterypack, temperatureInterface), temperatureManagerEnvironment (config.temperatureManagerEnvironment, temperatureInterface),
         fanInterface (config.fanInterface, fanInterfaceSetrategyMotorMap), fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, 
             [&] () { return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ()); }),

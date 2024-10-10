@@ -22,7 +22,7 @@ private:
 
 public:
     ConnectManager (const Config& cfg) : Singleton <ConnectManager> (this), config (cfg) {}
-    ~ConnectManager () { if (_eventsHandle) WiFi.removeEvent (_eventsHandle); }
+    ~ConnectManager () { end (); }
     void begin () override {
         _eventsHandle = WiFi.onEvent (__ConnectManager_WiFiEventHandler);
         WiFi.setHostname (config.client.c_str ());
@@ -30,6 +30,9 @@ public:
         WiFi.mode (WIFI_STA);
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
         DEBUG_PRINTF ("ConnectManager::begin: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), mac_address ().c_str (), config.client.c_str ());
+    }
+    void end () {
+        if (_eventsHandle) WiFi.removeEvent (_eventsHandle);
     }
     inline bool isAvailable () const {
         return _available;
@@ -162,7 +165,10 @@ private:
     PersistentValue <uint32_t> _persistentTime;
 
 public:
-    NettimeManager (const Config& cfg, const BooleanFunc networkIsAvailable) : config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _fetcher (cfg.useragent, cfg.server), 
+    NettimeManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
+            AlarmCondition (ALARM_TIME_SYNC, [this] () { return _failures > config.failureLimit; }),
+            AlarmCondition (ALARM_TIME_DRIFT, [this] () { return _drifter.isHighDrift (); })
+        }), config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _fetcher (cfg.useragent, cfg.server), 
             _persistentData ("nettime"), _persistentDrift (_persistentData, "drift", 0), _drifter (_persistentDrift), _persistentTime (_persistentData, "time", 0) {
         if (_persistentTime > 0UL) {
             struct timeval tv = { .tv_sec = _persistentTime, .tv_usec = 0 };
@@ -201,10 +207,6 @@ public:
     }
 
 protected:
-    void collectAlarms (AlarmSet& alarms) const override {
-        if (_failures > config.failureLimit) alarms += ALARM_TIME_SYNC;
-        if (_drifter.isHighDrift ()) alarms += ALARM_TIME_DRIFT;
-    }
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject nettime = obj ["nettime"].to <JsonObject> ();
         nettime ["now"] = getTimeString ();
