@@ -60,8 +60,9 @@ typedef uint32_t _AlarmType;
 #define ALARM_PUBLISH_FAIL          _ALARM_NUMB (8)
 #define ALARM_DELIVER_SIZE          _ALARM_NUMB (9)
 #define ALARM_UPDATE_VERS           _ALARM_NUMB (10)
-#define _ALARM_COUNT                 (11)
-static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_FAIL", "TEMP_MIN", "TEMP_WARN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "DELIVER_SIZE", "UPDATE_VERS" };
+#define ALARM_SYSTEM_MEMORY_LOW     _ALARM_NUMB (11)
+#define _ALARM_COUNT                 (12)
+static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_FAIL", "TEMP_MIN", "TEMP_WARN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "DELIVER_SIZE", "UPDATE_VERS", "SYSTEM_MEM" };
 #define _ALARM_NAME(x)               (_ALARM_NAMES [x])
 
 class AlarmSet {

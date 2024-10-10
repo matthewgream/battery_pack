@@ -3,6 +3,7 @@
 // -----------------------------------------------------------------------------------------------
 
 #define DEFAULT_SERIAL_BAUD 115200
+#define DEFAULT_WATCHDOG_SECS 60
 
 #define DEFAULT_NAME "BatteryMonitor"
 #define DEFAULT_VERS "0.9.9"
@@ -14,7 +15,7 @@
 
 #include "Utilities.hpp"
 #include "UtilitiesJson.hpp"
-#include "UtilitiesArduino.hpp"
+#include "UtilitiesPlatform.hpp"
 
 #include "Components.hpp"
 #include "ComponentsHardware.hpp"
@@ -44,7 +45,34 @@ static inline constexpr double FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CO
 
 // -----------------------------------------------------------------------------------------------
 
-class Program : public Component, public Diagnosticable {
+class PlatformArduino: public Alarmable, public Diagnosticable {
+    static constexpr int HEAP_FREE_PERCENTAGE_MINIMUM = 10;
+
+public:
+    PlatformArduino (): Alarmable ({
+            AlarmCondition (ALARM_SYSTEM_MEMORY_LOW, [this] () { return ((100 * ESP.getFreeHeap ()) / ESP.getHeapSize ()) < HEAP_FREE_PERCENTAGE_MINIMUM; }),
+        }) {
+        DEBUG_PRINTF ("PlatformArduino::init: code=%lu, heap=%lu\n", ESP.getSketchSize (), ESP.getHeapSize ());
+    }
+
+protected:
+    void collectDiagnostics (JsonDocument &obj) const override {
+        JsonObject system = obj ["system"].to <JsonObject> ();
+        JsonObject code = system ["code"].to <JsonObject> ();
+        code ["size"] = ESP.getSketchSize ();
+        JsonObject heap = system ["heap"].to <JsonObject> ();
+        heap ["size"] = ESP.getHeapSize ();
+        heap ["free"] = ESP.getFreeHeap ();
+        JsonObject reset = system ["reset"].to <JsonObject> ();
+        const std::pair <String, String> r = getResetReason ();
+        reset ["code"] = r.first;
+        reset ["details"] = r.second;
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+
+class Program: public Component, public Diagnosticable {
 
     const Config config;
 
@@ -68,6 +96,7 @@ class Program : public Component, public Diagnosticable {
     UpdateManager updater;
     AlarmInterface_SinglePIN alarmInterface;
     AlarmManager alarms;
+    PlatformArduino platform;
 
     DiagnosticManager diagnostics;
     class OperationalManager {
@@ -155,8 +184,8 @@ public:
         network (config.network), nettime (config.nettime, [&] () { return network.isAvailable (); }),
         deliver (config.deliver), publish (config.publish, [&] () { return network.isAvailable (); }), storage (config.storage),
         updater (config.updateManager, [&] () { return network.isAvailable (); }),
-        alarmInterface (config.alarmInterface), alarms (config.alarmManager, alarmInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage }),
-        diagnostics (config.diagnosticManager, { &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &network, &nettime, &deliver, &publish, &storage, &updater, &alarms, this }),
+        alarmInterface (config.alarmInterface), alarms (config.alarmManager, alarmInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
+        diagnostics (config.diagnosticManager, { &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &network, &nettime, &deliver, &publish, &storage, &updater, &alarms, &platform, this }),
         operational (this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
         components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager,

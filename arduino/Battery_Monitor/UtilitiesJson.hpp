@@ -36,12 +36,14 @@ namespace JsonFunctions {
         return (json.isEmpty () || key.isEmpty ()) ? -1 : json.indexOf ("\"" + key + "\":");
     }
     inline int findValueStart (const String& json, const int keyPos) {
-        int valueStart = json.indexOf (":", keyPos) + 1;
-        while (valueStart < json.length () && isSpace (json.charAt (valueStart))) valueStart ++;
+        int valueStart = json.indexOf (":", keyPos);
+        if (valueStart != -1)
+            do valueStart ++; while (valueStart < json.length () && isSpace (json.charAt (valueStart)));
         return valueStart;
     }
     inline int findValueEnd (const String& json, const int valueStart) {
         int valueEnd;
+        if (valueStart >= json.length ()) return -1;
         if (json.charAt (valueStart) == '"') {
             valueEnd = json.indexOf ("\"", valueStart + 1);
             while (valueEnd > 0 && json.charAt (valueEnd - 1) == '\\')
@@ -49,19 +51,23 @@ namespace JsonFunctions {
             if (valueEnd >= 0)
                 valueEnd ++;
         } else {
-            valueEnd = json.indexOf (",", valueStart);
-            if (valueEnd == -1)
-                valueEnd = json.indexOf ("}", valueStart);
+            const int commaPos = json.indexOf (",", valueStart), bracePos = json.indexOf ("}", valueStart);
+            if (commaPos == -1) valueEnd = bracePos;
+            else if (bracePos == -1) valueEnd = commaPos;
+            else valueEnd = min (commaPos, bracePos);
         }
         return valueEnd;
     }
     inline int findValue (const String& json, const String& key, String& value) {
         const int keyPos = findValueKey (json, key);
         if (keyPos >= 0) {
-            const int valueStart = findValueStart (json, keyPos), valueEnd = findValueEnd (json, valueStart);
-            if (valueEnd >= 0) {
-                value = json.substring (valueStart, valueEnd);
-                return value.length ();
+            const int valueStart = findValueStart (json, keyPos);
+            if (valueStart >= 0) {
+                const int valueEnd = findValueEnd (json, valueStart);
+                if (valueEnd >= 0) {
+                    value = json.substring (valueStart, valueEnd);
+                    return value.length ();
+                }
             }
         }
         return -1;
@@ -106,9 +112,9 @@ private:
     const std::vector <String> commonElements;
 
 public:
-    JsonSplitter (const int splitLength, const std::vector<String> &commonElements) : splitLength (splitLength), commonElements (commonElements) {}
+    JsonSplitter (const int splitLength, const std::vector <String> &commonElements) : splitLength (splitLength), commonElements (commonElements) {}
 
-    void splitJson (const String& json, const std::function<void (const String&, const int)> callback) {
+    void splitJson (const String& json, const std::function <void (const String&, const int)> callback) {
         String common;
         for (const auto& commonElement : commonElements) {
             String value;

@@ -63,8 +63,8 @@ public:
 #include <esp_mac.h>
 
 String mac_address (void) {
-#define __MAC_MACBYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
-#define __MAC_FORMAT_ADDRESS(addr) __MAC_MACBYTETOSTRING ((addr)[0]) + ":" + __MAC_MACBYTETOSTRING ((addr)[1]) + ":" + __MAC_MACBYTETOSTRING ((addr)[2]) + ":" + __MAC_MACBYTETOSTRING ((addr)[3]) + ":" + __MAC_MACBYTETOSTRING ((addr)[4]) + ":" + __MAC_MACBYTETOSTRING ((addr)[5])
+    #define __MAC_MACBYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
+    #define __MAC_FORMAT_ADDRESS(addr) __MAC_MACBYTETOSTRING ((addr)[0]) + ":" + __MAC_MACBYTETOSTRING ((addr)[1]) + ":" + __MAC_MACBYTETOSTRING ((addr)[2]) + ":" + __MAC_MACBYTETOSTRING ((addr)[3]) + ":" + __MAC_MACBYTETOSTRING ((addr)[4]) + ":" + __MAC_MACBYTETOSTRING ((addr)[5])
     uint8_t macaddr [6];
     esp_read_mac (macaddr, ESP_MAC_WIFI_STA);
     return __MAC_FORMAT_ADDRESS (macaddr);
@@ -82,7 +82,6 @@ String getTimeString (time_t timet = 0) {
     return String (timeString);  
 }
 
-
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
@@ -96,9 +95,9 @@ public:
     void start () { 
         if (!_started) {
             esp_task_wdt_deinit ();
-            esp_task_wdt_config_t wdt_config = {
+            const esp_task_wdt_config_t wdt_config = {
                 .timeout_ms = static_cast <uint32_t> (_timeout * 1000),
-                .idle_core_mask = 1,
+                .idle_core_mask = static_cast <uint32_t> ((1 << ESP.getChipCores ()) - 1),
                 .trigger_panic = true
             };
             esp_task_wdt_init (&wdt_config);
@@ -113,6 +112,40 @@ public:
         esp_task_wdt_reset (); 
     }
 };
+
+// -----------------------------------------------------------------------------------------------
+
+std::pair <String, String> getResetReason () {
+    const int reason = esp_rom_get_reset_reason (0);
+    switch (reason) {
+        case RESET_REASON_CHIP_POWER_ON:    return std::pair <String, String> ("CHIP_POWER_ON", "Power on reset");
+        // case RESET_REASON_CHIP_BROWN_OUT: return std::pair <String, String> ("CHIP_BROWN_OUT", "VDD voltage is not stable and resets the chip");
+        // case RESET_REASON_CHIP_SUPER_WDT: return std::pair <String, String> ("CHIP_SUPER_WDT", "Super watch dog resets the chip");
+
+        case RESET_REASON_CORE_SW:          return std::pair <String, String> ("CORE_SW", "Software resets the digital core by RTC_CNTL_SW_SYS_RST");
+        case RESET_REASON_CORE_MWDT0:       return std::pair <String, String> ("CORE_MWDT0", "Main watch dog 0 resets digital core");
+        case RESET_REASON_CORE_MWDT1:       return std::pair <String, String> ("CORE_MWDT1", "Main watch dog 1 resets digital core");
+        case RESET_REASON_CORE_RTC_WDT:     return std::pair <String, String> ("CORE_RTC_WDT", "RTC watch dog resets digital core");
+        case RESET_REASON_CORE_EFUSE_CRC:   return std::pair <String, String> ("CORE_EFUSE_CRC", "eFuse CRC error resets the digital core");
+        case RESET_REASON_CORE_DEEP_SLEEP:  return std::pair <String, String> ("CORE_DEEP_SLEEP", "Deep sleep reset the digital core");
+        case RESET_REASON_CORE_USB_UART:    return std::pair <String, String> ("CORE_USB_UART", "USB UART resets the digital core");
+        case RESET_REASON_CORE_USB_JTAG:    return std::pair <String, String> ("CORE_USB_JTAG", "USB JTAG resets the digital core");
+        case RESET_REASON_CORE_PWR_GLITCH:  return std::pair <String, String> ("CORE_PWR_GLITCH", "Glitch on power resets the digital core");
+
+        case RESET_REASON_CPU0_SW:          return std::pair <String, String> ("CPU0_SW", "Software resets CPU 0 by RTC_CNTL_SW_PROCPU_RST");
+        case RESET_REASON_CPU0_MWDT0:       return std::pair <String, String> ("CPU0_MWDT0", "Main watch dog 0 resets CPU 0");
+        case RESET_REASON_CPU0_MWDT1:       return std::pair <String, String> ("CPU0_MWDT1", "Main watch dog 1 resets CPU 0");
+        case RESET_REASON_CPU0_RTC_WDT:     return std::pair <String, String> ("CPU0_RTC_WDT", "RTC watch dog resets CPU 0");
+
+        case RESET_REASON_SYS_BROWN_OUT:    return std::pair <String, String> ("SYS_BROWN_OUT", "VDD voltage is not stable and resets the digital core");
+        case RESET_REASON_SYS_SUPER_WDT:    return std::pair <String, String> ("SYS_SUPER_WDT", "Super watch dog resets the digital core and rtc module");
+        case RESET_REASON_SYS_RTC_WDT:      return std::pair <String, String> ("SYS_RTC_WDT", "RTC watch dog resets digital core and rtc module");
+        case RESET_REASON_SYS_CLK_GLITCH:   return std::pair <String, String> ("SYS_CLK_GLITCH", "Glitch on clock resets the digital core and rtc module");
+
+        default:                            return std::pair <String, String> (IntToString (reason), "UKNOWN REASON (" + IntToString (reason) + ")");
+    }
+ 
+}
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------

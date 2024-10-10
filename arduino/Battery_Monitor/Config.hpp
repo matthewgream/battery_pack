@@ -115,7 +115,7 @@ struct Config {
     AlarmInterface_SinglePIN::Config alarmInterface = { .PIN_ALARM = -1 };
     AlarmManager::Config alarmManager = { };
     DiagnosticManager::Config diagnosticManager = { }; 
-    UpdateManager::Config updateManager = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = "http://ota.local:8090/images/images.json", .type = "batterymonitor-custom-esp32", .vers = DEFAULT_VERS };
+    UpdateManager::Config updateManager = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = "http://ota.local:8090/images/images.json", .type = "batterymonitor-custom-esp32c3", .vers = DEFAULT_VERS };
     interval_t intervalProcess = 5*1000, intervalDeliver = 15*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;
 };
 

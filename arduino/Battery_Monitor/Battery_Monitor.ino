@@ -20,16 +20,19 @@ static inline constexpr const char __build_time [] = {
     BUILD_T [0], BUILD_T [1], BUILD_T [3], BUILD_T [4], BUILD_T [6], BUILD_T [7],
     '\0'
 };  
+static inline String __build_plat () { String platform = ESP.getChipModel (); platform.toLowerCase (); platform.replace ("-", ""); return platform; }
 
-const String build_info (String (__build_name) + " V" + String (__build_vers) + "-" + String (__build_time));
+const String build_info (String (__build_name) + " V" + String (__build_vers) + "-" + String (__build_plat ()) + "-" + String (__build_time));
 
 // -----------------------------------------------------------------------------------------------
 
 Program *program;
-Watchdog watchdog (60);
+Watchdog watchdog (DEFAULT_WATCHDOG_SECS);
 
 void setup () {
     DEBUG_START ();
+    const std::pair <String, String> r = getResetReason ();
+    DEBUG_PRINTF ("\n[%s: %s]", r.first.c_str (), r.second.c_str ());
     DEBUG_PRINTF ("\n*** %s ***\n\n", build_info.c_str ());
 
     // must be a more elegant way
