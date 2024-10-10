@@ -69,6 +69,13 @@ public:
         return temp;
     }
 
+   static bool present (const int pin) {
+        static constexpr uint8_t DS18B20_ADDRESS = 0x28;
+        OneWire onewire (pin);
+        DeviceAddress address;
+        return onewire.reset () && onewire.search (address) && (address [0] == DS18B20_ADDRESS) && (OneWire::crc8 (address, sizeof (address) - 1) == address [sizeof (address) - 1]);
+    }
+
 private:
     static String __ds1820_address_to_string (const DeviceAddress& addr) {
         #define __DS18_BYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))

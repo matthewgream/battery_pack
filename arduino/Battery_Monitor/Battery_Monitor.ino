@@ -3,7 +3,7 @@
 // -----------------------------------------------------------------------------------------------
 
 #include "Program.hpp"
-#include "Testing.hpp"
+#include "Factory.hpp"
 
 // -----------------------------------------------------------------------------------------------
 
@@ -22,7 +22,7 @@ static inline constexpr const char __build_time [] = {
 };  
 static inline String __build_plat () { String platform = ESP.getChipModel (); platform.toLowerCase (); platform.replace ("-", ""); return platform; }
 
-const String build_info (String (__build_name) + " V" + String (__build_vers) + "-" + String (__build_plat ()) + "-" + String (__build_time));
+const String build_info (String (__build_name) + " V" + String (__build_vers) + "-" + String (__build_time) + " (" + __build_plat () + ")");
 
 // -----------------------------------------------------------------------------------------------
 
@@ -35,10 +35,20 @@ void setup () {
     DEBUG_PRINTF ("\n[%s: %s]", r.first.c_str (), r.second.c_str ());
     DEBUG_PRINTF ("\n*** %s ***\n\n", build_info.c_str ());
 
-    // must be a more elegant way
-    // Tester_HardwareInterfaces tester;
-    // tester.run ();
-    // temperatureCalibration ();
+    // 3-pin connector for DS18B20 is GND/VCC/DAT and DAT connected to ESP32 pin 21
+    // --> install DS18B20 to boot to temperature calibration
+    // --> tie pin 21 to high to boot to hardware testing
+    // --> leave pin 21 n/c to boot normally to program
+#define BOOT_MODE_PIN 21
+    if (TemperatureSensor_DS18B20::present (BOOT_MODE_PIN)) {
+        DEBUG_PRINTF ("BOOT: TEMPERATURE CALIBRATION\n");
+        factory_temperatureCalibration ();
+        esp_deep_sleep_start ();
+    } else if (digitalRead (BOOT_MODE_PIN) == HIGH) {
+        DEBUG_PRINTF ("BOOT: HARDWARE INTERFACE TEST\n");
+        factory_hardwareInterfaceTest ();
+        esp_deep_sleep_start ();
+    }
 
     watchdog.start ();
     exception_catcher ([&] () { 

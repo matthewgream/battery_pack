@@ -71,7 +71,14 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
-void temperatureCalibration () {
+void factory_hardwareInterfaceTest () {
+    Tester_HardwareInterfaces tester;
+    tester.run ();
+}
+
+// -----------------------------------------------------------------------------------------------
+
+void factory_temperatureCalibration () {
     const Config config;
 
     TemperatureSensor_DS18B20 ds18b20 (config.ds18b20);
@@ -81,7 +88,6 @@ void temperatureCalibration () {
     TemperatureCalibrator calibrator (config.temperatureCalibrator);
 
     calibrator.calibrateTemperatures ([&] () { return ds18b20.getTemperature (); }, [&] (size_t channel) { return interface.get (channel); });
-    while (1) delay (100);
 }
 
 // -----------------------------------------------------------------------------------------------
