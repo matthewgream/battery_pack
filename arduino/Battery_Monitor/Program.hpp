@@ -46,27 +46,32 @@ static inline constexpr double FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CO
 // -----------------------------------------------------------------------------------------------
 
 class PlatformArduino: public Alarmable, public Diagnosticable {
-    static constexpr int HEAP_FREE_PERCENTAGE_MINIMUM = 10;
-
+    static constexpr int HEAP_FREE_PERCENTAGE_MINIMUM = 5;
+    const unsigned long code_size, heap_size;
+    const int reset_reason;
+    const std::pair <String, String> reset_details;
+    const bool reset_okay;
 public:
     PlatformArduino (): Alarmable ({
-            AlarmCondition (ALARM_SYSTEM_MEMORY_LOW, [this] () { return ((100 * ESP.getFreeHeap ()) / ESP.getHeapSize ()) < HEAP_FREE_PERCENTAGE_MINIMUM; }),
-        }) {
-        DEBUG_PRINTF ("PlatformArduino::init: code=%lu, heap=%lu\n", ESP.getSketchSize (), ESP.getHeapSize ());
+            AlarmCondition (ALARM_SYSTEM_MEMORYLOW, [this] () { return ((100 * esp_get_minimum_free_heap_size ()) / heap_size) < HEAP_FREE_PERCENTAGE_MINIMUM; }),
+            AlarmCondition (ALARM_SYSTEM_BADRESET, [this] () { return !reset_okay; })
+        }), code_size (ESP.getSketchSize ()), heap_size (ESP.getHeapSize ()), reset_reason (getResetReason ()), reset_details (getResetDetails (reset_reason)), reset_okay (getResetOkay (reset_reason)) {
+        DEBUG_PRINTF ("PlatformArduino::init: code=%lu, heap=%lu, reset=%d\n", code_size, heap_size, reset_reason);
     }
 
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject system = obj ["system"].to <JsonObject> ();
         JsonObject code = system ["code"].to <JsonObject> ();
-        code ["size"] = ESP.getSketchSize ();
+        code ["size"] = code_size;
         JsonObject heap = system ["heap"].to <JsonObject> ();
-        heap ["size"] = ESP.getHeapSize ();
-        heap ["free"] = ESP.getFreeHeap ();
+        heap ["size"] = heap_size;
+        heap ["free"] = esp_get_free_heap_size ();
+        heap ["min"] = esp_get_minimum_free_heap_size ();
         JsonObject reset = system ["reset"].to <JsonObject> ();
-        const std::pair <String, String> r = getResetReason ();
-        reset ["code"] = r.first;
-        reset ["details"] = r.second;
+        reset ["okay"] = reset_okay;
+        reset ["reason"] = reset_details.first;
+        reset ["details"] = reset_details.second;
     }
 };
 
@@ -76,7 +81,7 @@ class Program: public Component, public Diagnosticable {
 
     const Config config;
 
-    FanInterfaceStrategy_motorMap fanInterfaceSetrategyMotorMap;
+    FanInterfaceStrategy_motorMapWithRotation fanInterfaceSetrategy;
     PidController <double> fanControllingAlgorithm;
     AlphaSmoothing <double> fanSmoothingAlgorithm;
 
@@ -126,7 +131,7 @@ class Program: public Component, public Diagnosticable {
         public:
             StorageLineHandler (PublishManager& publish): _publish (publish) {}
             bool process (const String& line) override {
-                return line.isEmpty () ? true : _publish.publish (line);
+                return line.isEmpty () ? true : _publish.publish (line, "data");
             }
         };
         if (publish.connected ()) {
@@ -136,7 +141,7 @@ class Program: public Component, public Diagnosticable {
                 if (storage.retrieve (handler))
                     storage.erase ();
             }
-            if (!publish.publish (data))
+            if (!publish.publish (data, "data"))
               storage.append (data);
         } else
             storage.append (data);
@@ -158,7 +163,7 @@ class Program: public Component, public Diagnosticable {
             DEBUG_PRINTF ("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
 #ifdef DEBUG
             if (publish.connected ())
-                publish.publish (diag);
+                publish.publish (diag, "diag");
 #endif
         }
         cycles ++;
@@ -179,7 +184,7 @@ public:
         temperatureCalibrator (config.temperatureCalibrator),
         temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) { return temperatureCalibrator.calculateTemperature (channel, resistance); }),
         temperatureManagerBatterypack (config.temperatureManagerBatterypack, temperatureInterface), temperatureManagerEnvironment (config.temperatureManagerEnvironment, temperatureInterface),
-        fanInterface (config.fanInterface, fanInterfaceSetrategyMotorMap), fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, 
+        fanInterface (config.fanInterface, fanInterfaceSetrategy), fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, 
             [&] () { return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ()); }),
         network (config.network), nettime (config.nettime, [&] () { return network.isAvailable (); }),
         deliver (config.deliver), publish (config.publish, [&] () { return network.isAvailable (); }), storage (config.storage),

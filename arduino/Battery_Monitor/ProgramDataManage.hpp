@@ -37,7 +37,8 @@ public:
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject deliver = obj ["deliver"].to <JsonObject> ();
-        _delivers.serialize (deliver ["delivers"].to <JsonObject> ());
+        if (_delivers.number () > 0)
+            _delivers.serialize (deliver ["delivers"].to <JsonObject> ());
         _blue.serialize (deliver);
     }
 };
@@ -75,9 +76,9 @@ public:
         if (_networkIsAvailable ())
             _mqtt.process ();
     }
-    bool publish (const String& data) {
+    bool publish (const String& data, const String& subtopic) {
         if (_networkIsAvailable ()) {
-          if (_mqtt.connected () && _mqtt.publish (config.mqtt.topic, data)) {
+          if (_mqtt.connected () && _mqtt.publish (config.mqtt.topic + "/" + subtopic, data)) {
               _publishes += IntToString (data.length ()), _failures = 0;
               return true;
           } else _failures ++;
@@ -89,10 +90,13 @@ public:
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject publish = obj ["publish"].to <JsonObject> ();
-        JsonObject failures = publish ["failures"].to <JsonObject> ();
-        failures ["count"] = _failures;
-        failures ["limit"] = config.failureLimit;
-        _publishes.serialize (publish ["publishes"].to <JsonObject> ());
+        if (_publishes.number () > 0)        
+            _publishes.serialize (publish ["publishes"].to <JsonObject> ());
+        if (_failures > 0) {
+            JsonObject failures = publish ["failures"].to <JsonObject> ();
+            failures ["count"] = _failures;
+            failures ["limit"] = config.failureLimit;
+        }
         _mqtt.serialize (publish);
     }
 };
@@ -148,11 +152,15 @@ protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject storage = obj ["storage"].to <JsonObject> ();
         storage ["critical"] = config.remainLimit;
-        storage ["erasures"] = _erasures;
-        JsonObject failures = storage ["failures"].to <JsonObject> ();
-        failures ["count"] = _failures;
-        failures ["limit"] = config.failureLimit;
-        _appends.serialize (storage ["appends"].to <JsonObject> ());
+        if (_erasures > 0)
+            storage ["erasures"] = _erasures;
+        if (_failures > 0) {
+            JsonObject failures = storage ["failures"].to <JsonObject> ();
+            failures ["count"] = _failures;
+            failures ["limit"] = config.failureLimit;
+        }
+        if (_appends.number () > 0)
+            _appends.serialize (storage ["appends"].to <JsonObject> ());
         _file.serialize (storage);
     }
 };
