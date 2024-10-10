@@ -34,8 +34,10 @@ public:
             DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to reduce to %.2f°C ... \n", temperatureBegin);
             int where = 0;
             while (temperature > temperatureBegin) {
-                if (-- where < 0)
-                    DEBUG_PRINTF ("(at %.2f°C)\n", static_cast <float> (temperature)), where = COUNT;
+                if (-- where < 0) {
+                    DEBUG_PRINTF ("(at %.2f°C)\n", static_cast <float> (temperature));
+                    where = COUNT;
+                }
                 delay (DELAY);
                 temperature = readTemperature ();
             }
@@ -49,8 +51,10 @@ public:
             DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to increase to %.2f°C ... \n", temperatureTarget);
             int where = 0;
             while (temperature < temperatureTarget) {
-                if (-- where < 0)
-                    DEBUG_PRINTF ("(at %.2f°C)\n", static_cast <float> (temperature)), where = COUNT;
+                if (-- where < 0) {
+                    DEBUG_PRINTF ("(at %.2f°C)\n", static_cast <float> (temperature));
+                    where = COUNT;
+                }
                 delay (DELAY);
                 temperature = readTemperature ();
             }
@@ -438,7 +442,7 @@ private:
     CalibrationStrategies calibrationStrategies;
 
 public:
-    TemperatureCalibrationRuntime (const StrategyDefault& defaultStrategy, const CalibrationStrategies& calibrationStrategies): defaultStrategy (defaultStrategy), calibrationStrategies (calibrationStrategies) {
+    TemperatureCalibrationRuntime (const StrategyDefault& defaultStrategy, const CalibrationStrategies& calibrationStrategies): defaultStrategy (defaultStrategy), calibrationStrategies (calibrationStrategies) {      
         DEBUG_PRINTF ("TemperatureCalibrationRuntime::init: default [%s", defaultStrategy.getDetails ().c_str ());
         for (int index = 0; index < calibrationStrategies.size (); index ++) {
             DEBUG_PRINTF ("], %d [", index); int count = 0;

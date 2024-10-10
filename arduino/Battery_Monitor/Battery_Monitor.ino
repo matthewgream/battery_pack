@@ -31,7 +31,7 @@ Watchdog watchdog (DEFAULT_WATCHDOG_SECS);
 
 void setup () {
     DEBUG_START ();
-    const std::pair <String, String> r = getResetReason ();
+    const std::pair <String, String> r = getResetDetails ();
     DEBUG_PRINTF ("\n[%s: %s]", r.first.c_str (), r.second.c_str ());
     DEBUG_PRINTF ("\n*** %s ***\n\n", build_info.c_str ());
 

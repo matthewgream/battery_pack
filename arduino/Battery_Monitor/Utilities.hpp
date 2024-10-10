@@ -6,14 +6,13 @@
 
 #define DEBUG
 #ifdef DEBUG
-    bool DEBUG_AVAILABLE = true;
-    #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD); if (DEBUG_AVAILABLE) delay (5*1000L);
-    #define DEBUG_END(...) Serial.flush (); Serial.end ()
-    #define DEBUG_PRINTF(...) if (DEBUG_AVAILABLE) Serial.printf (__VA_ARGS__)
+    #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD); delay (5*1000L);
+    #define DEBUG_END(...) Serial.flush (); Serial.end ();
+    #define DEBUG_PRINTF(...) Serial.printf (__VA_ARGS__)
 #else
     #define DEBUG_START(...)
     #define DEBUG_END(...)
-    #define DEBUG_PRINTF(...)
+    #define DEBUG_PRINTF(...) do {} while (0)
 #endif
 
 // -----------------------------------------------------------------------------------------------
@@ -190,11 +189,10 @@ public:
 #include <Arduino.h>
 
 class Intervalable {
-    const interval_t _interval;
-    interval_t _previous;
+    interval_t _interval, _previous;
 
 public:
-    Intervalable (const interval_t interval) : _interval (interval), _previous (0) {}
+    Intervalable (const interval_t interval = 0) : _interval (interval), _previous (0) {}
     operator bool () {
         const interval_t current = millis ();
         if (current - _previous > _interval) {
@@ -202,6 +200,11 @@ public:
             return true;
         }
         return false;
+    }
+    void reset (const interval_t interval = std::numeric_limits <interval_t>::max ()) {
+        if (interval != std::numeric_limits <interval_t>::max ())
+            _interval = interval;
+        _previous = millis ();      
     }
 };
 

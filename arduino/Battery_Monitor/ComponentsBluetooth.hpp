@@ -144,9 +144,12 @@ public:
             bluetooth ["devices"] = _server->getPeerDevices (true).size ();
             bluetooth ["mtu"] = config.mtu;
         }
-        bluetooth ["maxpacket"] = _maxpacket;
-        _connections.serialize (bluetooth ["connects"].to <JsonObject> ());
-        _disconnections.serialize (bluetooth ["disconnects"].to <JsonObject> ());
+        if (_maxpacket > 0)
+            bluetooth ["maxpacket"] = _maxpacket;
+        if (_connections.number () > 0)
+            _connections.serialize (bluetooth ["connects"].to <JsonObject> ());
+        if (_disconnections.number () > 0)
+            _disconnections.serialize (bluetooth ["disconnects"].to <JsonObject> ());
     }
 
 private:

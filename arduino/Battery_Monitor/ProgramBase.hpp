@@ -60,9 +60,10 @@ typedef uint32_t _AlarmType;
 #define ALARM_PUBLISH_FAIL          _ALARM_NUMB (8)
 #define ALARM_DELIVER_SIZE          _ALARM_NUMB (9)
 #define ALARM_UPDATE_VERS           _ALARM_NUMB (10)
-#define ALARM_SYSTEM_MEMORY_LOW     _ALARM_NUMB (11)
-#define _ALARM_COUNT                 (12)
-static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_FAIL", "TEMP_MIN", "TEMP_WARN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "DELIVER_SIZE", "UPDATE_VERS", "SYSTEM_MEM" };
+#define ALARM_SYSTEM_MEMORYLOW      _ALARM_NUMB (11)
+#define ALARM_SYSTEM_BADRESET       _ALARM_NUMB (12)
+#define _ALARM_COUNT                 (13)
+static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_FAIL", "TEMP_MIN", "TEMP_WARN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "DELIVER_SIZE", "UPDATE_VERS", "SYSTEM_MEMLOW", "SYSTEM_BADRESET" };
 #define _ALARM_NAME(x)               (_ALARM_NAMES [x])
 
 class AlarmSet {
@@ -87,7 +88,7 @@ public:
     String toStringNames () const {
         String s;
         for (int number = 0; number < _ALARM_COUNT; number ++)
-            s += (_alarms & _ALARM_NUMB (number)) ? (String (s.isEmpty () ? "" : ",") + String (_ALARM_NAME (number))) : "";
+            s += (_alarms & _ALARM_NUMB (number)) ? (String (s.isEmpty () ? "" : "|") + String (_ALARM_NAME (number))) : "";
         return s;
     }
 };
@@ -150,7 +151,7 @@ public:
                 if (changes.isSet (number))
                     (alarms.isSet (number) ? _activations [number] : _deactivations [number]) ++;
             _interface.set (alarms.isAny ());
-            DEBUG_PRINTF ("AlarmManager::process: alarms: %s <-- %s\n", alarms.toStringBitmap ().c_str (), _alarms.toStringBitmap ().c_str ());
+            DEBUG_PRINTF ("AlarmManager::process: alarms: %s <-- %s\n", alarms.toStringNames ().c_str (), _alarms.toStringNames ().c_str ());
             _alarms = alarms;
         }
     }
@@ -162,9 +163,13 @@ protected:
         JsonObject alarms = obj ["alarms"].to <JsonObject> ();
         for (int number = 0; number < _alarms.size (); number ++) {
             JsonObject alarm = alarms [_alarms.name (number)].to <JsonObject> ();
-            alarm ["cnt"] = _activations [number].number ();
-            alarm ["now"] = _alarms.isSet (number) ? 1 : 0;
-            alarm ["for"] = _alarms.isSet (number) ? _activations [number].seconds () : _deactivations [number].seconds ();
+            const int _now = _alarms.isSet (number) ? 1 : 0;
+            const counter_t _cnt = _activations [number].number ();
+            if (_now || _cnt > 0) {
+                alarm ["now"] = _now;
+                alarm ["for"] = _now ? _activations [number].seconds () : _deactivations [number].seconds ();
+                if (_cnt > 0) alarm ["cnt"] = _cnt;
+            }
         }
     }
 };

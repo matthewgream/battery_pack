@@ -64,7 +64,9 @@ struct Config {
     // hardware interfaces
     TemperatureInterface::Config temperatureInterface = {
         .hardware = { .PIN_EN = 20, .PIN_SIG = 0, .PIN_ADDR = { 10, 9, 8, 7 } },
-        // .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
+#ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION
+        .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
+#endif
     };
     TemperatureCalibrator::Config temperatureCalibrator = {
         .filename = "/temperaturecalibrations.json",
@@ -72,7 +74,8 @@ struct Config {
     };
     FanInterface::Config fanInterface = {
         .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 2, .PIN_PWMS = { 3, 4, 5, 6 }, .frequency = 5000 }, 
-        .MIN_SPEED = 192, .MAX_SPEED = 255 // duplicated, not ideal
+        .MIN_SPEED = 192, .MAX_SPEED = 255, // duplicated, not ideal
+        .MOTOR_ORDER = { 0, 1, 2, 3 }, .MOTOR_ROTATE = 5*60*1000
     };
     // hardware managers
     TemperatureManagerBatterypack::Config temperatureManagerBatterypack = {

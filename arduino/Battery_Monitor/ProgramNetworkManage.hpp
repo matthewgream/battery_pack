@@ -68,9 +68,12 @@ protected:
             network ["ipaddr"] = WiFi.localIP ();
             network ["rssi"] = WiFi.RSSI ();
         }
-        _connections.serialize (network ["connects"].to <JsonObject> ());
-        _allocations.serialize (network ["allocations"].to <JsonObject> ());
-        _disconnections.serialize (network ["disconnects"].to <JsonObject> ());
+        if (_connections.number () > 0)
+            _connections.serialize (network ["connects"].to <JsonObject> ());
+        if (_allocations.number () > 0)
+            _allocations.serialize (network ["allocations"].to <JsonObject> ());
+        if (_disconnections.number () > 0)            
+            _disconnections.serialize (network ["disconnects"].to <JsonObject> ());
     }
 
 private:
@@ -211,7 +214,8 @@ protected:
         JsonObject nettime = obj ["nettime"].to <JsonObject> ();
         nettime ["now"] = getTimeString ();
         nettime ["drift"] = _drifter.drift ();
-        _fetches.serialize (nettime ["fetches"].to <JsonObject> ());
+        if (_fetches.number () > 0)
+            _fetches.serialize (nettime ["fetches"].to <JsonObject> ());
     }
 };
 

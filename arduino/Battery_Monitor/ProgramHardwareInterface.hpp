@@ -2,7 +2,7 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class TemperatureInterface : public Component, public Diagnosticable {
+class TemperatureInterface: public Component, public Diagnosticable {
 
 public:
     using AdcValueType = uint16_t;
@@ -14,9 +14,11 @@ public:
 
     typedef struct {
         AdcHardware::Config hardware;
-        // struct Thermister {
-        //     float REFERENCE_RESISTANCE, NOMINAL_RESISTANCE, NOMINAL_TEMPERATURE;
-        // } thermister;
+#ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION        
+        struct Thermister {
+            float REFERENCE_RESISTANCE, NOMINAL_RESISTANCE, NOMINAL_TEMPERATURE;
+        } thermister;
+#endif        
     } Config;
 
 private:
@@ -40,8 +42,11 @@ public:
         assert (channel >= 0 && channel < AdcHardware::CHANNELS && "Channel out of range");
         AdcValueType value = _hardware.get (channel);
         const_cast <TemperatureInterface*> (this)->updateStats (channel, value);
+#ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION        
+        return steinharthart_calculator (value, AdcValueMax, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
+#else
         return _calculator (channel, value);
-//        return steinharthart_calculator (value, AdcValueMax, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
+#endif
     }
 
 protected:
@@ -63,7 +68,7 @@ public:
     virtual bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeedType speed) = 0;
 };
 
-class FanInterface : public Component, public Diagnosticable {
+class FanInterface: public Component, public Diagnosticable {
 
 public:
     using FanSpeedType = OpenSmart_QuadMotorDriver::MotorSpeedType;
@@ -73,6 +78,8 @@ public:
     typedef struct  {
         OpenSmart_QuadMotorDriver::Config hardware;
         FanSpeedType MIN_SPEED, MAX_SPEED;
+        std::array <int, OpenSmart_QuadMotorDriver::MotorCount> MOTOR_ORDER;
+        interval_t MOTOR_ROTATE;
     } Config;
 
 private:
@@ -87,7 +94,7 @@ private:
     ActivationTracker _sets;
 
 public:
-    FanInterface (const Config& cfg, FanInterfaceStrategy& strategy) : config (cfg), _strategy (strategy), _hardware (config.hardware) {}
+    FanInterface (const Config& cfg, FanInterfaceStrategy& strategy): config (cfg), _strategy (strategy), _hardware (config.hardware) {}
     ~FanInterface () { end (); }
     void begin () override {
         DEBUG_PRINTF ("FanInterface::begin: strategy=%s\n", _strategy.name ().c_str ());
@@ -119,7 +126,8 @@ protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject fan = obj ["fan"].to <JsonObject> ();
         fan ["speed"] = IntToString (_speed) + "," + IntToString (_stats.min ()) + "," + IntToString (_stats.max ());
-        _sets.serialize (fan);
+        if (_sets.number () > 0)
+            _sets.serialize (fan);
         // % duty
     }
 };
@@ -146,16 +154,19 @@ class FanInterfaceStrategy_motorMap: public FanInterfaceStrategy {
     OpenSmart_QuadMotorDriver* _hardware;
     OpenSmart_QuadMotorDriver::MotorSpeedType _min_speed, _max_speed;
     std::array <OpenSmart_QuadMotorDriver::MotorSpeedType, OpenSmart_QuadMotorDriver::MotorCount> _motorSpeeds;
-
+protected:
+    std::array <int, OpenSmart_QuadMotorDriver::MotorCount> _motorOrder;
 public:
     String name () const override { return "motorMap(" + IntToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
     void begin (const FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
         _hardware = &hardware; _min_speed = interface.getConfig ().MIN_SPEED; _max_speed = interface.getConfig ().MAX_SPEED;
-        for (int motorId = 0; motorId < OpenSmart_QuadMotorDriver::MotorCount; motorId ++) _motorSpeeds [motorId] = static_cast <OpenSmart_QuadMotorDriver::MotorSpeedType> (0);
+        for (int motorId = 0; motorId < OpenSmart_QuadMotorDriver::MotorCount; motorId ++)
+            _motorOrder [motorId] = interface.getConfig ().MOTOR_ORDER [motorId], _motorSpeeds [motorId] = static_cast <OpenSmart_QuadMotorDriver::MotorSpeedType> (0);
     }
-    bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeedType speed) override { // each time they go to zero, randomise order to even out wear
+    bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeedType speed) override {
         int activated = 0;
-        for (int motorId = 0, currentThreshold = 0, totalSpeed = speed * OpenSmart_QuadMotorDriver::MotorCount; motorId < OpenSmart_QuadMotorDriver::MotorCount; motorId ++, currentThreshold += FanInterface::FanSpeedRange) {
+        for (int i = 0, currentThreshold = 0, totalSpeed = speed * OpenSmart_QuadMotorDriver::MotorCount; i < OpenSmart_QuadMotorDriver::MotorCount; i ++, currentThreshold += FanInterface::FanSpeedRange) {
+            const int motorId = _motorOrder [i];
             OpenSmart_QuadMotorDriver::MotorSpeedType motorSpeed = 0;
             if (totalSpeed >= (currentThreshold + FanInterface::FanSpeedRange))
                 motorSpeed = _max_speed;
@@ -166,6 +177,27 @@ public:
             if (motorSpeed > 0) activated ++;
         }
         return activated > 0;
+    }
+};
+
+class FanInterfaceStrategy_motorMapWithRotation: public FanInterfaceStrategy_motorMap {
+    Intervalable _rotationInterval;
+public:
+    String name () const override { return "motorMapWithRotation(" + IntToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
+    void begin (const FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
+        DEBUG_PRINTF ("FanInterfaceStrategy_motorMapWithRotation:: order=[");
+        for (int i = 0; i < interface.getConfig ().MOTOR_ORDER.size (); i ++)
+            DEBUG_PRINTF ("%s%d", i == 0 ? "" : ",", interface.getConfig ().MOTOR_ORDER [i]);
+        DEBUG_PRINTF ("], period=%lu\n", interface.getConfig ().MOTOR_ROTATE);
+        _rotationInterval.reset (interface.getConfig ().MOTOR_ROTATE);
+        FanInterfaceStrategy_motorMap::begin (interface, hardware);
+    }
+    bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeedType speed) override {
+        if (_rotationInterval) {
+            DEBUG_PRINTF ("FanInterfaceStrategy_motorMapWithRotation:: rotating\n");
+            std::rotate (_motorOrder.begin (), _motorOrder.begin () + 1, _motorOrder.end ());
+        }
+        return FanInterfaceStrategy_motorMap::setSpeed (speed);
     }
 };
 
