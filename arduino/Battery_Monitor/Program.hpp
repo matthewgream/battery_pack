@@ -7,6 +7,8 @@
 
 #define DEFAULT_NAME "BatteryMonitor"
 #define DEFAULT_VERS "0.9.9"
+#define DEFAULT_TYPE "batterymonitor-custom-esp32c3"
+#define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
@@ -29,7 +31,7 @@
 #include "ProgramNetworkManage.hpp"
 #include "ProgramDataManage.hpp"
 #include "ProgramTemperatureCalibration.hpp"
-#include "UtilitiesOTA.hpp" // breaks if included earlier
+#include "UtilitiesOTA.hpp" // breaks if included earlier due to SPIFFS headers
 
 static inline constexpr size_t HARDWARE_TEMP_SIZE = TemperatureInterface::CHANNELS;
 static inline constexpr float HARDWARE_TEMP_START = 5.0f, HARDWARE_TEMP_END = 60.0f, HARDWARE_TEMP_STEP = 0.5f;
@@ -37,7 +39,7 @@ using TemperatureManagerBatterypack = TemperatureManagerBatterypackTemplate <HAR
 using TemperatureManagerEnvironment = TemperatureManagerEnvironmentTemplate <1>;
 using TemperatureCalibrator = TemperatureCalibrationManager <HARDWARE_TEMP_SIZE, HARDWARE_TEMP_START, HARDWARE_TEMP_END, HARDWARE_TEMP_STEP>;
 
-static inline constexpr double FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
+static inline constexpr double HARDWARE_FAN_CONTROL_P = 10.0, HARDWARE_FAN_CONTROL_I = 0.1, HARDWARE_FAN_CONTROL_D = 1.0, HARDWARE_FAN_SMOOTH_A = 0.1;
 
 // -----------------------------------------------------------------------------------------------
 
@@ -180,7 +182,7 @@ class Program: public Component, public Diagnosticable {
 
 public:
     Program () :
-        fanControllingAlgorithm (FAN_CONTROL_P, FAN_CONTROL_I, FAN_CONTROL_D), fanSmoothingAlgorithm (FAN_SMOOTH_A),
+        fanControllingAlgorithm (HARDWARE_FAN_CONTROL_P, HARDWARE_FAN_CONTROL_I, HARDWARE_FAN_CONTROL_D), fanSmoothingAlgorithm (HARDWARE_FAN_SMOOTH_A),
         temperatureCalibrator (config.temperatureCalibrator),
         temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) { return temperatureCalibrator.calculateTemperature (channel, resistance); }),
         temperatureManagerBatterypack (config.temperatureManagerBatterypack, temperatureInterface), temperatureManagerEnvironment (config.temperatureManagerEnvironment, temperatureInterface),

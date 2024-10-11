@@ -196,15 +196,15 @@ public:
               sum_YL2 +=  Y * L2;
               sum_YL3 +=  Y * L3;
         }
-        matrix4 <double> matrix = {{
+        gaussian::matrix4 <double> matrix = {{
             { siz,    sum_L1, sum_L2, sum_L3 },
             { sum_L1, sum_L2, sum_L3, sum_L4 },
             { sum_L2, sum_L3, sum_L4, sum_L5 },
             { sum_L3, sum_L4, sum_L5, sum_L6 }
         }};
         // solve matrices
-        vector4 <double> result = { sum_Y, sum_YL1, sum_YL2, sum_YL3 };
-        const String faults = gaussian_solve (matrix, result);
+        gaussian::vector4 <double> result = { sum_Y, sum_YL1, sum_YL2, sum_YL3 };
+        const String faults = gaussian::solve (matrix, result);
         if (!faults.isEmpty ())
             return faults;
         A = result [0];
@@ -225,8 +225,8 @@ public:
         assert (collection.temperatures.size () >= 4);
 
         // build matrices
-        matrix4 <double> XtX = { 0 };
-        vector4 <double> XtY = { 0 };
+        gaussian::matrix4 <double> XtX = { 0 };
+        gaussian::vector4 <double> XtY = { 0 };
         for (size_t index = 0; index < collection.temperatures.size (); index ++) {
             if (!isTemperatureReasonable (collection.temperatures [index]))
                 return String ("invalid temperature at index ") + IntToString (index);
@@ -244,8 +244,8 @@ public:
             }
         }
         // solve matrices
-        vector4 <double> result;
-        const String faults = gaussian_solve (XtX, XtY, result);
+        gaussian::vector4 <double> result;
+        const String faults = gaussian::solve (XtX, XtY, result);
         if (!faults.isEmpty ())
             return faults;
         A = result [0];

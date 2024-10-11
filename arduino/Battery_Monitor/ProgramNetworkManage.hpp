@@ -2,10 +2,7 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class ConnectManager;
-static void __ConnectManager_WiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info);
-
-class ConnectManager : public Component, public Diagnosticable, private Singleton <ConnectManager>  {
+class ConnectManager : private Singleton <ConnectManager>, public Component, public Diagnosticable  {
 
 public:
     typedef struct {
@@ -18,28 +15,10 @@ private:
     bool _available = false;
     ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
     
-    WiFiEventId_t _eventsHandle = 0;
-
-public:
-    ConnectManager (const Config& cfg) : Singleton <ConnectManager> (this), config (cfg) {}
-    ~ConnectManager () { end (); }
-    void begin () override {
-        _eventsHandle = WiFi.onEvent (__ConnectManager_WiFiEventHandler);
-        WiFi.setHostname (config.client.c_str ());
-        WiFi.setAutoReconnect (true);
-        WiFi.mode (WIFI_STA);
-        WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
-        DEBUG_PRINTF ("ConnectManager::begin: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), mac_address ().c_str (), config.client.c_str ());
+    static void __wiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info) {
+        ConnectManager *connectManager = Singleton <ConnectManager>::instance ();
+        if (connectManager != nullptr) connectManager->events (event, info);
     }
-    void end () {
-        if (_eventsHandle) WiFi.removeEvent (_eventsHandle);
-    }
-    inline bool isAvailable () const {
-        return _available;
-    }
-
-protected:
-    friend void __ConnectManager_WiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info);
     void events (const WiFiEvent_t event, const WiFiEventInfo_t info) {
         if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED) {
             _connections ++;
@@ -60,10 +39,24 @@ protected:
         }
     }
 
+public:
+    ConnectManager (const Config& cfg) : Singleton <ConnectManager> (this), config (cfg) {}
+    void begin () override {
+        WiFi.onEvent (__wiFiEventHandler);
+        WiFi.setHostname (config.client.c_str ());
+        WiFi.setAutoReconnect (true);
+        WiFi.mode (WIFI_STA);
+        WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
+        DEBUG_PRINTF ("ConnectManager::begin: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddress ().c_str (), config.client.c_str ());
+    }
+    inline bool isAvailable () const {
+        return _available;
+    }
+
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject network = obj ["network"].to <JsonObject> ();
-        network ["macaddr"] = mac_address ();
+        network ["macaddr"] = getMacAddress ();
         if ((network ["connected"] = WiFi.isConnected ())) {
             network ["ipaddr"] = WiFi.localIP ();
             network ["rssi"] = WiFi.RSSI ();
@@ -131,11 +124,6 @@ private:
         }
     }
 };
-
-static void __ConnectManager_WiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info) {
-    ConnectManager *connectManager = Singleton <ConnectManager>::instance ();
-    if (connectManager != nullptr) connectManager->events (event, info);
-}
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------

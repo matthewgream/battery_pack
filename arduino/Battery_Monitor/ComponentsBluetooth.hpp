@@ -9,35 +9,66 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
+#include <esp_gap_ble_api.h>
+
 // -----------------------------------------------------------------------------------------------
 
-class BluetoothNotifier: public JsonSerializable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks {
+class BluetoothNotifier: private Singleton <BluetoothNotifier>, public JsonSerializable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks {
 
 public:
+    static inline constexpr uint16_t MAX_MTU = 517;
+
     typedef struct {
         String name, serviceUUID, characteristicUUID;
         uint32_t pin;
-        int mtu;
+        uint16_t mtu;
+        interval_t intervalConnectionCheck;
     } Config;
+
+    enum class ConnectionQuality {
+        UNKNOWN,
+        EXCELLENT,
+        GOOD,
+        FAIR,
+        POOR
+    };
+    static inline ConnectionQuality connectionQuality (const int8_t rssi) const {
+        if (rssi > -50) return ConnectionQuality::EXCELLENT;
+        else if (rssi > -60) return ConnectionQuality::GOOD;
+        else if (rssi > -70) return ConnectionQuality::FAIR;
+        else return ConnectionQuality::POOR;
+    }
+
+    using ConnectionQualityCallback = std::function <void (const int8_t rssi, const ConnectionQuality quality)>;
 
 private:
     const Config &config;
+    const ConnectionQualityCallback _connectionQualityCallback;
 
     BLEServer *_server = nullptr;
     BLECharacteristic *_characteristic = nullptr;
-
     bool _advertising = false;
+    
+    esp_bd_addr_t _peerAddress;
+    int _mtuNegotiated = -1, _mtuExceeded = 0;
+    int8_t _rssiLast = 0;
+    ConnectionQuality _qualityLast = ConnectionQuality::UNKNOWN;
+    bool _connected = false;
+    Intervalable _intervalConnectionCheck;
 
     ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
-    bool _connected = false;
-  
-    int _maxpacket = 0;
 
-    void onConnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override {
+    void onConnect (BLEServer * server, esp_ble_gatts_cb_param_t* param) override {
         DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CONNECTED, %s (conn_id=%d, role=%s)\n",
             __ble_address_to_string (param->connect.remote_bda).c_str (), param->connect.conn_id, __ble_linkrole_to_string (param->connect.link_role).c_str ());
-        _connected = true; _connections ++;
         advertise (false);
+        memcpy (_peerAddress, param->connect.remote_bda, sizeof (esp_bd_addr_t));
+        _mtuNegotiated = -1; _rssiLast = 0; _mtuExceeded = 0;
+        _qualityLast = ConnectionQuality::UNKNOWN;
+        esp_ble_gap_read_rssi (_peerAddress);
+        server->updatePeerMTU (param->connect.conn_id, MAX_MTU);
+        _connections ++; _intervalConnectionCheck.reset ();
+        _connected = true;
     }
     void onDisconnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override {
         const String reason = __ble_disconnect_reason ((esp_gatt_conn_reason_t) param->disconnect.reason);
@@ -48,6 +79,7 @@ private:
     }
     void onMtuChanged (BLEServer *, esp_ble_gatts_cb_param_t *param) override {
         DEBUG_PRINTF ("BluetoothNotifier::events: BLE_MTU_CHANGED, (conn_id=%d, mtu=%u)\n", param->mtu.conn_id, param->mtu.mtu);
+        _mtuNegotiated = static_cast <int> (param->mtu.mtu);
     }
 
     void onWrite (BLECharacteristic *) override {
@@ -56,10 +88,25 @@ private:
     void onNotify (BLECharacteristic *characteristic) override {
         DEBUG_PRINTF  ("BluetoothNotifier::events: BLE_CHARACTERISTIC_NOTIFY, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
     }
-    void onStatus(BLECharacteristic* characteristic, Status s, uint32_t code) override {
+    void onStatus (BLECharacteristic* characteristic, Status s, uint32_t code) override {
         DEBUG_PRINTF  ("BluetoothNotifier::events: BLE_CHARACTERISTIC_STATUS, (uuid=%s, status=%s. code=%lu)\n", characteristic->getUUID ().toString ().c_str (), __ble_status_to_string (s).c_str (), code);
     }
+    void onRssiRead (esp_ble_gap_cb_param_t *param) {
+        if (param->read_rssi_cmpl.status == ESP_BT_STATUS_SUCCESS) {
+            DEBUG_PRINTF ("BluetoothNotifier::onRssiRead: rssi=%d (%s)\n", param->read_rssi_cmpl.rssi, __ble_quality_to_string (connectionQuality (param->read_rssi_cmpl.rssi)).c_str ());
+            updateConnectionQuality (_rssiLast = param->read_rssi_cmpl.rssi);
+        }
+    }    
 
+    static void __gapEventHandler (esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* param) {
+        BluetoothNotifier *bluetoothNotifier = Singleton <BluetoothNotifier>::instance ();
+        if (bluetoothNotifier != nullptr) bluetoothNotifier->events (event, param);
+    }
+    void events (esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
+        if (event == ESP_GAP_BLE_READ_RSSI_COMPLETE_EVT)
+            onRssiRead (param);
+    }
+    
     void advertise (const bool enable) {
         if (enable && !_advertising) {
             _server->getAdvertising ()->start ();
@@ -71,13 +118,25 @@ private:
             DEBUG_PRINTF ("BluetoothNotifier::advertising stop\n");
         }
     }
+    void updateConnectionQuality (int8_t rssi) {
+        ConnectionQuality quality = connectionQuality (rssi);
+        if (quality != _qualityLast) {
+            _qualityLast = quality;
+            if (_connectionQualityCallback)
+                _connectionQualityCallback (rssi, quality);
+        }
+    }
 
 public:
-    BluetoothNotifier (const Config& cfg) : config (cfg) {}
+    BluetoothNotifier (const Config& cfg, const ConnectionQualityCallback connectionQualityCallback = nullptr): Singleton <BluetoothNotifier> (this), config (cfg), _connectionQualityCallback (connectionQualityCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
 
-    void advertise ()  {
+    bool advertise ()  {
         BLEDevice::init (config.name);
-        _server = BLEDevice::createServer ();
+        if (!(_server = BLEDevice::createServer ())) {
+            DEBUG_PRINTF ("BluetoothNotifier::advertise unable to create BLE server\n");
+            return false;
+        }
+        esp_ble_gap_register_callback (__gapEventHandler);
         _server->setCallbacks (this);
         BLEService *service = _server->createService (config.serviceUUID);
         _characteristic = service->createCharacteristic (config.characteristicUUID, BLECharacteristic::PROPERTY_READ |  BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY);
@@ -93,31 +152,34 @@ public:
         advertising->setMinPreferred (0x06);
         advertising->setMinPreferred (0x12);
         advertise (true);
+        return true;
     }
     // json only
     void notify (const String& data) {
-        if (!_connected) {
+        if (!_connected || _mtuNegotiated == -1) {
             DEBUG_PRINTF ("BluetoothNotifier::notify: not in notifying state");
             return;
         }
-        if (data.length () < config.mtu) {
+        const uint16_t maxPayloadSize = static_cast <uint16_t> (_mtuNegotiated - 3);
+        if (data.length () <= maxPayloadSize) {
             _characteristic->setValue (data.c_str ());
             _characteristic->notify ();
             DEBUG_PRINTF ("BluetoothNotifier::notify: length=%u\n", data.length ());
         } else {
-            JsonSplitter splitter (config.mtu, { "type", "time" });
+            JsonSplitter splitter (maxPayloadSize, { "type", "time" });
             splitter.splitJson (data, [&] (const String& part, const int elements) {
+                const size_t length = part.length ();
                 _characteristic->setValue (part.c_str ());
                 _characteristic->notify ();
-                DEBUG_PRINTF ("BluetoothNotifier::notify: length=%u, part=%u, elements=%d\n", data.length (), part.length (), elements);
-                if (part.length () > _maxpacket)
-                    _maxpacket = part.length ();
+                DEBUG_PRINTF ("BluetoothNotifier::notify: data=%u, part=%u, elements=%d\n", data.length (), length, elements);
+                if (length > maxPayloadSize && length > _mtuExceeded)
+                    _mtuExceeded = length;
                 delay (20);
             });
         }
     }
-    inline int maxpacket (void) const {
-        return _maxpacket;
+    inline bool mtuexceeded (void) const {
+        return _mtuExceeded > 0;
     }
     inline bool connected (void) const {
         return _connected;
@@ -132,8 +194,15 @@ public:
     }
     void check () {
         if (!_connected && !_advertising) {
-            DEBUG_PRINTF ("BluetoothNotifier::check: not connected, resetting\n");
+            DEBUG_PRINTF ("BluetoothNotifier::check: not connected and not advertising, resetting\n");
             reset ();
+        } else if (_connected && _intervalConnectionCheck) {
+            if (_mtuNegotiated == -1) {
+                DEBUG_PRINTF ("BluetoothNotifier::check: connection timeout, resetting\n");
+                reset ();
+            } else {
+                esp_ble_gap_read_rssi (_peerAddress);
+            }
         }
     }
     //
@@ -142,10 +211,12 @@ public:
         if ((bluetooth ["connected"] = _connected)) {
             bluetooth ["address"] = BLEDevice::getAddress ().toString ();
             bluetooth ["devices"] = _server->getPeerDevices (true).size ();
-            bluetooth ["mtu"] = config.mtu;
+            bluetooth ["mtu"] = _mtuNegotiated;
+            bluetooth ["rssi"] = _rssiLast;
+            bluetooth ["quality"] = __ble_quality_to_string (_qualityLast);
         }
-        if (_maxpacket > 0)
-            bluetooth ["maxpacket"] = _maxpacket;
+        if (_mtuExceeded > 0)
+            bluetooth ["mtuExceeded"] = _mtuExceeded;
         if (_connections.number () > 0)
             _connections.serialize (bluetooth ["connects"].to <JsonObject> ());
         if (_disconnections.number () > 0)
@@ -167,7 +238,7 @@ private:
           default: return "UNDEFINED";
         }
     }
-    static String __ble_address_to_string (const uint8_t bleaddr []) {
+    static String __ble_address_to_string (const esp_bd_addr_t bleaddr) {
         #define __BLE_MACBYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
         #define __BLE_FORMAT_ADDRESS(addr) __BLE_MACBYTETOSTRING ((addr) [0]) + ":" + __BLE_MACBYTETOSTRING ((addr) [1]) + ":" + __BLE_MACBYTETOSTRING ((addr) [2]) + ":" + __BLE_MACBYTETOSTRING ((addr) [3]) + ":" + __BLE_MACBYTETOSTRING ((addr) [4]) + ":" + __BLE_MACBYTETOSTRING ((addr) [5])
         return __BLE_FORMAT_ADDRESS (bleaddr);
@@ -184,6 +255,16 @@ private:
           case BLECharacteristicCallbacks::Status::ERROR_INDICATE_TIMEOUT: return "INDICATE_TIMEOUT";
           case BLECharacteristicCallbacks::Status::ERROR_INDICATE_FAILURE: return "INDICATE_FAILURE";
           case BLECharacteristicCallbacks::Status::SUCCESS_INDICATE: return "INDICATE_SUCCESS";
+          default: return "UNDEFINED";
+        }
+    }
+    static String __ble_quality_to_string (const ConnectionQuality quality) {
+        switch (quality) {
+          case ConnectionQuality::UNKNOWN: return "UNKNOWN";
+          case ConnectionQuality::POOR: return "POOR";
+          case ConnectionQuality::FAIR: return "FAIR";
+          case ConnectionQuality::GOOD: return "GOOD";
+          case ConnectionQuality::EXCELLENT: return "EXCELLENT";
           default: return "UNDEFINED";
         }
     }

@@ -179,7 +179,7 @@ protected:
 
 #include <functional>
 
-extern String ota_image_check (const String& json, const String& type, const String& vers);
+extern String ota_image_check (const String& json, const String& type, const String& vers, const String& addr);
 
 class UpdateManager: public Component, public Alarmable, public Diagnosticable {
 
@@ -215,7 +215,7 @@ public:
             if (_networkIsAvailable ()) {
                 time_t previous = (time_t) static_cast <uint32_t> (_persistent_data_previous), current = time (NULL);
                 if ((current > 0 && (current - previous) > (config.intervalCheck / 1000)) || (previous > current)) {
-                    _persistent_data_version = ota_image_check (config.json, config.type, config.vers);
+                    _persistent_data_version = ota_image_check (config.json, config.type, config.vers, getMacAddress ());
                     _persistent_data_previous = current;
                     _available = true;
                 }

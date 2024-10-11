@@ -60,16 +60,16 @@ static void __ota_image_update_execute (esp32FOTA& ota, const char* newr, const 
 
 // -----------------------------------------------------------------------------------------------
 
-void ota_image_update (const String& json, const String& type, const String& vers, const std::function <void ()> &func = nullptr) {
+void ota_image_update (const String& json, const String& type, const String& vers, const String& addr, const std::function <void ()> &func = nullptr) {
     esp32FOTA ota (type.c_str (), vers.c_str ());
     char newr [32] = { '\0' };
-    if (__ota_image_update_check (ota, json.c_str (), type.c_str (), vers.c_str (), mac_address ().c_str (), newr))
+    if (__ota_image_update_check (ota, json.c_str (), type.c_str (), vers.c_str (), addr.c_str (), newr))
         __ota_image_update_execute (ota, newr, func);
 }
-String ota_image_check (const String& json, const String& type, const String& vers) {
+String ota_image_check (const String& json, const String& type, const String& vers, const String& addr) {
     esp32FOTA ota (type.c_str (), vers.c_str ());
     char newr [32] = { '\0' };
-    __ota_image_update_check (ota, json.c_str (), type.c_str (), vers.c_str (), mac_address ().c_str (), newr);
+    __ota_image_update_check (ota, json.c_str (), type.c_str (), vers.c_str (), addr.c_str (), newr);
     return newr;
 }
 

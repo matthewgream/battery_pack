@@ -18,7 +18,7 @@ private:
 
 public:
     DeliverManager (const Config& cfg): Alarmable ({
-            AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.maxpacket () > config.blue.mtu; })
+            AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.mtuexceeded (); })
         }), config (cfg), _blue (cfg.blue) {}
     void begin () override {
         _blue.advertise ();
