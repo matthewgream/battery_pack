@@ -15,7 +15,7 @@ class DataProcessor (
         when (val type = json.getString ("type")) {
             "data" -> {
                 dataProcessorStatus.render (json)
-                notificationsManager.process (json.getString ("alm"))
+                notificationsManager.process (DataManagerAlarm.translateAlarms (json.getString ("alm")))
             }
             "diag" -> dataProcessorDiagnostic.render (json)
             else -> Log.w("DataProcessor", "JSON type unknown: $type")

@@ -93,7 +93,7 @@ class MainActivity : PermissionsAwareActivity () {
         }
     }
 
-    fun processDataConnection (available: Boolean, permitted: Boolean, connected: Boolean) {
+    private fun processDataConnection (available: Boolean, permitted: Boolean, connected: Boolean) {
         val text = when {
             !available -> "Bluetooth not available"
             !permitted -> "Bluetooth not permitted"

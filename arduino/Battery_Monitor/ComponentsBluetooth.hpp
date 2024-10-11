@@ -32,7 +32,7 @@ public:
         FAIR,
         POOR
     };
-    static inline ConnectionQuality connectionQuality (const int8_t rssi) const {
+    static inline ConnectionQuality connectionQuality (const int8_t rssi) {
         if (rssi > -50) return ConnectionQuality::EXCELLENT;
         else if (rssi > -60) return ConnectionQuality::GOOD;
         else if (rssi > -70) return ConnectionQuality::FAIR;

@@ -4,16 +4,14 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.widget.TextView
 import org.json.JSONObject
+import kotlin.math.floor
 
 class DataProcessorStatus (private val activity: Activity) {
 
     private val timeTextView: TextView = activity.findViewById (R.id.timeTextView)
     private val envTempTextView: TextView = activity.findViewById (R.id.envTempTextView)
-    private val batteryLabelTextView: TextView = activity.findViewById (R.id.batteryLabelTextView)
-    private val batteryTempMinTextView: TextView = activity.findViewById (R.id.batteryTempMinTextView)
-    private val batteryTempAvgTextView: TextView = activity.findViewById (R.id.batteryTempAvgTextView)
-    private val batteryTempMaxTextView: TextView = activity.findViewById (R.id.batteryTempMaxTextView)
-    private val batteryTempValuesView: DataViewBatteryTemperature = activity.findViewById (R.id.batteryTempValuesView)
+    private val batTempTextView: TextView = activity.findViewById (R.id.batTempTextView)
+    private val batTempValuesView: DataViewBatteryTemperature = activity.findViewById (R.id.batTempValuesView)
     private val fanSpeedTextView: TextView = activity.findViewById (R.id.fanSpeedTextView)
     private val alarmsTextView: TextView = activity.findViewById (R.id.alarmsTextView)
 
@@ -21,23 +19,21 @@ class DataProcessorStatus (private val activity: Activity) {
     fun render (json: JSONObject) {
         activity.runOnUiThread {
             timeTextView.text = json.getString ("time")
+
             val env = json.getJSONObject ("tmp").getDouble ("env")
-            envTempTextView.text = "$env°C"
-
-            batteryLabelTextView.text = "Battery:"
+            envTempTextView.text = "%.1f°C (ext)".format (env)
             val bat = json.getJSONObject ("tmp").getJSONObject ("bat")
-            batteryTempAvgTextView.text = "Avg: ${bat.getDouble ("avg")}°C"
-            batteryTempMinTextView.text = "Min: ${bat.getDouble ("min")}°C"
-            batteryTempMaxTextView.text = "Max: ${bat.getDouble ("max")}°C"
+            batTempTextView.text = "%.1f°C (avg), %.1f°C (min), %.1f°C (max)".format (bat.getDouble("avg"), bat.getDouble("min"), bat.getDouble("max")
+)
             val vat = bat.getJSONArray ("val")
-            batteryTempValuesView.setTemperatureValues ((0 until vat.length()).map { vat.getDouble (it).toFloat () })
+            batTempValuesView.setTemperatureValues ((0 until vat.length()).map { vat.getDouble (it).toFloat () })
 
-            val fan = json.getInt ("fan")
-            fanSpeedTextView.text = "Fan: $fan %"
+            val fan = floor (100 * json.getInt("fan").toDouble() / 255).toInt ()
+            fanSpeedTextView.text = "$fan % (fan multiMap)"
 
-            val alm = json.getString ("alm")
-            alarmsTextView.text = "Alarms: $alm"
-            alarmsTextView.setTextColor (activity.getColor (if (alm.isNotEmpty ()) R.color.alarm_active_color else R.color.alarm_inactive_color))
+            val alarmPairs = DataManagerAlarm.translateAlarms (json.getString ("alm"))
+            alarmsTextView.text = if (alarmPairs.isNotEmpty ()) { alarmPairs.joinToString (", ") { it.first } } else { "No alarms" }
+            alarmsTextView.setTextColor (activity.getColor (if (alarmPairs.isNotEmpty ()) R.color.alarm_active_color else R.color.alarm_inactive_color))
         }
     }
 }

@@ -8,7 +8,6 @@ import android.view.MotionEvent
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.view.GestureDetectorCompat
 import org.json.JSONObject
 
 @SuppressLint("ClickableViewAccessibility")
@@ -16,7 +15,7 @@ class DataProcessorDiagnostic (private val activity: Activity) {
 
     private val scrollView: ScrollView = activity.findViewById (R.id.diagnosticScrollView)
     private val textView: TextView = activity.findViewById (R.id.diagDataTextView)
-    private val gestureDetector: GestureDetectorCompat = GestureDetectorCompat (activity, object : GestureDetector.SimpleOnGestureListener () {
+    private val gestureDetector: GestureDetector = GestureDetector (activity, object : GestureDetector.SimpleOnGestureListener () {
         override fun onDoubleTap (e: MotionEvent): Boolean {
             clear ()
             return true

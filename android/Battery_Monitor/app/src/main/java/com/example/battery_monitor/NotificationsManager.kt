@@ -2,10 +2,10 @@ package com.example.battery_monitor
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import androidx.core.app.NotificationCompat
 
 @SuppressLint("MissingPermission", "InlinedApi")
 class NotificationsManager (private val activity: Activity) {
@@ -23,7 +23,7 @@ class NotificationsManager (private val activity: Activity) {
     private val manager: NotificationManager = activity.getSystemService (Context.NOTIFICATION_SERVICE) as NotificationManager
     private val identifier = 1
     private var active: Int? = null
-    private var previous: String = ""
+    private var previous:  List <Pair <String, String>> = emptyList()
 
     init {
         val channel = NotificationChannel (channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT).apply {
@@ -34,15 +34,25 @@ class NotificationsManager (private val activity: Activity) {
 
     //
 
-    private fun show (current: String) {
+    private fun show (current: List<Pair<String, String>>) {
         if (current != previous) {
-            val builder = NotificationCompat.Builder (activity, channelId)
-                .setSmallIcon (R.drawable.ic_temp_fan)
-                .setContentTitle (channelTitle)
-                .setContentText (current)
-                .setPriority (NotificationCompat.PRIORITY_DEFAULT)
-                .setOngoing (true)
-            manager.notify (identifier, builder.build ())
+            val title = if (current.isNotEmpty()) {
+                current.joinToString(", ") { it.first }
+            } else {
+                channelTitle
+            }
+            val content = if (current.isNotEmpty()) {
+                current.joinToString("\n") { "${it.first}: ${it.second}" }
+            } else {
+                "No active alarms"
+            }
+            val builder = Notification.Builder(activity, channelId)
+                .setSmallIcon(R.drawable.ic_temp_fan)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setStyle(Notification.BigTextStyle().bigText(content))
+                .setOngoing(true)
+            manager.notify(identifier, builder.build())
             active = identifier
             previous = current
         }
@@ -50,7 +60,7 @@ class NotificationsManager (private val activity: Activity) {
     private fun reshow () {
         if (previous.isNotEmpty ()) {
             val current = previous
-            previous = ""
+            previous =  emptyList()
             show (current)
         }
     }
@@ -59,12 +69,12 @@ class NotificationsManager (private val activity: Activity) {
             manager.cancel (it)
             active = null
         }
-        previous = ""
+        previous = emptyList()
     }
 
     //
 
-    fun process (current: String) {
+    fun process (current: List<Pair<String, String>>) {
         if (current.isNotEmpty ()) {
             when {
                 !permissions.requested -> {

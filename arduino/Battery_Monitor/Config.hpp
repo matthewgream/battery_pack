@@ -119,7 +119,7 @@ struct Config {
     AlarmManager::Config alarmManager = { };
     DiagnosticManager::Config diagnosticManager = { }; 
     UpdateManager::Config updateManager = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS };
-    interval_t intervalProcess = 5*1000, intervalDeliver = 15*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;
+    interval_t intervalProcess = 5*1000, intervalDeliver = 5*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;
 };
 
 // -----------------------------------------------------------------------------------------------

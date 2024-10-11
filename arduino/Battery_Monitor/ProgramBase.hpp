@@ -88,7 +88,7 @@ public:
     String toStringNames () const {
         String s;
         for (int number = 0; number < _ALARM_COUNT; number ++)
-            s += (_alarms & _ALARM_NUMB (number)) ? (String (s.isEmpty () ? "" : "|") + String (_ALARM_NAME (number))) : "";
+            s += (_alarms & _ALARM_NUMB (number)) ? (String (s.isEmpty () ? "" : ",") + String (_ALARM_NAME (number))) : "";
         return s;
     }
 };
