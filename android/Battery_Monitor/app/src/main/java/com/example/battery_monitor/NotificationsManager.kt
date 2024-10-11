@@ -19,6 +19,7 @@ class NotificationsManager (private val activity: Activity) {
     private val channelName = activity.getString (R.string.notification_channel_name)
     private val channelDescription = activity.getString (R.string.notification_channel_description)
     private val channelTitle = activity.getString (R.string.notification_channel_title)
+    private val channelContent = activity.getString (R.string.notification_channel_content)
 
     private val manager: NotificationManager = activity.getSystemService (Context.NOTIFICATION_SERVICE) as NotificationManager
     private val identifier = 1
@@ -36,23 +37,15 @@ class NotificationsManager (private val activity: Activity) {
 
     private fun show (current: List<Pair<String, String>>) {
         if (current != previous) {
-            val title = if (current.isNotEmpty()) {
-                current.joinToString(", ") { it.first }
-            } else {
-                channelTitle
-            }
-            val content = if (current.isNotEmpty()) {
-                current.joinToString("\n") { "${it.first}: ${it.second}" }
-            } else {
-                "No active alarms"
-            }
-            val builder = Notification.Builder(activity, channelId)
-                .setSmallIcon(R.drawable.ic_temp_fan)
-                .setContentTitle(title)
-                .setContentText(content)
-                .setStyle(Notification.BigTextStyle().bigText(content))
-                .setOngoing(true)
-            manager.notify(identifier, builder.build())
+            val title = if (current.isNotEmpty ()) current.joinToString (", ") { it.first } else channelTitle
+            val content = if (current.isNotEmpty ()) current.joinToString ("\n") { "${it.first}: ${it.second}" } else channelContent
+            val builder = Notification.Builder (activity, channelId)
+                .setSmallIcon (R.drawable.ic_temp_fan)
+                .setContentTitle (title)
+                .setContentText (content)
+                .setStyle (Notification.BigTextStyle ().bigText (content))
+                .setOngoing (true)
+            manager.notify (identifier, builder.build ())
             active = identifier
             previous = current
         }
@@ -60,7 +53,7 @@ class NotificationsManager (private val activity: Activity) {
     private fun reshow () {
         if (previous.isNotEmpty ()) {
             val current = previous
-            previous =  emptyList()
+            previous =  emptyList ()
             show (current)
         }
     }
@@ -69,7 +62,7 @@ class NotificationsManager (private val activity: Activity) {
             manager.cancel (it)
             active = null
         }
-        previous = emptyList()
+        previous = emptyList ()
     }
 
     //

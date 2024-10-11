@@ -10,7 +10,6 @@ import org.json.JSONObject
 
 import android.view.GestureDetector
 import android.view.MotionEvent
-import androidx.core.view.GestureDetectorCompat
 
 class MainActivity : PermissionsAwareActivity () {
 
@@ -28,7 +27,7 @@ class MainActivity : PermissionsAwareActivity () {
     override fun onCreate (savedInstanceState: Bundle?) {
         super.onCreate (savedInstanceState)
         setContentView (R.layout.activity_main)
-        notificationsManager = NotificationsManager(this)
+        notificationsManager = NotificationsManager (this)
         dataProcessor = DataProcessor (this, notificationsManager)
         bluetoothManager = BluetoothManager (this,
             dataCallback = { data -> dataProcessor.processDataReceived (JSONObject (data)) },
@@ -68,12 +67,12 @@ class MainActivity : PermissionsAwareActivity () {
                 PowerManager.THERMAL_STATUS_CRITICAL ->
                     if (!powerSaveState) {
                         powerSaveState = true
-                        onPowerSave(true)
+                        onPowerSave (true)
                     }
                 else ->
-                    if (powerSaveState ) {
+                    if (powerSaveState) {
                         powerSaveState = false
-                        onPowerSave(false)
+                        onPowerSave (false)
                 }
             }
         }
@@ -81,7 +80,7 @@ class MainActivity : PermissionsAwareActivity () {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupConnectionStatusDoubleTap () {
-        val detector = GestureDetectorCompat (this, object : GestureDetector.SimpleOnGestureListener () {
+        val detector = GestureDetector (this, object : GestureDetector.SimpleOnGestureListener () {
             override fun onDoubleTap (e: MotionEvent): Boolean {
                 bluetoothManager.onDoubleTap ()
                 return true
