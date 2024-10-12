@@ -129,7 +129,7 @@ public:
         for (int cur = 1, nxt = 0; (nxt = JsonFunctions::findNextElement (json, cur, element)) > 0; cur = nxt) {
             if (std::any_of (commonElements.begin (), commonElements.end (), [&element] (const String& commonElement) { return element.startsWith ("\"" + commonElement + "\":"); }))
                 continue;
-            if ((1 + common.length ()) + current.length () + (element.length () + 1) < splitLength) {  // +1 for the comma or brace
+            if ((1 + common.length ()) + current.length () + (element.length () + 1) < splitLength) { // +1 for the comma or brace
                 if (!current.isEmpty ()) current += ",";
                 current += element;
                 numbers ++;

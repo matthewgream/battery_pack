@@ -75,7 +75,7 @@ public:
     static inline constexpr FanSpeedType FanSpeedMin = 0, FanSpeedMax = (1 << OpenSmart_QuadMotorDriver::MotorSpeedResolution) - 1;
     static inline constexpr size_t FanSpeedRange = (1 << OpenSmart_QuadMotorDriver::MotorSpeedResolution);
 
-    typedef struct  {
+    typedef struct {
         OpenSmart_QuadMotorDriver::Config hardware;
         FanSpeedType MIN_SPEED, MAX_SPEED;
         std::array <int, OpenSmart_QuadMotorDriver::MotorCount> MOTOR_ORDER;

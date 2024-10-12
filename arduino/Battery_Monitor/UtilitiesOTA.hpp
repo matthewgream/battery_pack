@@ -13,7 +13,7 @@ String __encodeUrlWithParameters (const String& result, K&& key, V&& value, R&&.
 }
 template <typename... A>
 String encodeUrlWithParameters (const String& url, A&&... args) {
-    return url +  __encodeUrlWithParameters ("", std::forward <A> (args)...);
+    return url + __encodeUrlWithParameters ("", std::forward <A> (args)...);
 }
 
 // -----------------------------------------------------------------------------------------------

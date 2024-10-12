@@ -136,7 +136,7 @@ public:
             DEBUG_PRINTF ("FanManager::process: setpoint=%.2f, current=%.2f\n", setpoint, current);
         } else {
             const double speedCalculated = _controllerAlgorithm.apply (setpoint, current);
-            const double speedConstrained = std::clamp (map  <double> (speedCalculated, -100.0, 100.0, static_cast <double> (config.MIN_SPEED), static_cast <double> (config.MAX_SPEED)), static_cast <double> (config.MIN_SPEED), static_cast <double> (config.MAX_SPEED));
+            const double speedConstrained = std::clamp (map <double> (speedCalculated, -100.0, 100.0, static_cast <double> (config.MIN_SPEED), static_cast <double> (config.MAX_SPEED)), static_cast <double> (config.MIN_SPEED), static_cast <double> (config.MAX_SPEED));
             const double speedSmoothed = _smootherAlgorithm.apply (speedConstrained);
             _fan.setSpeed (static_cast <FanInterface::FanSpeedType> (speedSmoothed));
             DEBUG_PRINTF ("FanManager::process: setpoint=%.2f, current=%.2f --> calculated=%.2e, constrained=%.2e, smoothed=%.2e\n", setpoint, current, speedCalculated, speedConstrained, speedSmoothed);

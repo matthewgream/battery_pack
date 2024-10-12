@@ -18,9 +18,9 @@ public:
     explicit PersistentData (const char *space): _okay (_initialise () && nvs_open_from_partition (DEFAULT_PERSISTENT_PARTITION, space, NVS_READWRITE, &_handle) == ESP_OK) {}
     ~PersistentData () { if (_okay) nvs_close (_handle); }
     inline bool get (const char *name, uint32_t *value) const { return (_okay && nvs_get_u32 (_handle, name, value) == ESP_OK); }
-    inline bool set (const char *name, uint32_t value) { return  (_okay && nvs_set_u32 (_handle, name, value) == ESP_OK); }
+    inline bool set (const char *name, uint32_t value) { return (_okay && nvs_set_u32 (_handle, name, value) == ESP_OK); }
     inline bool get (const char *name, int32_t *value) const { return (_okay && nvs_get_i32 (_handle, name, value) == ESP_OK); }
-    inline bool set (const char *name, int32_t value) { return  (_okay && nvs_set_i32 (_handle, name, value) == ESP_OK); }
+    inline bool set (const char *name, int32_t value) { return (_okay && nvs_set_i32 (_handle, name, value) == ESP_OK); }
     inline bool get (const char *name, String *value) const {
         size_t size;
         if (_okay && nvs_get_str (_handle, name, NULL, &size) == ESP_OK) {

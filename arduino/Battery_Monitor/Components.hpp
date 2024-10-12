@@ -163,7 +163,7 @@ private:
 #include <SPIFFS.h>
 
 // should be two classes
-class SPIFFSFile: public JsonSerializable  {
+class SPIFFSFile: public JsonSerializable {
 
 public:
     class LineCallback {

@@ -125,14 +125,14 @@ private:
     }
 
     void onWrite (BLECharacteristic *) override {
-        DEBUG_PRINTF  ("BluetoothNotifier::events: BLE_CHARACTERISTIC_WRITE\n");
+        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_WRITE\n");
     }
     void onNotify (BLECharacteristic *characteristic) override {
-        DEBUG_PRINTF  ("BluetoothNotifier::events: BLE_CHARACTERISTIC_NOTIFY, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
+        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_NOTIFY, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
     }
     void onStatus (BLECharacteristic* characteristic, Status s, uint32_t code) override {
         if (s != BLECharacteristicCallbacks::Status::SUCCESS_NOTIFY && s != BLECharacteristicCallbacks::Status::SUCCESS_INDICATE)
-            DEBUG_PRINTF  ("BluetoothNotifier::events: BLE_CHARACTERISTIC_STATUS, (uuid=%s, status=%s. code=%lu)\n", characteristic->getUUID ().toString ().c_str (), __ble_status_to_string (s).c_str (), code);
+            DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_STATUS, (uuid=%s, status=%s. code=%lu)\n", characteristic->getUUID ().toString ().c_str (), __ble_status_to_string (s).c_str (), code);
     }
     void onRssiRead (esp_ble_gap_cb_param_t *param) {
         if (param->read_rssi_cmpl.status == ESP_BT_STATUS_SUCCESS) {
@@ -165,7 +165,7 @@ private:
 public:
     explicit BluetoothNotifier (const Config& cfg, const ConnectionQualityTracker::Callback connectionQualityCallback = nullptr): Singleton <BluetoothNotifier> (this), config (cfg), _connectionQualityTracker (connectionQualityCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
 
-    bool advertise ()  {
+    bool advertise () {
         BLEDevice::init (config.name);
         if (!(_server = BLEDevice::createServer ())) {
             DEBUG_PRINTF ("BluetoothNotifier::advertise unable to create BLE server\n");
@@ -174,7 +174,7 @@ public:
         esp_ble_gap_register_callback (__gapEventHandler);
         _server->setCallbacks (this);
         BLEService *service = _server->createService (config.serviceUUID);
-        _characteristic = service->createCharacteristic (config.characteristicUUID, BLECharacteristic::PROPERTY_READ |  BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY);
+        _characteristic = service->createCharacteristic (config.characteristicUUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY);
         _characteristic->setCallbacks (this);
         _characteristic->addDescriptor (new BLE2902 ());
         _characteristic->setAccessPermissions (ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);

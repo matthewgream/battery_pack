@@ -233,7 +233,7 @@ class ActivationTracker {
 
 public:
     inline interval_t seconds () const { return _millis / 1000; }
-    inline counter_t  number () const { return _number; }
+    inline counter_t number () const { return _number; }
     ActivationTracker& operator ++ (int) {
         _millis = millis ();
         _number ++;

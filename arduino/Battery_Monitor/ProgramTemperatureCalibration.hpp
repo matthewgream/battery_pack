@@ -257,7 +257,7 @@ public:
         for (size_t index = 0; index < collection.temperatures.size (); index ++) {
             for (size_t sensor = 0; sensor < collection.resistances.size (); sensor ++) {
                 float temperature;
-                if (!calculate (temperature, collection.resistances [sensor] [index]) || std::abs (temperature - collection.temperatures [index]) > 10.0f)  // Allow 10 degrees of error
+                if (!calculate (temperature, collection.resistances [sensor] [index]) || std::abs (temperature - collection.temperatures [index]) > 10.0f) // Allow 10 degrees of error
                     return String ("unreliable result, error = ") + FloatToString (std::abs (temperature - collection.temperatures [index]));
             }
         }

@@ -16,7 +16,7 @@
 static inline constexpr const char __build_name [] = DEFAULT_NAME;
 static inline constexpr const char __build_vers [] = DEFAULT_VERS;
 static inline constexpr const char __build_time [] = {
-    BUILD_Y/1000 + '0', (BUILD_Y%1000)/100 + '0', (BUILD_Y%100)/10 + '0', BUILD_Y%10 + '0',  BUILD_M/10 + '0', BUILD_M%10 + '0',  BUILD_D/10 + '0', BUILD_D%10 + '0',
+    BUILD_Y/1000 + '0', (BUILD_Y%1000)/100 + '0', (BUILD_Y%100)/10 + '0', BUILD_Y%10 + '0', BUILD_M/10 + '0', BUILD_M%10 + '0', BUILD_D/10 + '0', BUILD_D%10 + '0',
     BUILD_T [0], BUILD_T [1], BUILD_T [3], BUILD_T [4], BUILD_T [6], BUILD_T [7],
     '\0'
 };

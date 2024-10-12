@@ -2,7 +2,7 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class ConnectManager : private Singleton <ConnectManager>, public Component, public Diagnosticable  {
+class ConnectManager: private Singleton <ConnectManager>, public Component, public Diagnosticable {
 
 public:
     typedef struct {

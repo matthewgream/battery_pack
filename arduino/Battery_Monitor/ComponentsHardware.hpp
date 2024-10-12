@@ -79,7 +79,7 @@ public:
 private:
     static String __ds1820_address_to_string (const DeviceAddress& addr) {
         #define __DS18_BYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
-        #define __DS18_FORMAT_ADDRESS(addr) __DS18_BYTETOSTRING ((addr) [0]) + __DS18_BYTETOSTRING ((addr) [1]) +  __DS18_BYTETOSTRING ((addr) [2]) +  __DS18_BYTETOSTRING ((addr) [3]) +  __DS18_BYTETOSTRING ((addr) [4]) +  __DS18_BYTETOSTRING ((addr) [5]) +  __DS18_BYTETOSTRING ((addr) [6]) +  __DS18_BYTETOSTRING ((addr) [7])
+        #define __DS18_FORMAT_ADDRESS(addr) __DS18_BYTETOSTRING ((addr) [0]) + __DS18_BYTETOSTRING ((addr) [1]) + __DS18_BYTETOSTRING ((addr) [2]) + __DS18_BYTETOSTRING ((addr) [3]) + __DS18_BYTETOSTRING ((addr) [4]) + __DS18_BYTETOSTRING ((addr) [5]) + __DS18_BYTETOSTRING ((addr) [6]) + __DS18_BYTETOSTRING ((addr) [7])
         return __DS18_FORMAT_ADDRESS (addr);
     }
 };
@@ -229,10 +229,10 @@ private:
     static String __osqmd_motorid_to_string (const int motorId) {
         switch (motorId) {
             case -1: return "ABCD";
-            case 0:  return "A";
-            case 1:  return "B";
-            case 2:  return "C";
-            case 3:  return "D";
+            case 0: return "A";
+            case 1: return "B";
+            case 2: return "C";
+            case 3: return "D";
             default: return "UNDEFINED";
         }
     }
