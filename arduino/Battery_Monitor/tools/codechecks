@@ -19,4 +19,8 @@ files=$(find . -type f \( -name "*.hpp" -o -name "*.ino" \))
 for file in $files; do
     process_file "$file"
 done
+
 jscpd $files
+
+cppcheck --enable=all --suppress=postfixOperator --suppress=syntaxError:Utilities.hpp --suppress=unusedStructMember:ProgramTemperatureCalibration.hpp --suppress=useStlAlgorithm:ProgramBase.hpp --suppress=missingIncludeSystem --std=c++21 *.hpp Battery_Monitor.ino
+
