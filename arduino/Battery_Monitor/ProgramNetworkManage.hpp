@@ -17,7 +17,7 @@ private:
     bool _connected = false, _available = false;
     Intervalable _intervalConnectionCheck;
     ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
-    
+
     static void __wiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info) {
         ConnectManager *connectManager = Singleton <ConnectManager>::instance ();
         if (connectManager != nullptr) connectManager->events (event, info);
@@ -39,7 +39,7 @@ private:
             _available = false; _connected = false; _disconnections += reason;
             DEBUG_PRINTF ("ConnectManager::events: WIFI_DISCONNECTED, ssid=%s, bssid=%s, reason=%s\n",
                 __wifi_ssid_to_string (info.wifi_sta_disconnected.ssid, info.wifi_sta_disconnected.ssid_len).c_str (),
-                __wifi_bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (), 
+                __wifi_bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (),
                 reason.c_str ());
         }
     }
@@ -88,7 +88,7 @@ protected:
             _connections.serialize (network ["connects"].to <JsonObject> ());
         if (_allocations.number () > 0)
             _allocations.serialize (network ["allocations"].to <JsonObject> ());
-        if (_disconnections.number () > 0)            
+        if (_disconnections.number () > 0)
             _disconnections.serialize (network ["disconnects"].to <JsonObject> ());
     }
 
@@ -172,7 +172,7 @@ private:
     PersistentData _persistentData;
     PersistentValue <long> _persistentDrift;
     TimeDriftCalculator _drifter;
-    
+
     counter_t _failures = 0;
     interval_t _previousTimeUpdate = 0, _previousTimeAdjust = 0;
     time_t _previousTime = 0;
@@ -182,7 +182,7 @@ public:
     NettimeManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
             AlarmCondition (ALARM_TIME_SYNC, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_TIME_DRIFT, [this] () { return _drifter.isHighDrift (); })
-        }), config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _fetcher (cfg.useragent, cfg.server), 
+        }), config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _fetcher (cfg.useragent, cfg.server),
             _persistentData ("nettime"), _persistentDrift (_persistentData, "drift", 0), _drifter (_persistentDrift), _persistentTime (_persistentData, "time", 0) {
         if (_persistentTime > 0UL) {
             struct timeval tv = { .tv_sec = _persistentTime, .tv_usec = 0 };

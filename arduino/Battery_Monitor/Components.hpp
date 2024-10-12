@@ -6,7 +6,7 @@
 #include <ctime>
 
 class NetworkTimeFetcher {
-  
+
     const String _useragent, _server;
 
 public:
@@ -190,7 +190,7 @@ private:
             DEBUG_PRINTF ("SPIFFSFile[%s]::begin: failed on SPIFFS.begin (), file activity not available\n", _filename.c_str ());
             _mode = MODE_ERROR;
             return false;
-        }        
+        }
         _totalBytes = SPIFFS.totalBytes ();
         _usedBytes = SPIFFS.usedBytes ();
         DEBUG_PRINTF ("SPIFFSFile[%s]::begin: available=%.2f%% (totalBytes=%lu, usedBytes=%lu)\n", _filename.c_str (), (float) ((_totalBytes - _usedBytes) * 100.0) / (float) _totalBytes, _totalBytes, _usedBytes);

@@ -199,7 +199,7 @@ private:
     PersistentData _persistent_data;
     PersistentValue <uint32_t> _persistent_data_previous;
     PersistentValue <String> _persistent_data_version;
-    
+
     Intervalable _interval;
 
     bool _available = false;
@@ -231,7 +231,7 @@ protected:
         const time_t time = (time_t) static_cast <uint32_t> (_persistent_data_previous);
         if (time > 0)
             updates ["checked"] = getTimeString (time);
-    }        
+    }
 };
 
 // -----------------------------------------------------------------------------------------------

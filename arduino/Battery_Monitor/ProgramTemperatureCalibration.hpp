@@ -66,10 +66,10 @@ public:
             for (int count = 0; count < AVG_SAMPLE; count ++)
               for (size_t sensor = 0; sensor < resistances.size (); sensor ++)
                   resistances [sensor] += static_cast <uint32_t> (readResistance (sensor));
-            for (size_t sensor = 0; sensor < resistances.size (); sensor ++)                  
+            for (size_t sensor = 0; sensor < resistances.size (); sensor ++)
                 collection.resistances [sensor] [step] = static_cast <uint16_t> (resistances [sensor] / static_cast <uint32_t> (AVG_SAMPLE));
             DEBUG_PRINTF ("done\n");
-            
+
             //
             DEBUG_PRINTF ("= %d,%.2f", step, collection.temperatures [step]);
             for (size_t sensor = 0; sensor < collection.resistances.size (); sensor ++)
@@ -100,7 +100,7 @@ public:
     StatsErrors calculateStatsErrors (const Definitions::Temperatures& temperatures, const Definitions::Resistances& resistances) const {
         StatsErrors stats;
         assert (temperatures.size () == resistances.size ());
-        for (size_t index = 0; index < temperatures.size (); index ++) { 
+        for (size_t index = 0; index < temperatures.size (); index ++) {
             float temperature;
             if (calculate (temperature, resistances [index]))
                 stats += std::abs (temperature - temperatures [index]);
@@ -117,7 +117,7 @@ public:
     using Definitions = TemperatureCalibrationDefinitions <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
     static constexpr const char * NAME = "lookup";
 
-private:    
+private:
     Definitions::Temperatures temperatures;
     Definitions::Resistances resistances;
 
@@ -261,7 +261,7 @@ public:
                     return String ("unreliable result, error = ") + FloatToString (std::abs (temperature - collection.temperatures [index]));
             }
         }
-         
+
         return String ();
     }
     //
@@ -269,7 +269,7 @@ public:
         if (!isTemperatureReasonable (temperature)) {
             DEBUG_PRINTF ("calculateSteinhartHart: invalid temperature value.\n");
             return false;
-        }      
+        }
         double lnR = std::log (10000.0);
         for (int i = 0; i < 10; i ++) {
             const double delta = (A + B * lnR + C * lnR * lnR + D * lnR * lnR * lnR - (1.0 / (temperature + 273.15))) / (B + 2 * C * lnR + 3 * D * lnR * lnR);
@@ -283,7 +283,7 @@ public:
         if (!isResistanceReasonable (resistance)) {
             DEBUG_PRINTF ("calculateSteinhartHart: invalid resistance value.\n");
             return false;
-        }      
+        }
         const double lnR = std::log (static_cast <double> (resistance));
         temperature = static_cast <float> (1.0 / (A + B*lnR + C*lnR*lnR + D*lnR*lnR*lnR) - 273.15);
         return isTemperatureReasonable (temperature);
@@ -350,7 +350,7 @@ public:
         }
         DEBUG_PRINTF (")\n");
         return true;
-    }    
+    }
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -379,7 +379,7 @@ public:
         }
         JsonObject strategyDefault = doc ["default"].to <JsonObject> ();
         defaultStrategy.serialize (strategyDefault);
-        
+
         SPIFFSFile file (filename); size_t size;
         if (!file.begin () || !((size = file.write (doc)) > 0)) {
             DEBUG_PRINTF ("TemperatureCalibrationStorage::serialize: could not write to '%s'\n", filename.c_str ());
@@ -394,7 +394,7 @@ public:
 
         SPIFFSFile file (filename); size_t size;
         if (!file.begin () || !((size = file.read (doc)) > 0)) {
-            DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: could not read from '%s'\n", filename.c_str ());          
+            DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: could not read from '%s'\n", filename.c_str ());
             return false;
         }
         DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: read %d bytes from '%s'\n", size, filename.c_str ());
@@ -442,7 +442,7 @@ private:
     CalibrationStrategies calibrationStrategies;
 
 public:
-    TemperatureCalibrationRuntime (const StrategyDefault& defaultStrategy, const CalibrationStrategies& calibrationStrategies): defaultStrategy (defaultStrategy), calibrationStrategies (calibrationStrategies) {      
+    TemperatureCalibrationRuntime (const StrategyDefault& defaultStrategy, const CalibrationStrategies& calibrationStrategies): defaultStrategy (defaultStrategy), calibrationStrategies (calibrationStrategies) {
         DEBUG_PRINTF ("TemperatureCalibrationRuntime::init: default [%s", defaultStrategy.getDetails ().c_str ());
         for (int index = 0; index < calibrationStrategies.size (); index ++) {
             DEBUG_PRINTF ("], %d [", index); int count = 0;

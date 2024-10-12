@@ -1,0 +1,22 @@
+#!/bin/bash
+set -euo pipefail
+process_file() {
+    local file="$1"
+    temp_file=$(mktemp)
+    expand -t 4 "$file" | sed 's/[[:space:]]*$//' > "$temp_file"
+    sed -i -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$temp_file"
+    sed -i -e '$a\' "$temp_file"
+    sed -i '/^$/N;/^\n$/D' "$temp_file"
+    sed -i 's/ \+\t/\t/g' "$temp_file"
+    if ! cmp -s "$temp_file" "$file"; then
+        mv "$temp_file" "$file"
+        echo "fixed whitespace in $file"
+    else
+        rm "$temp_file"
+    fi
+}
+files=$(find . -type f \( -name "*.hpp" -o -name "*.ino" \))
+for file in $files; do
+    process_file "$file"
+done
+jscpd $files

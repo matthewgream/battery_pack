@@ -179,7 +179,7 @@ private:
         MOTOR_CONTROL_CLOCKWISE = 0x02
     };
     static constexpr uint8_t controlvalue_alloff = 0x00;
-    
+
     static constexpr uint8_t encodeControlValue (const int motorID, const uint8_t directions, const uint8_t value) {
         return (directions & ~(0x03 << (2 * motorID))) | (value << (2 * motorID));
     }

@@ -41,7 +41,7 @@ private:
         else                                 return ConnectionQuality::POOR;
     }
 
-public:        
+public:
     ConnectionQualityTracker (const Callback callback = nullptr): _callback (callback) {}
     RssiType rssi () const {
         return _rssiLast;
@@ -56,7 +56,7 @@ public:
     }
     void reset () {
         _rssiLast = std::numeric_limits <RssiType>::min ();
-        _qualityLast = ConnectionQuality::UNKNOWN; 
+        _qualityLast = ConnectionQuality::UNKNOWN;
     }
     void serialize (JsonObject &obj) const {
         obj ["rssi"] = _rssiLast;
@@ -94,7 +94,7 @@ private:
     BLEServer *_server = nullptr;
     BLECharacteristic *_characteristic = nullptr;
     bool _advertising = false;
-    
+
     esp_bd_addr_t _peerAddress;
     int _mtuNegotiated = -1, _mtuExceeded = 0;
     ConnectionQualityTracker _connectionQualityTracker;
@@ -140,7 +140,7 @@ private:
             _connectionQualityTracker.update (param->read_rssi_cmpl.rssi);
             DEBUG_PRINTF ("BluetoothNotifier::onRssiRead: rssi=%d (%s)\n", param->read_rssi_cmpl.rssi, _connectionQualityTracker.toString ().c_str ());
         }
-    }    
+    }
 
     static void __gapEventHandler (esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* param) {
         BluetoothNotifier *bluetoothNotifier = Singleton <BluetoothNotifier>::instance ();
@@ -150,7 +150,7 @@ private:
         if (event == ESP_GAP_BLE_READ_RSSI_COMPLETE_EVT)
             onRssiRead (param);
     }
-    
+
     void advertise (const bool enable) {
         if (enable && !_advertising) {
             _server->getAdvertising ()->start ();

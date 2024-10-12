@@ -45,7 +45,7 @@ protected:
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
-    
+
 class PublishManager : public Component, public Alarmable, public Diagnosticable {
 
 public:
@@ -90,7 +90,7 @@ public:
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject publish = obj ["publish"].to <JsonObject> ();
-        if (_publishes.number () > 0)        
+        if (_publishes.number () > 0)
             _publishes.serialize (publish ["publishes"].to <JsonObject> ());
         if (_failures > 0) {
             JsonObject failures = publish ["failures"].to <JsonObject> ();

@@ -92,7 +92,7 @@ class Watchdog {
     bool _started;
 public:
     Watchdog (const int timeout): _timeout (timeout), _started (false) {};
-    void start () { 
+    void start () {
         if (!_started) {
             esp_task_wdt_deinit ();
             const esp_task_wdt_config_t wdt_config = {
@@ -109,7 +109,7 @@ public:
         }
     }
     void reset () {
-        esp_task_wdt_reset (); 
+        esp_task_wdt_reset ();
     }
 };
 
@@ -151,7 +151,7 @@ std::pair <String, String> getResetDetails (const int reason = getResetReason ()
     }
 }
 bool getResetOkay (const int reason = getResetReason ()) {
-    return (reason == RESET_REASON_CHIP_POWER_ON || 
+    return (reason == RESET_REASON_CHIP_POWER_ON ||
             reason == RESET_REASON_CORE_SW || reason == RESET_REASON_CPU0_SW ||
             reason == RESET_REASON_CORE_USB_UART || reason == RESET_REASON_CORE_USB_JTAG);
 }

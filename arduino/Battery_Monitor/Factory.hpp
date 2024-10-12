@@ -31,7 +31,7 @@ class Tester_HardwareInterfaces {
 
 public:
     void allInterface (const int repetitions = 16) {
-        static constexpr int SPEED_MIN = 0, SPEED_MAX = 255, SPEED_STEP = 16; 
+        static constexpr int SPEED_MIN = 0, SPEED_MAX = 255, SPEED_STEP = 16;
         static constexpr int DELAY = 5*1000;
 
         DEBUG_PRINTF ("*** Tester_HardwareInterfaces:: all (%d repetitions)\n", repetitions);

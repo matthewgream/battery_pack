@@ -19,7 +19,7 @@ static inline constexpr const char __build_time [] = {
     BUILD_Y/1000 + '0', (BUILD_Y%1000)/100 + '0', (BUILD_Y%100)/10 + '0', BUILD_Y%10 + '0',  BUILD_M/10 + '0', BUILD_M%10 + '0',  BUILD_D/10 + '0', BUILD_D%10 + '0',
     BUILD_T [0], BUILD_T [1], BUILD_T [3], BUILD_T [4], BUILD_T [6], BUILD_T [7],
     '\0'
-};  
+};
 static inline String __build_plat () { String platform = ESP.getChipModel (); platform.toLowerCase (); platform.replace ("-", ""); return platform; }
 
 const String build_info (String (__build_name) + " V" + String (__build_vers) + "-" + String (__build_time) + " (" + __build_plat () + ")");
@@ -51,14 +51,14 @@ void setup () {
     }
 
     watchdog.start ();
-    exception_catcher ([&] () { 
+    exception_catcher ([&] () {
         program = new Program ();
-        program->setup (); 
+        program->setup ();
     });
 }
 
 void loop () {
-    exception_catcher ([&] () { 
+    exception_catcher ([&] () {
         program->loop ();
         program->sleep ();
     });

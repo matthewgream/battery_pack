@@ -73,7 +73,7 @@ struct Config {
         .strategyDefault = { .A = -0.012400427786, .B = 0.006860769298, .C = -0.001057743719, .D = 0.000056166727 } // XXX populate from calibration data
     };
     FanInterface::Config fanInterface = {
-        .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 2, .PIN_PWMS = { 3, 4, 5, 6 }, .frequency = 5000 }, 
+        .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 2, .PIN_PWMS = { 3, 4, 5, 6 }, .frequency = 5000 },
         .MIN_SPEED = 192, .MAX_SPEED = 255, // duplicated, not ideal
         .MOTOR_ORDER = { 0, 1, 2, 3 }, .MOTOR_ROTATE = 5*60*1000
     };
@@ -117,7 +117,7 @@ struct Config {
     // program
     AlarmInterface_SinglePIN::Config alarmInterface = { .PIN_ALARM = -1 };
     AlarmManager::Config alarmManager = { };
-    DiagnosticManager::Config diagnosticManager = { }; 
+    DiagnosticManager::Config diagnosticManager = { };
     UpdateManager::Config updateManager = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS };
     interval_t intervalProcess = 5*1000, intervalDeliver = 5*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;
 };

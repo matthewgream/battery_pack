@@ -121,7 +121,7 @@ public:
     inline size_t cnt () const { return _cnt; }
     inline T min () const { return _min; }
     inline T max () const { return _max; }
-    inline T avg () const { 
+    inline T avg () const {
         if (_cnt > 0) {
             const_cast <Stats <T> *> (this)->_avg = static_cast <T> (_sum / static_cast <S> (_cnt));
             const_cast <Stats <T> *> (this)->_cnt = 0;
@@ -204,7 +204,7 @@ public:
     void reset (const interval_t interval = std::numeric_limits <interval_t>::max ()) {
         if (interval != std::numeric_limits <interval_t>::max ())
             _interval = interval;
-        _previous = millis ();      
+        _previous = millis ();
     }
 };
 
@@ -311,7 +311,6 @@ public:
     virtual ~Singleton () { _instance = nullptr; }
 };
 
-
 // -----------------------------------------------------------------------------------------------
 
 #include <array>
@@ -328,11 +327,11 @@ namespace gaussian {
         static constexpr double DETERMINANT_DEMINIMUS = 1e-10;
 
         const double determinant = matrix [0][0] * (
-            matrix [1][1] * matrix [2][2] * matrix [3][3] + 
-            matrix [1][2] * matrix [2][3] * matrix [3][1] + 
-            matrix [1][3] * matrix [2][1] * matrix [3][2] - 
-            matrix [1][3] * matrix [2][2] * matrix [3][1] - 
-            matrix [1][2] * matrix [2][1] * matrix [3][3] - 
+            matrix [1][1] * matrix [2][2] * matrix [3][3] +
+            matrix [1][2] * matrix [2][3] * matrix [3][1] +
+            matrix [1][3] * matrix [2][1] * matrix [3][2] -
+            matrix [1][3] * matrix [2][2] * matrix [3][1] -
+            matrix [1][2] * matrix [2][1] * matrix [3][3] -
             matrix [1][1] * matrix [2][3] * matrix [3][2]
         );
         if (std::abs (determinant) < DETERMINANT_DEMINIMUS)
@@ -368,7 +367,7 @@ namespace gaussian {
         const double condition_number = max_singular / min_singular;
         if (condition_number > CONDITION_DEMAXIMUS)
             return "matrix ill-conditioned, condition number estimate: " + FloatToString (condition_number, 12);
-        const double determinant = 
+        const double determinant =
               XtX[0][0] * (XtX[1][1] * XtX[2][2] * XtX[3][3] + XtX[1][2] * XtX[2][3] * XtX[3][1] + XtX[1][3] * XtX[2][1] * XtX[3][2] - XtX[1][3] * XtX[2][2] * XtX[3][1] - XtX[1][2] * XtX[2][1] * XtX[3][3] - XtX[1][1] * XtX[2][3] * XtX[3][2])
             - XtX[0][1] * (XtX[1][0] * XtX[2][2] * XtX[3][3] + XtX[1][2] * XtX[2][3] * XtX[3][0] + XtX[1][3] * XtX[2][0] * XtX[3][2] - XtX[1][3] * XtX[2][2] * XtX[3][0] - XtX[1][2] * XtX[2][0] * XtX[3][3] - XtX[1][0] * XtX[2][3] * XtX[3][2])
             + XtX[0][2] * (XtX[1][0] * XtX[2][1] * XtX[3][3] + XtX[1][1] * XtX[2][3] * XtX[3][0] + XtX[1][3] * XtX[2][0] * XtX[3][1] - XtX[1][3] * XtX[2][1] * XtX[3][0] - XtX[1][1] * XtX[2][0] * XtX[3][3] - XtX[1][0] * XtX[2][3] * XtX[3][1])
@@ -396,7 +395,7 @@ namespace gaussian {
                 result [i] -= XtX [i][j] * result [j];
             result [i] /= XtX [i][i];
         }
-        return String ();      
+        return String ();
     }
 }
 

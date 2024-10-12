@@ -186,7 +186,7 @@ public:
         temperatureCalibrator (config.temperatureCalibrator),
         temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) { return temperatureCalibrator.calculateTemperature (channel, resistance); }),
         temperatureManagerBatterypack (config.temperatureManagerBatterypack, temperatureInterface), temperatureManagerEnvironment (config.temperatureManagerEnvironment, temperatureInterface),
-        fanInterface (config.fanInterface, fanInterfaceSetrategy), fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, 
+        fanInterface (config.fanInterface, fanInterfaceSetrategy), fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm,
             [&] () { return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ()); }),
         network (config.network), nettime (config.nettime, [&] () { return network.isAvailable (); }),
         deliver (config.deliver), publish (config.publish, [&] () { return network.isAvailable (); }), storage (config.storage),

@@ -30,7 +30,7 @@ public:
             AlarmCondition (ALARM_TEMPERATURE_MAXIMAL, [this] () { return _value.max () >= config.MAXIMAL; }),
             AlarmCondition (ALARM_TEMPERATURE_WARNING, [this] () { return _value.max () < config.MAXIMAL && _value.max () >= config.WARNING; })
         }), config (cfg), _interface (interface), _values () {
-        _values.fill (MovingAverageWithValue <float, 16> (round2places));      
+        _values.fill (MovingAverageWithValue <float, 16> (round2places));
     };
     void process () override {
         _value.reset ();
@@ -51,12 +51,12 @@ public:
     inline float max () const { return _value.max (); }
     inline float avg () const { return round2places (_value.avg ()); }
     using TemperatureArray = std::array <float, PROBE_COUNT>;
-    inline const TemperatureArray getTemperatures () const { 
+    inline const TemperatureArray getTemperatures () const {
         TemperatureArray result;
         auto it = result.begin ();
         for (const auto& value : _values)
             *it ++ = static_cast <float> (value);
-        return result;        
+        return result;
     }
     inline float setpoint () const { return config.SETPOINT; }
     inline float current () const { return _value.max (); } // XXX think about this ... max, average, etc
@@ -100,7 +100,7 @@ public:
 
 protected:
    void collectDiagnostics (JsonDocument &obj) const override {
-//        JsonObject env = obj ["env"].to <JsonObject> ();    
+//        JsonObject env = obj ["env"].to <JsonObject> ();
 //        _stats
     }
 };

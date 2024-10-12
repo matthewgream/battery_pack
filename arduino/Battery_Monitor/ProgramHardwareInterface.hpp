@@ -14,11 +14,11 @@ public:
 
     typedef struct {
         AdcHardware::Config hardware;
-#ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION        
+#ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION
         struct Thermister {
             float REFERENCE_RESISTANCE, NOMINAL_RESISTANCE, NOMINAL_TEMPERATURE;
         } thermister;
-#endif        
+#endif
     } Config;
 
 private:
@@ -42,7 +42,7 @@ public:
         assert (channel >= 0 && channel < AdcHardware::CHANNELS && "Channel out of range");
         AdcValueType value = _hardware.get (channel);
         const_cast <TemperatureInterface*> (this)->updateStats (channel, value);
-#ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION        
+#ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION
         return steinharthart_calculator (value, AdcValueMax, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
 #else
         return _calculator (channel, value);
@@ -62,7 +62,7 @@ protected:
 
 class FanInterface;
 class FanInterfaceStrategy {
-public:  
+public:
     virtual String name () const = 0;
     virtual void begin (const FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) = 0;
     virtual bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeedType speed) = 0;
@@ -137,7 +137,7 @@ protected:
 class FanInterfaceStrategy_motorAll: public FanInterfaceStrategy {
     OpenSmart_QuadMotorDriver* _hardware;
     OpenSmart_QuadMotorDriver::MotorSpeedType _min_speed;
-public:  
+public:
     String name () const override { return "motorAll(" + IntToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
     void begin (const FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
         _hardware = &hardware; _min_speed = interface.getConfig ().MIN_SPEED;
@@ -170,7 +170,7 @@ public:
             OpenSmart_QuadMotorDriver::MotorSpeedType motorSpeed = 0;
             if (totalSpeed >= (currentThreshold + FanInterface::FanSpeedRange))
                 motorSpeed = _max_speed;
-            else if (totalSpeed > currentThreshold && totalSpeed < (currentThreshold + FanInterface::FanSpeedRange))
+            else if (totalSpeed > currentThreshold && totalSpeed < (currentThreshold + static_cast <int> (FanInterface::FanSpeedRange)))
                 motorSpeed = map (totalSpeed - currentThreshold, 0, FanInterface::FanSpeedRange, _min_speed, _max_speed);
             if (motorSpeed != _motorSpeeds [motorId])
                 _hardware->setSpeed (motorSpeed, static_cast<OpenSmart_QuadMotorDriver::MotorID> (motorId)), _motorSpeeds [motorId] = motorSpeed;
@@ -203,3 +203,4 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
+
