@@ -10,7 +10,7 @@ class NetworkTimeFetcher {
     const String _useragent, _server;
 
 public:
-    NetworkTimeFetcher (const String& useragent, const String& server) : _useragent (useragent), _server (server) {}
+    explicit NetworkTimeFetcher (const String& useragent, const String& server) : _useragent (useragent), _server (server) {}
     time_t fetch () {
         HTTPClient client;
         String header = "";
@@ -53,7 +53,7 @@ class TimeDriftCalculator {
     bool _isHighDrift = false;
 
 public:
-    TimeDriftCalculator (const long driftMs) : _driftMs (driftMs) {}
+    explicit TimeDriftCalculator (const long driftMs) : _driftMs (driftMs) {}
     long updateDrift (time_t periodSecs, const interval_t periodMs) {
         long driftMs = (((periodSecs * 1000) - periodMs) * (60 * 60 * 1000)) / periodMs; // ms per hour
         driftMs = (_driftMs * 3 + driftMs) / 4; // 75% old value, 25% new value
@@ -112,7 +112,7 @@ private:
         return result;
     }
 public:
-    MQTTPublisher (const Config& cfg) : config (cfg), _mqttClient (_wifiClient) {}
+    explicit MQTTPublisher (const Config& cfg) : config (cfg), _mqttClient (_wifiClient) {}
     void setup () {
         _mqttClient.setServer (config.host.c_str (), config.port)
             .setBufferSize (config.bufferSize);
@@ -263,7 +263,7 @@ private:
     }
 
 public:
-    SPIFFSFile (const String& filename): _filename (filename) {}
+    explicit SPIFFSFile (const String& filename): _filename (filename) {}
     ~SPIFFSFile () { close (); }
     bool begin () {
         return _init ();

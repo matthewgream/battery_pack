@@ -453,7 +453,7 @@ public:
     }
 
     float calculateTemperature (const size_t index, const uint16_t resistance) const {
-        float temperature;
+        float temperature = 0.0f;
         if (std::any_of (calibrationStrategies [index].begin (), calibrationStrategies [index].end (),
             [&] (const auto& strategy) { return strategy->calculate (temperature, resistance); }))
                 return temperature;

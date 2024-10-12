@@ -42,7 +42,7 @@ private:
     }
 
 public:
-    ConnectionQualityTracker (const Callback callback = nullptr): _callback (callback) {}
+    explicit ConnectionQualityTracker (const Callback callback = nullptr): _callback (callback) {}
     RssiType rssi () const {
         return _rssiLast;
     }
@@ -163,7 +163,7 @@ private:
     }
 
 public:
-    BluetoothNotifier (const Config& cfg, const ConnectionQualityTracker::Callback connectionQualityCallback = nullptr): Singleton <BluetoothNotifier> (this), config (cfg), _connectionQualityTracker (connectionQualityCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+    explicit BluetoothNotifier (const Config& cfg, const ConnectionQualityTracker::Callback connectionQualityCallback = nullptr): Singleton <BluetoothNotifier> (this), config (cfg), _connectionQualityTracker (connectionQualityCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
 
     bool advertise ()  {
         BLEDevice::init (config.name);

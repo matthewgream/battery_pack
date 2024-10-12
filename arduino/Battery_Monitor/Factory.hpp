@@ -17,7 +17,7 @@ class Tester_HardwareInterfaces {
     class RepetitionRunner {
         int repetitions, timedelay;
     public:
-        RepetitionRunner (int repetitions, int timedelay = 0): repetitions (repetitions), timedelay (timedelay) {}
+        explicit RepetitionRunner (int repetitions, int timedelay = 0): repetitions (repetitions), timedelay (timedelay) {}
         void run (std::function <bool ()> func) {
             int iterations = 0;
             while (iterations < repetitions) {
