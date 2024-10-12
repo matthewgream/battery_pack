@@ -118,6 +118,7 @@ public:
     // Alarmable () {}
     virtual ~Alarmable() {};
     void collectAlarms (AlarmSet& alarms) const {
+      
         for (const auto& condition : _conditions)
             if (condition.check ())
                 alarms += condition.getType ();

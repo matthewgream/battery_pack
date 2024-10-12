@@ -44,7 +44,7 @@ private:
         }
     }
 public:
-    ConnectManager (const Config& cfg, const ConnectionQualityTracker::Callback connectionQualityCallback = nullptr) : Singleton <ConnectManager> (this), config (cfg), _connectionQualityTracker (connectionQualityCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+    explicit ConnectManager (const Config& cfg, const ConnectionQualityTracker::Callback connectionQualityCallback = nullptr) : Singleton <ConnectManager> (this), config (cfg), _connectionQualityTracker (connectionQualityCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
     void begin () override {
         WiFi.onEvent (__wiFiEventHandler);
         WiFi.setHostname (config.client.c_str ());
@@ -179,7 +179,7 @@ private:
     PersistentValue <uint32_t> _persistentTime;
 
 public:
-    NettimeManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
+    explicit NettimeManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
             AlarmCondition (ALARM_TIME_SYNC, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_TIME_DRIFT, [this] () { return _drifter.isHighDrift (); })
         }), config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _fetcher (cfg.useragent, cfg.server),

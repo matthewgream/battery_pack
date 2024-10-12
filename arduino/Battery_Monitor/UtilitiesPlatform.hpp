@@ -15,7 +15,7 @@ private:
     nvs_handle_t _handle;
     const bool _okay = false;
 public:
-    PersistentData (const char *space): _okay (_initialise () && nvs_open_from_partition (DEFAULT_PERSISTENT_PARTITION, space, NVS_READWRITE, &_handle) == ESP_OK) {}
+    explicit PersistentData (const char *space): _okay (_initialise () && nvs_open_from_partition (DEFAULT_PERSISTENT_PARTITION, space, NVS_READWRITE, &_handle) == ESP_OK) {}
     ~PersistentData () { if (_okay) nvs_close (_handle); }
     inline bool get (const char *name, uint32_t *value) const { return (_okay && nvs_get_u32 (_handle, name, value) == ESP_OK); }
     inline bool set (const char *name, uint32_t value) { return  (_okay && nvs_set_u32 (_handle, name, value) == ESP_OK); }
@@ -49,7 +49,7 @@ class PersistentValue {
     const T _value_default;
 
 public:
-    PersistentValue (PersistentData& data, const char *name, const T value_default): _data (data), _name (name), _value_default (value_default) {}
+    explicit PersistentValue (PersistentData& data, const char *name, const T value_default): _data (data), _name (name), _value_default (value_default) {}
     inline operator T () const { T value; return _data.get (_name.c_str (), &value) ? value : _value_default; }
     inline bool operator= (const T value) { return _data.set (_name.c_str (), value); }
     inline bool operator+= (const T value2) { T value = _value_default; _data.get (_name.c_str (), &value); value += value2; return _data.set (_name.c_str (), value); }
@@ -91,7 +91,7 @@ class Watchdog {
     const int _timeout;
     bool _started;
 public:
-    Watchdog (const int timeout): _timeout (timeout), _started (false) {};
+    explicit Watchdog (const int timeout): _timeout (timeout), _started (false) {};
     void start () {
         if (!_started) {
             esp_task_wdt_deinit ();

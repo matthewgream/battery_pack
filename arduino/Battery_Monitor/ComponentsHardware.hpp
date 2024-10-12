@@ -17,7 +17,7 @@ private:
     bool _enabled = false;
 
 public:
-    AlarmInterface_SinglePIN (const Config& cfg) : config (cfg) {
+    explicit AlarmInterface_SinglePIN (const Config& cfg) : config (cfg) {
         if (config.PIN_ALARM >= 0) {
             pinMode (config.PIN_ALARM, OUTPUT);
             digitalWrite (config.PIN_ALARM, LOW); // Active HIGH
@@ -55,7 +55,7 @@ private:
     DeviceAddress _address;
 
 public:
-    TemperatureSensor_DS18B20 (const Config& cfg): config (cfg), oneWire (config.PIN_DAT), sensors (&oneWire) {
+    explicit TemperatureSensor_DS18B20 (const Config& cfg): config (cfg), oneWire (config.PIN_DAT), sensors (&oneWire) {
         sensors.begin ();
         DEBUG_PRINTF ("TemperatureSensor_DS18B20::init: (DAT=%d) found %d devices on bus, %d are DS18", config.PIN_DAT, sensors.getDeviceCount (), sensors.getDS18Count ());
         if ((_found = sensors.getAddress (_address, DS1820_INDEX)))
@@ -107,7 +107,7 @@ private:
     const Config &config;
 
 public:
-    MuxInterface_CD74HC4067 (const Config& cfg) : config (cfg) {
+    explicit MuxInterface_CD74HC4067 (const Config& cfg) : config (cfg) {
         DEBUG_PRINTF ("MuxInterface_CD74HC4067::init: (EN=%d,S0=%d,S1=%d,S2=%d,S3=%d,SIG=%d)\n", config.PIN_EN, config.PIN_ADDR [0], config.PIN_ADDR [1], config.PIN_ADDR [2], config.PIN_ADDR [3], config.PIN_SIG);
         pinMode (config.PIN_EN, OUTPUT);
         digitalWrite (config.PIN_EN, HIGH); // OFF
@@ -199,7 +199,7 @@ private:
     }
 
 public:
-    OpenSmart_QuadMotorDriver (const Config& cfg) : config (cfg), _directions (0x00) {
+    explicit OpenSmart_QuadMotorDriver (const Config& cfg) : config (cfg), _directions (0x00) {
         Wire.begin (config.PIN_I2C_SDA, config.PIN_I2C_SCL);
         Wire.beginTransmission (config.I2C_ADDR);
         Wire.write (controlvalue_alloff);

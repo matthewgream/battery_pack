@@ -77,7 +77,7 @@ class TypeOfAverageWithValue: public BaseAverage <T, WINDOW> {
     T val = T (0);
     std::function <T (T)> process;
 public:
-    TypeOfAverageWithValue (std::function <T (T)> proc = [] (T x) { return x; }): process (proc) {}
+    explicit TypeOfAverageWithValue (std::function <T (T)> proc = [] (T x) { return x; }): process (proc) {}
     T update (const T value) override {
         val = process (BaseAverage <T, WINDOW>::update (value));
         return val;
@@ -178,7 +178,7 @@ class AlphaSmoothing {
     T _value = T (0);
 
 public:
-    AlphaSmoothing (const T alpha) : _alpha (alpha) {}
+    explicit AlphaSmoothing (const T alpha) : _alpha (alpha) {}
     inline T apply (const T value) {
         return (_value = (_alpha * value + (1.0 - _alpha) * _value));
     }
@@ -192,7 +192,7 @@ class Intervalable {
     interval_t _interval, _previous;
 
 public:
-    Intervalable (const interval_t interval = 0) : _interval (interval), _previous (0) {}
+    explicit Intervalable (const interval_t interval = 0) : _interval (interval), _previous (0) {}
     operator bool () {
         const interval_t current = millis ();
         if (current - _previous > _interval) {
@@ -232,7 +232,6 @@ class ActivationTracker {
     unsigned long _millis = 0;
 
 public:
-    ActivationTracker () {}
     inline interval_t seconds () const { return _millis / 1000; }
     inline counter_t  number () const { return _number; }
     ActivationTracker& operator ++ (int) {
@@ -251,7 +250,6 @@ class ActivationTrackerWithDetail: public ActivationTracker {
     String _detail;
 
 public:
-    ActivationTrackerWithDetail () {}
     ActivationTrackerWithDetail& operator += (const String& detail) {
         ActivationTracker::operator++ (1);
         _detail = detail;
@@ -303,7 +301,7 @@ class Singleton {
     inline static T* _instance = nullptr;
 public:
     inline static T* instance () { return _instance; }
-    Singleton (T* t) {
+    explicit Singleton (T* t) {
       if (_instance != nullptr)
           throw std::runtime_error ("duplicate Singleton initializer");
       _instance = t;

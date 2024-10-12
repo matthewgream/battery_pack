@@ -167,8 +167,8 @@ private:
     inline bool isTemperatureReasonable (const float temperature) const { return temperature > -273.15f && temperature < 200.0f; }
 
 public:
-    TemperatureCalibrationAdjustmentStrategy_Steinhart (const double a = 0.0, const double b = 0.0, const double c = 0.0, const double d = 0.0): A (a), B (b), C (c), D (d) {}
-    TemperatureCalibrationAdjustmentStrategy_Steinhart (const Config& config): A (config.A), B (config.B), C (config.C), D (config.D) {}
+    explicit TemperatureCalibrationAdjustmentStrategy_Steinhart (const double a = 0.0, const double b = 0.0, const double c = 0.0, const double d = 0.0): A (a), B (b), C (c), D (d) {}
+    explicit TemperatureCalibrationAdjustmentStrategy_Steinhart (const Config& config): A (config.A), B (config.B), C (config.C), D (config.D) {}
 
     String calibrate (const Definitions::Temperatures& temperatures, const Definitions::Resistances& resistances) override {
         assert (temperatures.size () >= 4 && temperatures.size () == resistances.size ());
@@ -454,8 +454,8 @@ public:
 
     float calculateTemperature (const size_t index, const uint16_t resistance) const {
         float temperature;
-        for (const auto& strategy : calibrationStrategies [index])
-            if (strategy->calculate (temperature, resistance))
+        if (std::any_of (calibrationStrategies [index].begin (), calibrationStrategies [index].end (),
+            [&] (const auto& strategy) { return strategy->calculate (temperature, resistance); }))
                 return temperature;
         if (defaultStrategy.calculate (temperature, resistance))
             return temperature;
@@ -662,7 +662,7 @@ private:
     }
 
 public:
-    TemperatureCalibrationManager (const Config& cfg) : config (cfg) {}
+    explicit TemperatureCalibrationManager (const Config& cfg) : config (cfg) {}
 
     void begin () override {
         std::shared_ptr <typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_shared <typename Calculator::CalibrationStrategies> ();

@@ -17,7 +17,7 @@ private:
     ActivationTrackerWithDetail _delivers;
 
 public:
-    DeliverManager (const Config& cfg): Alarmable ({
+    explicit DeliverManager (const Config& cfg): Alarmable ({
             AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.mtuexceeded (); })
         }), config (cfg), _blue (cfg.blue) {}
     void begin () override {
@@ -36,10 +36,10 @@ public:
 
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
-        JsonObject deliver = obj ["deliver"].to <JsonObject> ();
+        JsonObject sub = obj ["deliver"].to <JsonObject> ();
         if (_delivers.number () > 0)
-            _delivers.serialize (deliver ["delivers"].to <JsonObject> ());
-        _blue.serialize (deliver);
+            _delivers.serialize (sub ["delivers"].to <JsonObject> ());
+        _blue.serialize (sub);
     }
 };
 
@@ -66,7 +66,7 @@ private:
     counter_t _failures = 0;
 
 public:
-    PublishManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
+    explicit PublishManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
             AlarmCondition (ALARM_PUBLISH_FAIL, [this] () { return _failures > config.failureLimit; })
         }), config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _mqtt (cfg.mqtt) {}
     void begin () override {
@@ -89,15 +89,15 @@ public:
 
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
-        JsonObject publish = obj ["publish"].to <JsonObject> ();
+        JsonObject sub = obj ["publish"].to <JsonObject> ();
         if (_publishes.number () > 0)
-            _publishes.serialize (publish ["publishes"].to <JsonObject> ());
+            _publishes.serialize (sub ["publishes"].to <JsonObject> ());
         if (_failures > 0) {
-            JsonObject failures = publish ["failures"].to <JsonObject> ();
+            JsonObject failures = sub ["failures"].to <JsonObject> ();
             failures ["count"] = _failures;
             failures ["limit"] = config.failureLimit;
         }
-        _mqtt.serialize (publish);
+        _mqtt.serialize (sub);
     }
 };
 
@@ -123,7 +123,7 @@ private:
 
 public:
     typedef SPIFFSFile::LineCallback LineCallback;
-    StorageManager (const Config& cfg): Alarmable ({
+    explicit StorageManager (const Config& cfg): Alarmable ({
             AlarmCondition (ALARM_STORAGE_FAIL, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_STORAGE_SIZE, [this] () { return _file.remains () < config.remainLimit; })
         }), config (cfg), _file (config.filename) {}
@@ -150,18 +150,18 @@ public:
 
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
-        JsonObject storage = obj ["storage"].to <JsonObject> ();
+        JsonObject sub = obj ["storage"].to <JsonObject> ();
         storage ["critical"] = config.remainLimit;
         if (_erasures > 0)
-            storage ["erasures"] = _erasures;
+            sub ["erasures"] = _erasures;
         if (_failures > 0) {
-            JsonObject failures = storage ["failures"].to <JsonObject> ();
+            JsonObject failures = sub ["failures"].to <JsonObject> ();
             failures ["count"] = _failures;
             failures ["limit"] = config.failureLimit;
         }
         if (_appends.number () > 0)
-            _appends.serialize (storage ["appends"].to <JsonObject> ());
-        _file.serialize (storage);
+            _appends.serialize (sub ["appends"].to <JsonObject> ());
+        _file.serialize (sub);
     }
 };
 
