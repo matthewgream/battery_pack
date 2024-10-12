@@ -79,7 +79,7 @@ String getTimeString (time_t timet = 0) {
     if (timet == 0) time (&timet);
     if (gmtime_r (&timet, &timeinfo) != NULL)
         strftime (timeString, sizeof (timeString), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
-    return String (timeString);  
+    return timeString;
 }
 
 // -----------------------------------------------------------------------------------------------

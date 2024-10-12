@@ -93,7 +93,7 @@ struct Config {
 
     // network managers
     ConnectManager::Config network = {
-        .client = DEFAULT_NAME, .ssid = DEFAULT_WIFI_SSID, .pass = DEFAULT_WIFI_PASS
+        .client = DEFAULT_NAME, .ssid = DEFAULT_WIFI_SSID, .pass = DEFAULT_WIFI_PASS, .intervalConnectionCheck = 1*60*1000
     };
     NettimeManager::Config nettime = {
         .useragent = String (DEFAULT_NAME) + String ("/1.0"), .server = "https://www.google.com",

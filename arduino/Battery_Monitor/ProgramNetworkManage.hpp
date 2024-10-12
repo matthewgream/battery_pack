@@ -7,12 +7,15 @@ class ConnectManager : private Singleton <ConnectManager>, public Component, pub
 public:
     typedef struct {
         String client, ssid, pass;
+        interval_t intervalConnectionCheck;
     } Config;
 
 private:
     const Config &config;
 
-    bool _available = false;
+    ConnectionQualityTracker _connectionQualityTracker;
+    bool _connected = false, _available = false;
+    Intervalable _intervalConnectionCheck;
     ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
     
     static void __wiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info) {
@@ -21,26 +24,27 @@ private:
     }
     void events (const WiFiEvent_t event, const WiFiEventInfo_t info) {
         if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED) {
-            _connections ++;
-            DEBUG_PRINTF ("ConnectManager::events: WIFI_CONNECTED, ssid=%s, bssid=%s, channel=%d, authmode=%s, rssi=%d\n",
+            _connectionQualityTracker.reset ();
+            _intervalConnectionCheck.reset (); _connections ++; _connected = true;
+            _connectionQualityTracker.update (WiFi.RSSI ());
+            DEBUG_PRINTF ("ConnectManager::events: WIFI_CONNECTED, ssid=%s, bssid=%s, channel=%d, authmode=%s, rssi=%d (%s)\n",
                 __wifi_ssid_to_string (info.wifi_sta_connected.ssid, info.wifi_sta_connected.ssid_len).c_str (),
                 __wifi_bssid_to_string (info.wifi_sta_connected.bssid).c_str (), (int) info.wifi_sta_connected.channel,
-                __wifi_authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode).c_str (), WiFi.RSSI ());
+                __wifi_authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode).c_str (), _connectionQualityTracker.rssi (), _connectionQualityTracker.toString ().c_str ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP) {
-            _available = true; _allocations ++;
+            _allocations ++; _available = true;
             DEBUG_PRINTF ("ConnectManager::events: WIFI_ALLOCATED, address=%s\n", IPAddress (info.got_ip.ip_info.ip.addr).toString ().c_str ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
             const String reason = __wifi_error_to_string ((wifi_err_reason_t) info.wifi_sta_disconnected.reason);
-            _available = false; _disconnections += reason;
+            _available = false; _connected = false; _disconnections += reason;
             DEBUG_PRINTF ("ConnectManager::events: WIFI_DISCONNECTED, ssid=%s, bssid=%s, reason=%s\n",
                 __wifi_ssid_to_string (info.wifi_sta_disconnected.ssid, info.wifi_sta_disconnected.ssid_len).c_str (),
                 __wifi_bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (), 
                 reason.c_str ());
         }
     }
-
 public:
-    ConnectManager (const Config& cfg) : Singleton <ConnectManager> (this), config (cfg) {}
+    ConnectManager (const Config& cfg, const ConnectionQualityTracker::Callback connectionQualityCallback = nullptr) : Singleton <ConnectManager> (this), config (cfg), _connectionQualityTracker (connectionQualityCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
     void begin () override {
         WiFi.onEvent (__wiFiEventHandler);
         WiFi.setHostname (config.client.c_str ());
@@ -48,6 +52,24 @@ public:
         WiFi.mode (WIFI_STA);
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
         DEBUG_PRINTF ("ConnectManager::begin: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddress ().c_str (), config.client.c_str ());
+    }
+    void reset () {
+        DEBUG_PRINTF ("ConnectManager::reset\n");
+        const String reason = "LOCAL_TIMEOUT";
+        _available = false; _connected = false; _disconnections += reason;
+        WiFi.disconnect ();
+        // XXX begin () again?
+    }
+    void process () override {
+        if (_connected && _intervalConnectionCheck) {
+            if (!_available) {
+                DEBUG_PRINTF ("ConnectManager::check: connection timeout, resetting\n");
+                reset ();
+            } else {
+                _connectionQualityTracker.update (WiFi.RSSI ());
+                DEBUG_PRINTF ("ConnectManager::process: rssi=%d (%s)\n", _connectionQualityTracker.rssi (), _connectionQualityTracker.toString ().c_str ());
+            }
+        }
     }
     inline bool isAvailable () const {
         return _available;
@@ -57,9 +79,10 @@ protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject network = obj ["network"].to <JsonObject> ();
         network ["macaddr"] = getMacAddress ();
-        if ((network ["connected"] = WiFi.isConnected ())) {
-            network ["ipaddr"] = WiFi.localIP ();
-            network ["rssi"] = WiFi.RSSI ();
+        if ((network ["connected"] = _connected)) {
+            if ((network ["available"] = _available))
+                network ["ipaddr"] = WiFi.localIP ();
+            _connectionQualityTracker.serialize (network);
         }
         if (_connections.number () > 0)
             _connections.serialize (network ["connects"].to <JsonObject> ());
