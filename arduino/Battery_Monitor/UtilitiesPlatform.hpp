@@ -36,7 +36,7 @@ public:
         }
         return false;
     }
-    inline bool set (const char *name, const String &value) { return  (_okay && nvs_set_str (_handle, name, value.c_str ()) == ESP_OK); }
+    inline bool set (const char *name, const String &value) { return (_okay && nvs_set_str (_handle, name, value.c_str ()) == ESP_OK); }
 
 };
 

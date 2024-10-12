@@ -215,7 +215,7 @@ public:
         // check result and errors
         for (size_t index = 0; index < temperatures.size (); index ++) {
             float temperature;
-            if (!calculate (temperature, resistances [index]) || std::abs (temperature - temperatures [index]) > 5.0f)  // Allow 5 degrees of error
+            if (!calculate (temperature, resistances [index]) || std::abs (temperature - temperatures [index]) > 5.0f) // Allow 5 degrees of error
                 return String ("unreliable result, error = ") + FloatToString (std::abs (temperature - temperatures [index]));
         }
 
