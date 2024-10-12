@@ -135,8 +135,8 @@ protected:
 // -----------------------------------------------------------------------------------------------
 
 class FanInterfaceStrategy_motorAll: public FanInterfaceStrategy {
-    OpenSmart_QuadMotorDriver* _hardware;
-    OpenSmart_QuadMotorDriver::MotorSpeedType _min_speed;
+    OpenSmart_QuadMotorDriver* _hardware = nullptr;
+    OpenSmart_QuadMotorDriver::MotorSpeedType _min_speed = OpenSmart_QuadMotorDriver::MotorSpeedType (0);
 public:
     String name () const override { return "motorAll(" + IntToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
     void begin (const FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
@@ -151,8 +151,8 @@ public:
 using FanInterfaceStrategy_default = FanInterfaceStrategy_motorAll;
 
 class FanInterfaceStrategy_motorMap: public FanInterfaceStrategy {
-    OpenSmart_QuadMotorDriver* _hardware;
-    OpenSmart_QuadMotorDriver::MotorSpeedType _min_speed, _max_speed;
+    OpenSmart_QuadMotorDriver* _hardware = nullptr;
+    OpenSmart_QuadMotorDriver::MotorSpeedType _min_speed = OpenSmart_QuadMotorDriver::MotorSpeedType (0), _max_speed = OpenSmart_QuadMotorDriver::MotorSpeedType (0);
     std::array <OpenSmart_QuadMotorDriver::MotorSpeedType, OpenSmart_QuadMotorDriver::MotorCount> _motorSpeeds;
 protected:
     std::array <int, OpenSmart_QuadMotorDriver::MotorCount> _motorOrder;

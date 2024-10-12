@@ -84,7 +84,6 @@ public:
     typedef struct {
         String name, serviceUUID, characteristicUUID;
         uint32_t pin;
-        uint16_t mtu;
         interval_t intervalConnectionCheck;
     } Config;
 

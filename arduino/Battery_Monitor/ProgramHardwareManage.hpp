@@ -43,9 +43,9 @@ public:
               DEBUG_PRINTF ("%s%.2f<%.2f", (cnt > 0) ? ", " : "", val, tmp);
               cnt ++;
         }
-        const float avg = round2places (_value.avg ()), min = _value.min (), max = _value.max ();
-        DEBUG_PRINTF ("], avg=%.2f, min=%.2f, max=%.2f\n", avg, min, max);
-        _statsValueAvg += avg; _statsValueMin += min; _statsValueMax += max;
+        const float _avg = round2places (_value.avg ()), _min = _value.min (), _max = _value.max ();
+        DEBUG_PRINTF ("], avg=%.2f, min=%.2f, max=%.2f\n", _avg, _min, _max);
+        _statsValueAvg += _avg; _statsValueMin += _min; _statsValueMax += _max;
     }
     inline float min () const { return _value.min (); }
     inline float max () const { return _value.max (); }

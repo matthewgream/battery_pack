@@ -36,7 +36,7 @@ private:
     const Diagnosticable::List _diagnosticables;
 
 public:
-    DiagnosticManager (const Config& cfg, const Diagnosticable::List diagnosticables) : config (cfg), _diagnosticables (diagnosticables) {}
+    DiagnosticManager (const Config& cfg, const Diagnosticable::List& diagnosticables) : config (cfg), _diagnosticables (diagnosticables) {}
     void collect (JsonDocument &doc) const {
         for (const auto& diagnosticable : _diagnosticables)
             diagnosticable->collectDiagnostics (doc);
@@ -140,7 +140,7 @@ private:
     std::array <ActivationTracker, _ALARM_COUNT> _activations, _deactivations;
 
 public:
-    AlarmManager (const Config& cfg, AlarmInterface_SinglePIN &interface, const Alarmable::List alarmables) : config (cfg), _interface (interface), _alarmables (alarmables) {}
+    AlarmManager (const Config& cfg, AlarmInterface_SinglePIN &interface, const Alarmable::List& alarmables) : config (cfg), _interface (interface), _alarmables (alarmables) {}
     void process () override {
         AlarmSet alarms;
         for (const auto& alarmable : _alarmables)

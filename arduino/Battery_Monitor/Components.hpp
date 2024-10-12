@@ -174,14 +174,14 @@ public:
 private:
     const String _filename;
     long _size = -1;
-    long _totalBytes, _usedBytes;
+    long _totalBytes = 0, _usedBytes = 0;
     typedef enum {
         MODE_ERROR = 0,
         MODE_CLOSED = 1,
         MODE_WRITING = 2,
         MODE_READING = 3,
     } mode_t;
-    mode_t _mode;
+    mode_t _mode = MODE_ERROR;
     File _file;
 
 private:
@@ -234,14 +234,14 @@ private:
     size_t _append (const JsonDocument& doc) { return _append ("JsonDocument", [&] () { return serializeJson (doc, _file); }, measureJson (doc)); }
 
     size_t _read (LineCallback& callback) {
-        size_t size = 0;
+        size_t count = 0;
         while (_file.available ()) {
             const String input = _file.readStringUntil ('\n');
             if (!callback.process (input))
                 break;
-            size += input.length ();
+            count += input.length ();
         }
-        return size;
+        return count;
     }
     size_t _read (JsonDocument& doc) {
         DeserializationError error;
