@@ -169,15 +169,6 @@ class Program: public Component, public Diagnosticable {
 #endif
         }
         cycles ++;
-
-        // const String x = doCollect ("diag", [&] (JsonDocument& doc) { diagnostics.collect (doc); });
-        // DEBUG_PRINTF ("Program::_debug_: diag, length=%d, content=<<<%s>>>\n", x.length (), x.c_str ());
-        // JsonSplitter splitter (512, { "type", "time" });
-        // splitter.splitJson (x, [&] (const String& part, const int elements) {
-        //     DEBUG_PRINTF ("Program::_debug_: length=%u, part=%u, elements=%d\n", x.length (), part.length (), elements);
-        //     DEBUG_PRINTF ("--> %s\n", part.c_str ());
-        // });
-
     }
 
 public:

@@ -185,16 +185,16 @@ public:
                   return String ("invalid resistance at index ") + IntToString (index);
               const double Y = 1.0 / (temperatures [index] + 273.15);
               const double L1 = std::log (static_cast <double> (resistances [index])), L2 = L1 * L1, L3 = L2 * L1;
-              sum_Y   +=  Y;
-              sum_L1  += L1;
-              sum_L2  += L2;
-              sum_L3  += L3;
-              sum_L4  += L2 * L2;
-              sum_L5  += L2 * L3;
-              sum_L6  += L3 * L3;
-              sum_YL1 +=  Y * L1;
-              sum_YL2 +=  Y * L2;
-              sum_YL3 +=  Y * L3;
+              sum_Y += Y;
+              sum_L1 += L1;
+              sum_L2 += L2;
+              sum_L3 += L3;
+              sum_L4 += L2 * L2;
+              sum_L5 += L2 * L3;
+              sum_L6 += L3 * L3;
+              sum_YL1 += Y * L1;
+              sum_YL2 += Y * L2;
+              sum_YL3 += Y * L3;
         }
         gaussian::matrix4 <double> matrix = {{
             { siz,    sum_L1, sum_L2, sum_L3 },
