@@ -151,7 +151,7 @@ public:
 protected:
     void collectDiagnostics (JsonDocument &obj) const override {
         JsonObject sub = obj ["storage"].to <JsonObject> ();
-        storage ["critical"] = config.remainLimit;
+        sub ["critical"] = config.remainLimit;
         if (_erasures > 0)
             sub ["erasures"] = _erasures;
         if (_failures > 0) {

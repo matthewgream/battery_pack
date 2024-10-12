@@ -109,7 +109,7 @@ class Program: public Component, public Diagnosticable {
     class OperationalManager {
         const Program* _program;
         public:
-            OperationalManager (const Program* program) : _program (program) {};
+            explicit OperationalManager (const Program* program) : _program (program) {};
             void collect (JsonDocument &doc) const;
     } operational;
 
@@ -131,7 +131,7 @@ class Program: public Component, public Diagnosticable {
         class StorageLineHandler: public StorageManager::LineCallback {
             PublishManager& _publish;
         public:
-            StorageLineHandler (PublishManager& publish): _publish (publish) {}
+            explicit StorageLineHandler (PublishManager& publish): _publish (publish) {}
             bool process (const String& line) override {
                 return line.isEmpty () ? true : _publish.publish (line, "data");
             }
@@ -151,15 +151,15 @@ class Program: public Component, public Diagnosticable {
 
     Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
     void process () override {
-        const bool deliver = intervalDeliver, capture = intervalCapture, diagnose = intervalDiagnose;
-        DEBUG_PRINTF ("\nProgram::process: deliver=%d, capture=%d, diagnose=%d\n", deliver, capture, diagnose);
-        if (deliver || capture) {
+        const bool deliverTo = intervalDeliver, captureTo = intervalCapture, diagnoseTo = intervalDiagnose;
+        DEBUG_PRINTF ("\nProgram::process: deliver=%d, capture=%d, diagnose=%d\n", deliverTo, captureTo, diagnoseTo);
+        if (deliverTo || captureTo) {
             const String data = doCollect ("data", [&] (JsonDocument& doc) { operational.collect (doc); });
-            if (deliver) doDeliver (data);
-            if (capture) doCapture (data);
+            if (deliverTo) doDeliver (data);
+            if (captureTo) doCapture (data);
             DEBUG_PRINTF ("Program::process: data, length=%d, content=<<<%s>>>\n", data.length (), data.c_str ());
         }
-        if (diagnose) {
+        if (diagnoseTo) {
             const String diag = doCollect ("diag", [&] (JsonDocument& doc) { diagnostics.collect (doc); });
             doDeliver (diag);
             DEBUG_PRINTF ("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());

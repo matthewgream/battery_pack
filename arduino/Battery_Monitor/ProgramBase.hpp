@@ -79,13 +79,7 @@ public:
     inline AlarmSet& operator+= (const _AlarmType alarm) { _alarms |= alarm; return *this; }
     inline AlarmSet& operator+= (const AlarmSet& other) { _alarms |= other._alarms; return *this; }
     inline AlarmSet operator^ (const AlarmSet& other) const { AlarmSet result; result._alarms = _alarms ^ other._alarms; return result; }
-    String toStringBitmap () const {
-        String s;
-        for (int number = 0; number < _ALARM_COUNT; number ++)
-            s += (_alarms & _ALARM_NUMB (number)) ? '1' : '0';
-        return s;
-    }
-    String toStringNames () const {
+    String toString () const {
         String s;
         for (int number = 0; number < _ALARM_COUNT; number ++)
             s += (_alarms & _ALARM_NUMB (number)) ? (String (s.isEmpty () ? "" : ",") + String (_ALARM_NAME (number))) : "";
@@ -152,12 +146,11 @@ public:
                 if (changes.isSet (number))
                     (alarms.isSet (number) ? _activations [number] : _deactivations [number]) ++;
             _interface.set (alarms.isAny ());
-            DEBUG_PRINTF ("AlarmManager::process: alarms: %s <-- %s\n", alarms.toStringNames ().c_str (), _alarms.toStringNames ().c_str ());
+            DEBUG_PRINTF ("AlarmManager::process: alarms: %s <-- %s\n", alarms.toString ().c_str (), _alarms.toString ().c_str ());
             _alarms = alarms;
         }
     }
-    inline String getAlarmsAsBitmap () const { return _alarms.toStringBitmap (); }
-    inline String getAlarmsAsString () const { return _alarms.toStringNames (); }
+    inline String getAlarmsAsString () const { return _alarms.toString (); }
 
 protected:
     void collectDiagnostics (JsonDocument &obj) const override { // XXX this is too large and needs reduction

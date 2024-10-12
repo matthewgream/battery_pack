@@ -58,7 +58,7 @@ public:
         _rssiLast = std::numeric_limits <RssiType>::min ();
         _qualityLast = ConnectionQuality::UNKNOWN;
     }
-    void serialize (JsonObject &obj) const {
+    void serialize (JsonObject &obj) const override {
         obj ["rssi"] = _rssiLast;
         obj ["quality"] = toString ();
     }

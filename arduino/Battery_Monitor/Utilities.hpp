@@ -104,7 +104,7 @@ class Stats {
     static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
     using S = std::conditional_t <std::is_integral_v <T>, std::conditional_t <sizeof (T) < sizeof (int32_t), int32_t, int64_t>, double>;
     S _sum = S (0);
-    T _min, _max, _avg = T (0);
+    T _min = std::numeric_limits <T>::max (), _max = std::numeric_limits <T>::min (), _avg = T (0);
     size_t _cnt = 0;
 public:
     inline void reset () { _cnt = 0; _avg = T (0); }
@@ -118,7 +118,7 @@ public:
         }
         return *this;
     }
-    inline size_t cnt () const { return _cnt; }
+//    inline size_t cnt () const { return _cnt; }
     inline T min () const { return _min; }
     inline T max () const { return _max; }
     inline T avg () const {
@@ -152,7 +152,7 @@ using StatsWithValue = TypeOfStatsWithValue <Stats, T>;
 template <typename T>
 class PidController {
     const T _Kp, _Ki, _Kd;
-    T _p, _i = T (0), _d, _e = T (0);
+    T _p = T (0), _i = T (0), _d = T (0), _e = T (0);
     interval_t _t = 0;
 
 public:
