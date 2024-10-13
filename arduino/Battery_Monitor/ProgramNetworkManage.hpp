@@ -106,9 +106,7 @@ private:
         return String (reinterpret_cast <const char*> (ssid), ssid_len);
     }
     static String __wifi_bssid_to_string (const uint8_t bssid []) {
-        #define __BSSID_MACBYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
-        #define __BSSID_FORMAT_BSSID(addr) __BSSID_MACBYTETOSTRING ((addr)[0]) + ":" + __BSSID_MACBYTETOSTRING ((addr)[1]) + ":" + __BSSID_MACBYTETOSTRING ((addr)[2]) + ":" + __BSSID_MACBYTETOSTRING ((addr)[3]) + ":" + __BSSID_MACBYTETOSTRING ((addr)[4]) + ":" + __BSSID_MACBYTETOSTRING ((addr)[5])
-        return __BSSID_FORMAT_BSSID (bssid);
+        return hexabyte_to_hexastring (bssid);
     }
     static String __wifi_authmode_to_string (const wifi_auth_mode_t authmode) {
         switch (authmode) {

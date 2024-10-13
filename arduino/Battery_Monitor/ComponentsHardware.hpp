@@ -77,9 +77,11 @@ public:
 
 private:
     static String __ds1820_address_to_string (const DeviceAddress& addr) {
+        #define NIBBLE_TO_HEX_CHAR(nibble) ((char) ((nibble) < 10 ? '0' + (nibble) : 'A' + ((nibble) - 10)))
+        #define BYTE_TO_HEX(byte) NIBBLE_TO_HEX_CHAR ((byte) >> 4), NIBBLE_TO_HEX_CHAR ((byte) & 0x0F)
         #define __DS18_BYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
         #define __DS18_FORMAT_ADDRESS(addr) __DS18_BYTETOSTRING ((addr) [0]) + __DS18_BYTETOSTRING ((addr) [1]) + __DS18_BYTETOSTRING ((addr) [2]) + __DS18_BYTETOSTRING ((addr) [3]) + __DS18_BYTETOSTRING ((addr) [4]) + __DS18_BYTETOSTRING ((addr) [5]) + __DS18_BYTETOSTRING ((addr) [6]) + __DS18_BYTETOSTRING ((addr) [7])
-        return __DS18_FORMAT_ADDRESS (addr);
+        return __DS18_FORMAT_ADDRESS(addr);
     }
 };
 

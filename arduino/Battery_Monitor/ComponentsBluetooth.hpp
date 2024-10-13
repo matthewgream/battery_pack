@@ -269,9 +269,7 @@ private:
         }
     }
     static String __ble_address_to_string (const esp_bd_addr_t bleaddr) {
-        #define __BLE_MACBYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
-        #define __BLE_FORMAT_ADDRESS(addr) __BLE_MACBYTETOSTRING ((addr) [0]) + ":" + __BLE_MACBYTETOSTRING ((addr) [1]) + ":" + __BLE_MACBYTETOSTRING ((addr) [2]) + ":" + __BLE_MACBYTETOSTRING ((addr) [3]) + ":" + __BLE_MACBYTETOSTRING ((addr) [4]) + ":" + __BLE_MACBYTETOSTRING ((addr) [5])
-        return __BLE_FORMAT_ADDRESS (bleaddr);
+        return hexabyte_to_hexastring (bleaddr);
     }
     static String __ble_linkrole_to_string (const int linkrole) {
         return linkrole == 0 ? "master" : "slave";

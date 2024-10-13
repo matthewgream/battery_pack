@@ -17,8 +17,11 @@
 
 // -----------------------------------------------------------------------------------------------
 
-#define NIBBLE_TO_HEX_CHAR(nibble) ((char) ((nibble) < 10 ? '0' + (nibble) : 'A' + ((nibble) - 10)))
-#define BYTE_TO_HEX(byte) NIBBLE_TO_HEX_CHAR ((byte) >> 4), NIBBLE_TO_HEX_CHAR ((byte) & 0x0F)
+String hexabyte_to_hexastring (const uint8_t bytes []) {
+    char buffer [3*6+1];
+    sprintf (buffer, "%02x:%02x:%02x:%02x:%02x:%02x", bytes [0], bytes [1], bytes [2], bytes [3], bytes [4], bytes [5]);
+    return String (buffer);
+}
 
 // -----------------------------------------------------------------------------------------------
 
