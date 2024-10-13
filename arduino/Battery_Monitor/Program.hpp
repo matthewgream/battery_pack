@@ -6,7 +6,7 @@
 #define DEFAULT_WATCHDOG_SECS 60
 
 #define DEFAULT_NAME "BatteryMonitor"
-#define DEFAULT_VERS "1.0.2"
+#define DEFAULT_VERS "1.0.3"
 #define DEFAULT_TYPE "batterymonitor-custom-esp32c3"
 #define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 
@@ -38,8 +38,6 @@ static inline constexpr float HARDWARE_TEMP_START = 5.0f, HARDWARE_TEMP_END = 60
 using TemperatureManagerBatterypack = TemperatureManagerBatterypackTemplate <HARDWARE_TEMP_SIZE - 1>;
 using TemperatureManagerEnvironment = TemperatureManagerEnvironmentTemplate <1>;
 using TemperatureCalibrator = TemperatureCalibrationManager <HARDWARE_TEMP_SIZE, HARDWARE_TEMP_START, HARDWARE_TEMP_END, HARDWARE_TEMP_STEP>;
-
-static inline constexpr double HARDWARE_FAN_CONTROL_P = 10.0, HARDWARE_FAN_CONTROL_I = 0.1, HARDWARE_FAN_CONTROL_D = 1.0, HARDWARE_FAN_SMOOTH_A = 0.1;
 
 // -----------------------------------------------------------------------------------------------
 
@@ -109,9 +107,9 @@ class Program: public Component, public Diagnosticable {
     DiagnosticManager diagnostics;
     class OperationalManager {
         const Program* _program;
-        public:
-            explicit OperationalManager (const Program* program) : _program (program) {};
-            void collect (JsonVariant &) const;
+    public:
+        explicit OperationalManager (const Program* program) : _program (program) {};
+        void collect (JsonVariant &) const;
     } operational;
 
     Uptime uptime;
@@ -174,7 +172,7 @@ class Program: public Component, public Diagnosticable {
 
 public:
     Program () :
-        fanControllingAlgorithm (HARDWARE_FAN_CONTROL_P, HARDWARE_FAN_CONTROL_I, HARDWARE_FAN_CONTROL_D), fanSmoothingAlgorithm (HARDWARE_FAN_SMOOTH_A),
+        fanControllingAlgorithm (config.FAN_CONTROL_P, config.FAN_CONTROL_I, config.FAN_CONTROL_D), fanSmoothingAlgorithm (config.FAN_SMOOTH_A),
         temperatureCalibrator (config.temperatureCalibrator),
         temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) { return temperatureCalibrator.calculateTemperature (channel, resistance); }),
         temperatureManagerBatterypack (config.temperatureManagerBatterypack, temperatureInterface), temperatureManagerEnvironment (config.temperatureManagerEnvironment, temperatureInterface),
@@ -184,7 +182,7 @@ public:
         deliver (config.deliver), publish (config.publish, [&] () { return network.isAvailable (); }), storage (config.storage),
         updater (config.updateManager, [&] () { return network.isAvailable (); }),
         alarmInterface (config.alarmInterface), alarms (config.alarmManager, alarmInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
-        diagnostics (config.diagnosticManager, { &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &network, &nettime, &deliver, &publish, &storage, &updater, &alarms, &platform, this }),
+        diagnostics (config.diagnosticManager, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &network, &nettime, &deliver, &publish, &storage, &updater, &alarms, &platform, this }),
         operational (this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
         components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &network, &nettime, &deliver, &publish, &storage, &updater, &diagnostics, this }) {

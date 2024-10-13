@@ -389,13 +389,13 @@ public:
         return true;
     }
 
-    static bool deserialize (const String& filename, StrategyDefault& defaultStrategy, CalibrationStrategies& calibrationStrategies, const StrategyFactories& strategyFactories) {
+    static int deserialize (const String& filename, StrategyDefault& defaultStrategy, CalibrationStrategies& calibrationStrategies, const StrategyFactories& strategyFactories) {
         JsonDocument doc;
 
         SPIFFSFile file (filename); size_t size;
         if (!file.begin () || !((size = file.read (doc)) > 0)) {
             DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: could not read from '%s'\n", filename.c_str ());
-            return false;
+            return 0;
         }
         DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: read %d bytes from '%s'\n", size, filename.c_str ());
 
@@ -404,9 +404,9 @@ public:
             JsonObject sensorObj = doc ["sensor" + ArithmeticToString (sensor)].as <JsonObject> ();
             if (sensorObj) {
                 for (JsonPair kv : sensorObj) {
-                    auto factoryIt = strategyFactories.find (String (kv.key ().c_str ()));
-                    if (factoryIt != strategyFactories.end ()) {
-                        auto strategy = factoryIt->second ();
+                    auto factory = strategyFactories.find (String (kv.key ().c_str ()));
+                    if (factory != strategyFactories.end ()) {
+                        auto strategy = factory->second ();
                         JsonObject details = kv.value ().as <JsonObject> ();
                         strategy->deserialize (details);
                         DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: sensor %d, installed %s\n", sensor, strategy->getDetails ().c_str ());
@@ -420,7 +420,7 @@ public:
         JsonObject details = doc ["default"].as <JsonObject> ();
         if (details)
             defaultStrategy.deserialize (details), count ++;
-        return count > 0;
+        return count;
     }
 };
 
@@ -623,7 +623,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
-class TemperatureCalibrationManager: public Component {
+class TemperatureCalibrationManager: public Component, public Diagnosticable {
 public:
     using Definitions = TemperatureCalibrationDefinitions <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
     using Collector = TemperatureCalibrationCollector <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
@@ -645,6 +645,7 @@ public:
 private:
     const Config &config;
     std::shared_ptr <Runtime> runtime;
+    size_t _loaded = 0;
 
     StrategyFactories createStrategyFactoriesForCalibration () const { // store the lookup tables, but don't use them
         return StrategyFactories {
@@ -664,7 +665,7 @@ public:
     void begin () override {
         std::shared_ptr <typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_shared <typename Calculator::CalibrationStrategies> ();
         StrategyDefault defaultStrategy (config.strategyDefault);
-        if (!Storage::deserialize (config.filename, defaultStrategy, *calibrationStrategies, createStrategyFactoriesForOperation ()))
+        if (!(_loaded = Storage::deserialize (config.filename, defaultStrategy, *calibrationStrategies, createStrategyFactoriesForOperation ())))
             DEBUG_PRINTF ("TemperatureCalibrationManager:: no stored calibrations (filename = %s), will rely upon default\n", config.filename.c_str ());
         runtime = std::make_shared <Runtime> (defaultStrategy, *calibrationStrategies);
     }
@@ -709,6 +710,12 @@ private:
         Storage::serialize (config.filename, defaultStrategy, *calibrationStrategies);
         runtime = std::make_shared <Runtime> (defaultStrategy, *calibrationStrategies);
         return true;
+    }
+
+protected:
+    void collectDiagnostics (JsonVariant &obj) const override {
+        JsonObject cal = obj ["cal"].to <JsonObject> ();
+        cal ["loaded"] = _loaded;
     }
 };
 

@@ -87,6 +87,7 @@ struct Config {
         .channel = 0,
         .FAILURE = -100.0
     };
+    double FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
     FanManager::Config fanManager = {
         .NO_SPEED = 0, .MIN_SPEED = 85, .MAX_SPEED = 255
     };
