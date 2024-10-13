@@ -27,18 +27,18 @@ public:
     }
     bool deliver (const String& data) {
         if (_blue.connected ()) {
-            _delivers += IntToString (data.length ()), _blue.notify (data);
+            _delivers += ArithmeticToString (data.length ()), _blue.notify (data);
             return true;
         }
         return false;
     }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["deliver"].to <JsonObject> ();
-        if (_delivers.number () > 0)
-            _delivers.serialize (sub ["delivers"].to <JsonObject> ());
-        _blue.serialize (sub);
+        if (_delivers.count () > 0)
+            sub ["delivers"] = _delivers;
+        sub ["bluetooth"] = _blue;
     }
 };
 
@@ -78,7 +78,7 @@ public:
     bool publish (const String& data, const String& subtopic) {
         if (_networkIsAvailable ()) {
           if (_mqtt.connected () && _mqtt.publish (config.mqtt.topic + "/" + subtopic, data)) {
-              _publishes += IntToString (data.length ()), _failures = 0;
+              _publishes += ArithmeticToString (data.length ()), _failures = 0;
               return true;
           } else _failures ++;
         }
@@ -87,16 +87,16 @@ public:
     inline bool connected () { return _networkIsAvailable () && _mqtt.connected (); }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["publish"].to <JsonObject> ();
-        if (_publishes.number () > 0)
-            _publishes.serialize (sub ["publishes"].to <JsonObject> ());
+        if (_publishes.count () > 0)
+            sub ["publishes"] = _publishes;
         if (_failures > 0) {
             JsonObject failures = sub ["failures"].to <JsonObject> ();
             failures ["count"] = _failures;
             failures ["limit"] = config.failureLimit;
         }
-        _mqtt.serialize (sub);
+        sub ["mqtt"] = _mqtt;
     }
 };
 
@@ -133,7 +133,7 @@ public:
     }
     bool append (const String& data) {
         if (_file.append (data)) {
-            _appends += IntToString (data.length ()), _failures = 0;
+            _appends += ArithmeticToString (data.length ()), _failures = 0;
             return true;
         } else _failures ++;
         return false;
@@ -147,7 +147,7 @@ public:
     }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["storage"].to <JsonObject> ();
         sub ["critical"] = config.remainLimit;
         if (_erasures > 0)
@@ -157,9 +157,9 @@ protected:
             failures ["count"] = _failures;
             failures ["limit"] = config.failureLimit;
         }
-        if (_appends.number () > 0)
-            _appends.serialize (sub ["appends"].to <JsonObject> ());
-        _file.serialize (sub);
+        if (_appends.count () > 0)
+            sub ["appends"] = _appends;
+        sub ["file"] = _file;
     }
 };
 

@@ -2,8 +2,6 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-#include <ArduinoJson.h>
-
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
@@ -13,18 +11,17 @@
 
 // -----------------------------------------------------------------------------------------------
 
-enum class ConnectionQuality {
-    UNKNOWN,
-    EXCELLENT,
-    GOOD,
-    FAIR,
-    POOR
-};
-
-class ConnectionQualityTracker: public JsonSerializable {
+class ConnectionSignalTracker: public JsonSerializable {
 public:
     using RssiType = int8_t;
-    using Callback = std::function <void (const RssiType rssi, const ConnectionQuality quality)>;
+    enum class QualityType {
+        UNKNOWN,
+        EXCELLENT,
+        GOOD,
+        FAIR,
+        POOR
+    };
+    using Callback = std::function <void (const RssiType rssi, const QualityType quality)>;
     static constexpr RssiType RSSI_THRESHOLD_EXCELLENT = RssiType (-50);
     static constexpr RssiType RSSI_THRESHOLD_GOOD      = RssiType (-60);
     static constexpr RssiType RSSI_THRESHOLD_FAIR      = RssiType (-70);
@@ -32,22 +29,22 @@ public:
 private:
     const Callback _callback;
     RssiType _rssiLast = std::numeric_limits <RssiType>::min ();
-    ConnectionQuality _qualityLast = ConnectionQuality::UNKNOWN;
+    QualityType _qualityLast = QualityType::UNKNOWN;
 
-    static inline ConnectionQuality connectionQuality (const RssiType rssi) {
-        if (rssi > RSSI_THRESHOLD_EXCELLENT) return ConnectionQuality::EXCELLENT;
-        else if (rssi > RSSI_THRESHOLD_GOOD) return ConnectionQuality::GOOD;
-        else if (rssi > RSSI_THRESHOLD_FAIR) return ConnectionQuality::FAIR;
-        else                                 return ConnectionQuality::POOR;
+    static inline QualityType signalQuality (const RssiType rssi) {
+        if (rssi > RSSI_THRESHOLD_EXCELLENT) return QualityType::EXCELLENT;
+        else if (rssi > RSSI_THRESHOLD_GOOD) return QualityType::GOOD;
+        else if (rssi > RSSI_THRESHOLD_FAIR) return QualityType::FAIR;
+        else                                 return QualityType::POOR;
     }
 
 public:
-    explicit ConnectionQualityTracker (const Callback callback = nullptr): _callback (callback) {}
+    explicit ConnectionSignalTracker (const Callback callback = nullptr): _callback (callback) {}
     RssiType rssi () const {
         return _rssiLast;
     }
     void update (const RssiType rssi) {
-        ConnectionQuality quality = connectionQuality (_rssiLast = rssi);
+        QualityType quality = signalQuality (_rssiLast = rssi);
         if (quality != _qualityLast) {
             _qualityLast = quality;
             if (_callback)
@@ -56,21 +53,22 @@ public:
     }
     void reset () {
         _rssiLast = std::numeric_limits <RssiType>::min ();
-        _qualityLast = ConnectionQuality::UNKNOWN;
-    }
-    void serialize (JsonObject &obj) const override {
-        obj ["rssi"] = _rssiLast;
-        obj ["quality"] = toString ();
+        _qualityLast = QualityType::UNKNOWN;
     }
     String toString () const {
         switch (_qualityLast) {
-          case ConnectionQuality::UNKNOWN: return "UNKNOWN";
-          case ConnectionQuality::POOR: return "POOR";
-          case ConnectionQuality::FAIR: return "FAIR";
-          case ConnectionQuality::GOOD: return "GOOD";
-          case ConnectionQuality::EXCELLENT: return "EXCELLENT";
+          case QualityType::UNKNOWN: return "UNKNOWN";
+          case QualityType::POOR: return "POOR";
+          case QualityType::FAIR: return "FAIR";
+          case QualityType::GOOD: return "GOOD";
+          case QualityType::EXCELLENT: return "EXCELLENT";
           default: return "UNDEFINED";
         }
+    }
+    //
+    void serialize (JsonVariant &obj) const override {
+        obj ["rssi"] = _rssiLast;
+        obj ["quality"] = toString ();
     }
 };
 
@@ -95,7 +93,7 @@ private:
 
     esp_bd_addr_t _peerAddress;
     int _mtuNegotiated = -1, _mtuExceeded = 0;
-    ConnectionQualityTracker _connectionQualityTracker;
+    ConnectionSignalTracker _connectionSignalTracker;
     bool _connected = false;
     Intervalable _intervalConnectionCheck;
     ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
@@ -105,7 +103,7 @@ private:
             __ble_address_to_string (param->connect.remote_bda).c_str (), param->connect.conn_id, __ble_linkrole_to_string (param->connect.link_role).c_str ());
         advertise (false);
         _mtuNegotiated = -1; _mtuExceeded = 0;
-        _connectionQualityTracker.reset ();
+        _connectionSignalTracker.reset ();
         memcpy (_peerAddress, param->connect.remote_bda, sizeof (esp_bd_addr_t));
         _intervalConnectionCheck.reset (); _connections ++; _connected = true;
         esp_ble_gap_read_rssi (_peerAddress);
@@ -135,8 +133,8 @@ private:
     }
     void onRssiRead (esp_ble_gap_cb_param_t *param) {
         if (param->read_rssi_cmpl.status == ESP_BT_STATUS_SUCCESS) {
-            _connectionQualityTracker.update (param->read_rssi_cmpl.rssi);
-            DEBUG_PRINTF ("BluetoothNotifier::onRssiRead: rssi=%d (%s)\n", param->read_rssi_cmpl.rssi, _connectionQualityTracker.toString ().c_str ());
+            _connectionSignalTracker.update (param->read_rssi_cmpl.rssi);
+            DEBUG_PRINTF ("BluetoothNotifier::onRssiRead: rssi=%d (%s)\n", param->read_rssi_cmpl.rssi, _connectionSignalTracker.toString ().c_str ());
         }
     }
 
@@ -162,7 +160,7 @@ private:
     }
 
 public:
-    explicit BluetoothNotifier (const Config& cfg, const ConnectionQualityTracker::Callback connectionQualityCallback = nullptr): Singleton <BluetoothNotifier> (this), config (cfg), _connectionQualityTracker (connectionQualityCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+    explicit BluetoothNotifier (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr): Singleton <BluetoothNotifier> (this), config (cfg), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
 
     bool advertise () {
         BLEDevice::init (config.name);
@@ -240,20 +238,19 @@ public:
         }
     }
     //
-    void serialize (JsonObject &obj) const override {
-        JsonObject bluetooth = obj ["bluetooth"].to <JsonObject> ();
-        if ((bluetooth ["connected"] = _connected)) {
-            bluetooth ["address"] = BLEDevice::getAddress ().toString ();
-            bluetooth ["devices"] = _server->getPeerDevices (true).size ();
-            bluetooth ["mtu"] = _mtuNegotiated;
-            _connectionQualityTracker.serialize (bluetooth);
+    void serialize (JsonVariant &obj) const override {
+        if ((obj ["connected"] = _connected)) {
+            obj ["address"] = BLEDevice::getAddress ().toString ();
+            obj ["devices"] = _server->getPeerDevices (true).size ();
+            obj ["mtu"] = _mtuNegotiated;
+            obj ["signal"] = _connectionSignalTracker;
         }
         if (_mtuExceeded > 0)
-            bluetooth ["mtuExceeded"] = _mtuExceeded;
-        if (_connections.number () > 0)
-            _connections.serialize (bluetooth ["connects"].to <JsonObject> ());
-        if (_disconnections.number () > 0)
-            _disconnections.serialize (bluetooth ["disconnects"].to <JsonObject> ());
+            obj ["mtuExceeded"] = _mtuExceeded;
+        if (_connections.count () > 0)
+            obj ["connects"] = _connections;
+        if (_disconnections.count () > 0)
+            obj ["disconnects"] = _disconnections;
     }
 
 private:
@@ -268,7 +265,7 @@ private:
           case ESP_GATT_CONN_LMP_TIMEOUT: return "LMP_TIMEOUT";
           case ESP_GATT_CONN_CONN_CANCEL: return "CANCELLED";
           case ESP_GATT_CONN_NONE: return "NONE";
-          default: return "UNDEFINED_(" + IntToString (static_cast <int> (reason)) + ")";
+          default: return "UNDEFINED_(" + ArithmeticToString (static_cast <int> (reason)) + ")";
         }
     }
     static String __ble_address_to_string (const esp_bd_addr_t bleaddr) {
@@ -288,7 +285,7 @@ private:
           case BLECharacteristicCallbacks::Status::ERROR_INDICATE_TIMEOUT: return "INDICATE_TIMEOUT";
           case BLECharacteristicCallbacks::Status::ERROR_INDICATE_FAILURE: return "INDICATE_FAILURE";
           case BLECharacteristicCallbacks::Status::SUCCESS_INDICATE: return "INDICATE_SUCCESS";
-          default: return "UNDEFINED_(" + IntToString (static_cast <int> (status)) + ")";
+          default: return "UNDEFINED_(" + ArithmeticToString (static_cast <int> (status)) + ")";
         }
     }
 };

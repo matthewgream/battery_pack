@@ -86,18 +86,6 @@ String getMacAddress (void) {
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-String getTimeString (time_t timet = 0) {
-    struct tm timeinfo;
-    char timeString [sizeof ("yyyy-mm-ddThh:mm:ssZ") + 1] = { '\0' };
-    if (timet == 0) time (&timet);
-    if (gmtime_r (&timet, &timeinfo) != NULL)
-        strftime (timeString, sizeof (timeString), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
-    return timeString;
-}
-
-// -----------------------------------------------------------------------------------------------
-// -----------------------------------------------------------------------------------------------
-
 #include <esp_task_wdt.h>
 
 class Watchdog {
@@ -161,7 +149,7 @@ std::pair <String, String> getResetDetails (const int reason = getResetReason ()
         case RESET_REASON_CORE_PWR_GLITCH:  return std::pair <String, String> ("PWR_GLITCH", "Glitch on power resets the digital core");
         case RESET_REASON_SYS_BROWN_OUT:    return std::pair <String, String> ("PWR_BROWN_OUT", "VDD voltage is not stable and resets the digital core");
 
-        default:                            return std::pair <String, String> (IntToString (reason), "Unknown reason");
+        default:                            return std::pair <String, String> (ArithmeticToString (reason), "Unknown reason");
     }
 }
 bool getResetOkay (const int reason = getResetReason ()) {
@@ -190,7 +178,7 @@ bool getResetOkay (const int reason = getResetReason ()) {
 //         case ESP_RST_EFUSE:       return std::pair <String, String> ("EFUSE", "Reset due to efuse error");
 //         case ESP_RST_PWR_GLITCH:  return std::pair <String, String> ("PWR_GLITCH", "Reset due to power glitch detected");
 //         case ESP_RST_CPU_LOCKUP:  return std::pair <String, String> ("CPU_LOOKUP", "Reset due to CPU lock up");
-//         default:                  return std::pair <String, String> (IntToString (reason), "Reset reason undefined");
+//         default:                  return std::pair <String, String> (ArithmeticToString (reason), "Reset reason undefined");
 //     }
 // }
 // bool getResetOkay (const int reason = getResetReason ()) {

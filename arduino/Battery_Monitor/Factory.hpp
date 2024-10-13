@@ -2,10 +2,12 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+#include <cmath>
+
 float steinharthart_calculator (const float value, const float value_max, const float resistance_reference, const float resistance_nominal, const float temperature_nominal) {
     static constexpr float beta = 3950.0f, kelvin_constant = 273.15f;
     float resistance = resistance_reference / ((value_max / value) - 1.0f);
-    float steinhart = logf (resistance / resistance_nominal) / beta + 1.0f / (temperature_nominal + kelvin_constant);
+    float steinhart = std::log (resistance / resistance_nominal) / beta + 1.0f / (temperature_nominal + kelvin_constant);
     return 1.0f / steinhart - kelvin_constant;
 }
 

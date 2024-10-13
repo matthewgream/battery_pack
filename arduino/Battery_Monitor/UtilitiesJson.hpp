@@ -2,15 +2,10 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class JsonSerializable {
-public:
-    virtual void serialize (JsonObject& obj) const = 0;
-};
-
-// -----------------------------------------------------------------------------------------------
-// -----------------------------------------------------------------------------------------------
-
 #include <ArduinoJson.h>
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
 
 class JsonCollector {
     JsonDocument doc;
@@ -143,6 +138,57 @@ public:
             callback ("{" + common + current + "}", numbers);
     }
 };
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
+template <typename T>
+bool convertToJson (const StatsWithValue <T>& src, JsonVariant dst) {
+    dst ["val"] = src.val ();
+    dst ["avg"] = src.avg ();
+    dst ["min"] = src.min ();
+    dst ["max"] = src.max ();
+    dst ["cnt"] = src.cnt ();
+    return true;
+}
+template <typename T>
+bool convertToJson (const Stats <T>& src, JsonVariant dst) {
+    dst ["avg"] = src.avg ();
+    dst ["min"] = src.min ();
+    dst ["max"] = src.max ();
+    dst ["cnt"] = src.cnt ();
+    return true;
+}
+template <typename T>
+bool convertToJson (const PidController <T>& src, JsonVariant dst) {
+    dst.set (src.toString ());
+    return true;
+}
+bool convertToJson (const ActivationTrackerWithDetail& src, JsonVariant dst) {
+    dst ["last"] = src.seconds ();
+    dst ["count"] = src.count ();
+    if (!src.detail ().isEmpty ())
+        dst ["detail"] = src.detail ();
+    return true;
+}
+bool convertToJson (const ActivationTracker& src, JsonVariant dst) {
+    dst ["last"] = src.seconds ();
+    dst ["count"] = src.count ();
+    return true;
+}
+bool convertToJson (const Uptime& src, JsonVariant dst) {
+    dst.set (src.seconds ());
+    return true;
+}
+
+class JsonSerializable {
+public:
+    virtual void serialize (JsonVariant&) const = 0;
+};
+bool convertToJson (const JsonSerializable& src, JsonVariant dst) {
+    src.serialize (dst);
+    return true;
+}
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------

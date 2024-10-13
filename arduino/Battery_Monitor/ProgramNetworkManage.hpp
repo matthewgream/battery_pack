@@ -2,6 +2,10 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+#include <WiFi.h>
+
+// -----------------------------------------------------------------------------------------------
+
 class ConnectManager: private Singleton <ConnectManager>, public Component, public Diagnosticable {
 public:
     typedef struct {
@@ -12,7 +16,7 @@ public:
 private:
     const Config &config;
 
-    ConnectionQualityTracker _connectionQualityTracker;
+    ConnectionSignalTracker _connectionSignalTracker;
     bool _connected = false, _available = false;
     Intervalable _intervalConnectionCheck;
     ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
@@ -23,13 +27,13 @@ private:
     }
     void events (const WiFiEvent_t event, const WiFiEventInfo_t info) {
         if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED) {
-            _connectionQualityTracker.reset ();
+            _connectionSignalTracker.reset ();
             _intervalConnectionCheck.reset (); _connections ++; _connected = true;
-            _connectionQualityTracker.update (WiFi.RSSI ());
+            _connectionSignalTracker.update (WiFi.RSSI ());
             DEBUG_PRINTF ("ConnectManager::events: WIFI_CONNECTED, ssid=%s, bssid=%s, channel=%d, authmode=%s, rssi=%d (%s)\n",
                 __wifi_ssid_to_string (info.wifi_sta_connected.ssid, info.wifi_sta_connected.ssid_len).c_str (),
                 __wifi_bssid_to_string (info.wifi_sta_connected.bssid).c_str (), (int) info.wifi_sta_connected.channel,
-                __wifi_authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode).c_str (), _connectionQualityTracker.rssi (), _connectionQualityTracker.toString ().c_str ());
+                __wifi_authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode).c_str (), _connectionSignalTracker.rssi (), _connectionSignalTracker.toString ().c_str ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP) {
             _allocations ++; _available = true;
             DEBUG_PRINTF ("ConnectManager::events: WIFI_ALLOCATED, address=%s\n", IPAddress (info.got_ip.ip_info.ip.addr).toString ().c_str ());
@@ -43,7 +47,7 @@ private:
     }
 
 public:
-    explicit ConnectManager (const Config& cfg, const ConnectionQualityTracker::Callback connectionQualityCallback = nullptr) : Singleton <ConnectManager> (this), config (cfg), _connectionQualityTracker (connectionQualityCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+    explicit ConnectManager (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <ConnectManager> (this), config (cfg), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
     void begin () override {
         WiFi.persistent (false);
         WiFi.onEvent (__wiFiEventHandler);
@@ -68,8 +72,8 @@ public:
                 DEBUG_PRINTF ("ConnectManager::check: connection timeout, resetting\n");
                 reset ();
             } else {
-                _connectionQualityTracker.update (WiFi.RSSI ());
-                DEBUG_PRINTF ("ConnectManager::process: rssi=%d (%s)\n", _connectionQualityTracker.rssi (), _connectionQualityTracker.toString ().c_str ());
+                _connectionSignalTracker.update (WiFi.RSSI ());
+                DEBUG_PRINTF ("ConnectManager::process: rssi=%d (%s)\n", _connectionSignalTracker.rssi (), _connectionSignalTracker.toString ().c_str ());
             }
         // } else if (!_connected && _intervalConnectionCheck) {
         //     WiFi.disconnect (true);
@@ -81,20 +85,20 @@ public:
     }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject network = obj ["network"].to <JsonObject> ();
         network ["macaddr"] = getMacAddress ();
         if ((network ["connected"] = _connected)) {
             if ((network ["available"] = _available))
                 network ["ipaddr"] = WiFi.localIP ();
-            _connectionQualityTracker.serialize (network);
+            obj ["signal"] = _connectionSignalTracker;
         }
-        if (_connections.number () > 0)
-            _connections.serialize (network ["connects"].to <JsonObject> ());
-        if (_allocations.number () > 0)
-            _allocations.serialize (network ["allocations"].to <JsonObject> ());
-        if (_disconnections.number () > 0)
-            _disconnections.serialize (network ["disconnects"].to <JsonObject> ());
+        if (_connections.count () > 0)
+            network ["connects"] = _connections;
+        if (_allocations.count () > 0)
+            network ["allocations"] = _allocations;
+        if (_disconnections.count () > 0)
+            network ["disconnects"] = _disconnections;
     }
 
 private:
@@ -114,7 +118,7 @@ private:
             case WIFI_AUTH_WPA2_PSK: return "WPA2-PSK";
             case WIFI_AUTH_WPA_WPA2_PSK: return "WPA/2-PSK";
             case WIFI_AUTH_WPA2_ENTERPRISE: return "ENTERPRISE";
-            default: return "UNDEFINED_(" + IntToString (static_cast <int> (authmode)) + ")";
+            default: return "UNDEFINED_(" + ArithmeticToString (static_cast <int> (authmode)) + ")";
         }
     }
     // note: WiFi.disconnectReasonName
@@ -149,7 +153,7 @@ private:
             case WIFI_REASON_ASSOC_FAIL: return "ASSOC_FAIL";
             case WIFI_REASON_HANDSHAKE_TIMEOUT: return "HANDSHAKE_TIMEOUT";
             case WIFI_REASON_CONNECTION_FAIL: return "CONNECTION_FAIL";
-            default: return "UNDEFINED_(" + IntToString (static_cast <int> (reason)) + ")";
+            default: return "UNDEFINED_(" + ArithmeticToString (static_cast <int> (reason)) + ")";
         }
     }
 };
@@ -202,7 +206,7 @@ public:
           if (!_previousTimeUpdate || (currentTime - _previousTimeUpdate >= config.intervalUpdate)) {
               const time_t fetchedTime = _fetcher.fetch ();
               if (fetchedTime > 0) {
-                  _fetches += IntToString (fetchedTime);
+                  _fetches += ArithmeticToString (fetchedTime);
                   const struct timeval tv = { .tv_sec = fetchedTime, .tv_usec = 0 };
                   settimeofday (&tv, nullptr);
                   if (_previousTime > 0)
@@ -227,12 +231,12 @@ public:
     }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject nettime = obj ["nettime"].to <JsonObject> ();
         nettime ["now"] = getTimeString ();
         nettime ["drift"] = _drifter.drift ();
-        if (_fetches.number () > 0)
-            _fetches.serialize (nettime ["fetches"].to <JsonObject> ());
+        if (_fetches.count () > 0)
+            nettime ["fetches"] = _fetches;
     }
 };
 

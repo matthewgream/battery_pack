@@ -21,7 +21,7 @@ protected:
 
 public:
     typedef std::vector <Diagnosticable*> List;
-    virtual void collectDiagnostics (JsonDocument &) const = 0;
+    virtual void collectDiagnostics (JsonVariant &) const = 0;
 };
 
 class DiagnosticManager : public Component {
@@ -36,9 +36,9 @@ private:
 
 public:
     DiagnosticManager (const Config& cfg, const Diagnosticable::List& diagnosticables) : config (cfg), _diagnosticables (diagnosticables) {}
-    void collect (JsonDocument &doc) const {
+    void collect (JsonVariant &obj) const {
         for (const auto& diagnosticable : _diagnosticables)
-            diagnosticable->collectDiagnostics (doc);
+            diagnosticable->collectDiagnostics (obj);
     }
 };
 
@@ -153,12 +153,12 @@ public:
     inline String getAlarmsAsString () const { return _alarms.toString (); }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override { // XXX this is too large and needs reduction
+    void collectDiagnostics (JsonVariant &obj) const override { // XXX this is too large and needs reduction
         JsonObject alarms = obj ["alarms"].to <JsonObject> ();
         for (int number = 0; number < _alarms.size (); number ++) {
             JsonObject alarm = alarms [_alarms.name (number)].to <JsonObject> ();
             const int _now = _alarms.isSet (number) ? 1 : 0;
-            const counter_t _cnt = _activations [number].number ();
+            const counter_t _cnt = _activations [number].count ();
             if (_now || _cnt > 0) {
                 alarm ["now"] = _now;
                 alarm ["for"] = _now ? _activations [number].seconds () : _deactivations [number].seconds ();
@@ -218,7 +218,7 @@ public:
     }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject updates = obj ["updates"].to <JsonObject> ();
         updates ["current"] = config.vers;
         updates ["available"] = static_cast <String> (_persistent_data_version);

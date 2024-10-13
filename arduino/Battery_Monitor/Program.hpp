@@ -6,7 +6,7 @@
 #define DEFAULT_WATCHDOG_SECS 60
 
 #define DEFAULT_NAME "BatteryMonitor"
-#define DEFAULT_VERS "1.0.1"
+#define DEFAULT_VERS "1.0.2"
 #define DEFAULT_TYPE "batterymonitor-custom-esp32c3"
 #define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 
@@ -53,6 +53,7 @@ class PlatformArduino: public Alarmable, public Diagnosticable {
     const int reset_reason;
     const std::pair <String, String> reset_details;
     const bool reset_okay;
+
 public:
     PlatformArduino (): Alarmable ({
             AlarmCondition (ALARM_SYSTEM_MEMORYLOW, [this] () { return ((100 * esp_get_minimum_free_heap_size ()) / heap_size) < HEAP_FREE_PERCENTAGE_MINIMUM; }),
@@ -62,7 +63,7 @@ public:
     }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject system = obj ["system"].to <JsonObject> ();
         JsonObject code = system ["code"].to <JsonObject> ();
         code ["size"] = code_size;
@@ -110,7 +111,7 @@ class Program: public Component, public Diagnosticable {
         const Program* _program;
         public:
             explicit OperationalManager (const Program* program) : _program (program) {};
-            void collect (JsonDocument &doc) const;
+            void collect (JsonVariant &) const;
     } operational;
 
     Uptime uptime;
@@ -118,10 +119,10 @@ class Program: public Component, public Diagnosticable {
 
     //
 
-    using JsonDocumentFunc = std::function <void (JsonDocument& doc)>;
-    String doCollect (const String& name, const JsonDocumentFunc func) const {
+    String doCollect (const String& name, const std::function <void (JsonVariant &)> func) const {
         JsonCollector collector (name, getTimeString ());
-        func (collector.document ());
+        JsonVariant obj = collector.document ().as <JsonVariant> ();
+        func (obj);
         return collector;
     }
     void doDeliver (const String& data) {
@@ -154,13 +155,13 @@ class Program: public Component, public Diagnosticable {
         const bool deliverTo = intervalDeliver, captureTo = intervalCapture, diagnoseTo = intervalDiagnose;
         DEBUG_PRINTF ("\nProgram::process: deliver=%d, capture=%d, diagnose=%d\n", deliverTo, captureTo, diagnoseTo);
         if (deliverTo || captureTo) {
-            const String data = doCollect ("data", [&] (JsonDocument& doc) { operational.collect (doc); });
+            const String data = doCollect ("data", [&] (JsonVariant& obj) { operational.collect (obj); });
             if (deliverTo) doDeliver (data);
             if (captureTo) doCapture (data);
             DEBUG_PRINTF ("Program::process: data, length=%d, content=<<<%s>>>\n", data.length (), data.c_str ());
         }
         if (diagnoseTo) {
-            const String diag = doCollect ("diag", [&] (JsonDocument& doc) { diagnostics.collect (doc); });
+            const String diag = doCollect ("diag", [&] (JsonVariant& obj) { diagnostics.collect (obj); });
             doDeliver (diag);
             DEBUG_PRINTF ("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
 #ifdef DEBUG
@@ -197,19 +198,19 @@ public:
     void sleep () { delay (config.intervalProcess); }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject program = obj ["program"].to <JsonObject> ();
         extern const String build_info;
         program ["build"] = build_info;
-        program ["uptime"] = uptime.seconds ();
-        cycles.serialize (program ["cycles"].to <JsonObject> ());
+        program ["uptime"] = uptime;
+        program ["cycles"] = cycles;
     }
 };
 
 // -----------------------------------------------------------------------------------------------
 
-void Program::OperationalManager::collect (JsonDocument &doc) const {
-    JsonObject tmp = doc ["tmp"].to <JsonObject> ();
+void Program::OperationalManager::collect (JsonVariant &obj) const {
+    JsonObject tmp = obj ["tmp"].to <JsonObject> ();
     tmp ["env"] = _program->temperatureManagerEnvironment.getTemperature ();
     JsonObject bat = tmp ["bat"].to <JsonObject> ();
     bat ["avg"] = _program->temperatureManagerBatterypack.avg ();
@@ -218,8 +219,8 @@ void Program::OperationalManager::collect (JsonDocument &doc) const {
     JsonArray val = bat ["val"].to <JsonArray> ();
     for (const auto& v : _program->temperatureManagerBatterypack.getTemperatures ())
         val.add (v);
-    doc ["fan"] = _program->fanInterface.getSpeed ();
-    doc ["alm"] = _program->alarms.getAlarmsAsString ();
+    obj ["fan"] = _program->fanInterface.getSpeed ();
+    obj ["alm"] = _program->alarms.getAlarmsAsString ();
 }
 
 // -----------------------------------------------------------------------------------------------

@@ -27,15 +27,31 @@ typedef unsigned long counter_t;
 
 // -----------------------------------------------------------------------------------------------
 
+#include <Arduino.h>
+
 template <typename T>
-inline String IntToString (const T n, const int b = 10) {
-    static_assert (std::is_integral_v <T>, "T must be an integral type");
-    char s [64 + 1]; return String (ltoa (static_cast <long> (n), s, b));
-};
-template <typename T>
-inline String FloatToString (const T n, const int p = 2) {
-    static_assert (std::is_floating_point_v <T>, "T must be a floating point type");
-    char s [64 + 1]; snprintf (s, sizeof (s) - 1, "%.*f", p, n); return s;
+inline String ArithmeticToString (const T n, const int x = -1, const bool t = false) {
+    static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
+    char s [64 + 1]; 
+    if constexpr (std::is_integral_v <T>)
+        return (x == -1 || x == 10) ? String (n) : String (ltoa (static_cast <long> (n), s, x));
+    else if constexpr (std::is_floating_point_v <T>) {
+        dtostrf (n, 0, x == -1 ? 2 : x, s);
+        if (t) {
+            char *d = nullptr, *e = s;
+            while (*e != '\0') {
+                if (*e == '.')
+                    d = e;
+                e ++;
+            }
+            e --;
+            if (d)
+                while (e > d + 1 && *e == '0') *e -- = '\0';
+            else
+                *e ++ = '.', *e ++ = '0', *e  = '\0';
+        }
+        return String (s);
+    }
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -92,6 +108,8 @@ using MovingAverageWithValue = TypeOfAverageWithValue <MovingAverage, T, WINDOW>
 
 // -----------------------------------------------------------------------------------------------
 
+#include <cmath>
+
 inline float round2places (float value) {
     return std::round (value * 100.0f) / 100.0f;
 }
@@ -120,7 +138,7 @@ public:
         }
         return *this;
     }
-//    inline size_t cnt () const { return _cnt; }
+    inline size_t cnt () const { return _cnt; }
     inline T min () const { return _min; }
     inline T max () const { return _max; }
     inline T avg () const {
@@ -171,8 +189,10 @@ public:
         _e = e;
         return _p + _i + _d;
     }
-    std::tuple <T, T, T> get () const {
-        return std::tuple <T, T, T> (_p, _i, _d);
+    String toString () const {
+        return "Kp=" + ArithmeticToString (_Kp, 12, true) + ",Ki=" + ArithmeticToString (_Ki, 12, true) + ",Kd=" + ArithmeticToString (_Kd, 12, true) + 
+            ",p=" + ArithmeticToString (_p, 12, true) + ",i=" + ArithmeticToString (_i, 12, true) + ",d=" + ArithmeticToString (_d, 12, true) + 
+            ",e=" + ArithmeticToString (_e, 12, true) + ",t=" + ArithmeticToString (_t);
     }
 };
 
@@ -246,24 +266,18 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 #include <Arduino.h>
-#include <ArduinoJson.h>
 
 class ActivationTracker {
-    counter_t _number = 0;
+    counter_t _count = 0;
     unsigned long _millis = 0;
 
 public:
     inline interval_t seconds () const { return _millis / 1000; }
-    inline counter_t number () const { return _number; }
+    inline counter_t count () const { return _count; }
     ActivationTracker& operator ++ (int) {
         _millis = millis ();
-        _number ++;
+        _count ++;
         return *this;
-    }
-    template <typename JsonObjectT>
-    void serialize (JsonObjectT&& obj) const {
-        obj ["last"] = _millis / 1000;
-        obj ["count"] = _number;
     }
 };
 
@@ -271,16 +285,11 @@ class ActivationTrackerWithDetail: public ActivationTracker {
     String _detail;
 
 public:
+    const String& detail () const { return _detail; }
     ActivationTrackerWithDetail& operator += (const String& detail) {
         ActivationTracker::operator++ (1);
         _detail = detail;
         return *this;
-    }
-    template <typename JsonObjectT>
-    void serialize (JsonObjectT&& obj) const {
-        ActivationTracker::serialize (obj);
-        if (!_detail.isEmpty ())
-            obj ["detail"] = _detail;
     }
 };
 
@@ -324,8 +333,7 @@ class Singleton {
 public:
     inline static T* instance () { return _instance; }
     explicit Singleton (T* t) {
-      if (_instance != nullptr)
-          throw std::runtime_error ("duplicate Singleton initializer");
+      assert (_instance == nullptr && "duplicate Singleton initializer");
       _instance = t;
     }
     virtual ~Singleton () { _instance = nullptr; }
@@ -355,7 +363,7 @@ namespace gaussian {
             matrix [1][1] * matrix [2][3] * matrix [3][2]
         );
         if (std::abs (determinant) < DETERMINANT_DEMINIMUS)
-            return "matrix is singular/near-singular, determinant: " + FloatToString (determinant, 12);
+            return "matrix is singular/near-singular, determinant: " + ArithmeticToString (determinant, 12);
 
         for (size_t i = 0; i < 4; i ++) {
             for (size_t j = i + 1; j < 4; j ++) {
@@ -386,14 +394,14 @@ namespace gaussian {
         }
         const double condition_number = max_singular / min_singular;
         if (condition_number > CONDITION_DEMAXIMUS)
-            return "matrix ill-conditioned, condition number estimate: " + FloatToString (condition_number, 12);
+            return "matrix ill-conditioned, condition number estimate: " + ArithmeticToString (condition_number, 12);
         const double determinant =
               XtX[0][0] * (XtX[1][1] * XtX[2][2] * XtX[3][3] + XtX[1][2] * XtX[2][3] * XtX[3][1] + XtX[1][3] * XtX[2][1] * XtX[3][2] - XtX[1][3] * XtX[2][2] * XtX[3][1] - XtX[1][2] * XtX[2][1] * XtX[3][3] - XtX[1][1] * XtX[2][3] * XtX[3][2])
             - XtX[0][1] * (XtX[1][0] * XtX[2][2] * XtX[3][3] + XtX[1][2] * XtX[2][3] * XtX[3][0] + XtX[1][3] * XtX[2][0] * XtX[3][2] - XtX[1][3] * XtX[2][2] * XtX[3][0] - XtX[1][2] * XtX[2][0] * XtX[3][3] - XtX[1][0] * XtX[2][3] * XtX[3][2])
             + XtX[0][2] * (XtX[1][0] * XtX[2][1] * XtX[3][3] + XtX[1][1] * XtX[2][3] * XtX[3][0] + XtX[1][3] * XtX[2][0] * XtX[3][1] - XtX[1][3] * XtX[2][1] * XtX[3][0] - XtX[1][1] * XtX[2][0] * XtX[3][3] - XtX[1][0] * XtX[2][3] * XtX[3][1])
             - XtX[0][3] * (XtX[1][0] * XtX[2][1] * XtX[3][2] + XtX[1][1] * XtX[2][2] * XtX[3][0] + XtX[1][2] * XtX[2][0] * XtX[3][1] - XtX[1][2] * XtX[2][1] * XtX[3][0] - XtX[1][1] * XtX[2][0] * XtX[3][2] - XtX[1][0] * XtX[2][2] * XtX[3][1]);
         if (std::abs (determinant) < DETERMINANT_DEMINIMUS)
-            return "matrix is singular/near-singular, determinant: " + FloatToString (determinant, 12);
+            return "matrix is singular/near-singular, determinant: " + ArithmeticToString (determinant, 12);
 
         for (int i = 0; i < 4; i ++) {
             int max_row = i;
@@ -417,6 +425,20 @@ namespace gaussian {
         }
         return String ();
     }
+}
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
+#include <ctime>
+
+String getTimeString (time_t timet = 0) {
+    struct tm timeinfo;
+    char timeString [sizeof ("yyyy-mm-ddThh:mm:ssZ") + 1] = { '\0' };
+    if (timet == 0) time (&timet);
+    if (gmtime_r (&timet, &timeinfo) != NULL)
+        strftime (timeString, sizeof (timeString), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    return timeString;
 }
 
 // -----------------------------------------------------------------------------------------------

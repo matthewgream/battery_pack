@@ -49,10 +49,10 @@ public:
     }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject tmp = obj ["tmp"].to <JsonObject> ();
         for (int channel = 0; channel < AdcHardware::CHANNELS; channel ++)
-            tmp [IntToString (channel)] = IntToString (_stats [channel].val ()) + "," + IntToString (_stats [channel].min ()) + "," + IntToString (_stats [channel].max ());
+            tmp [ArithmeticToString (channel)] = ArithmeticToString (_stats [channel].val ()) + "," + ArithmeticToString (_stats [channel].min ()) + "," + ArithmeticToString (_stats [channel].max ());
     }
 };
 
@@ -88,7 +88,7 @@ private:
 
     FanSpeedType _speed = 0;
     bool _active = false;
-    Stats <FanSpeedType> _stats;
+    StatsWithValue <FanSpeedType> _stats;
     ActivationTracker _sets;
 
 public:
@@ -123,11 +123,11 @@ public:
     inline const Config &getConfig () const { return config; } // yuck
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject fan = obj ["fan"].to <JsonObject> ();
-        fan ["speed"] = IntToString (_speed) + "," + IntToString (_stats.min ()) + "," + IntToString (_stats.max ());
-        if (_sets.number () > 0)
-            _sets.serialize (fan);
+        fan ["speed"] = _stats;
+        if (_sets.count () > 0)
+            fan ["active"] = _sets;
         // % duty
     }
 };
@@ -139,7 +139,7 @@ class FanInterfaceStrategy_motorAll: public FanInterfaceStrategy {
     OpenSmart_QuadMotorDriver::MotorSpeedType _min_speed = OpenSmart_QuadMotorDriver::MotorSpeedType (0);
 
 public:
-    String name () const override { return "motorAll(" + IntToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
+    String name () const override { return "motorAll(" + ArithmeticToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
     void begin (const FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
         _hardware = &hardware; _min_speed = interface.getConfig ().MIN_SPEED;
     }
@@ -160,7 +160,7 @@ protected:
     std::array <int, OpenSmart_QuadMotorDriver::MotorCount> _motorOrder;
 
 public:
-    String name () const override { return "motorMap(" + IntToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
+    String name () const override { return "motorMap(" + ArithmeticToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
     void begin (const FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
         _hardware = &hardware; _min_speed = interface.getConfig ().MIN_SPEED; _max_speed = interface.getConfig ().MAX_SPEED;
         for (int motorId = 0; motorId < OpenSmart_QuadMotorDriver::MotorCount; motorId ++)
@@ -187,7 +187,7 @@ class FanInterfaceStrategy_motorMapWithRotation: public FanInterfaceStrategy_mot
     Intervalable _rotationInterval;
 
 public:
-    String name () const override { return "motorMapWithRotation(" + IntToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
+    String name () const override { return "motorMapWithRotation(" + ArithmeticToString (OpenSmart_QuadMotorDriver::MotorCount) + ")"; }
     void begin (const FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
         DEBUG_PRINTF ("FanInterfaceStrategy_motorMapWithRotation:: order=[");
         for (int i = 0; i < interface.getConfig ().MOTOR_ORDER.size (); i ++)

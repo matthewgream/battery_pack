@@ -146,7 +146,7 @@ public:
             temperatures [index] = t [index], resistances [index] = r [index];
     }
     String getName () const override { return NAME; }
-    String getDetails () const override { return "lookup (N=" + IntToString (temperatures.size ()) + ")"; }
+    String getDetails () const override { return "lookup (N=" + ArithmeticToString (temperatures.size ()) + ")"; }
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -180,9 +180,9 @@ public:
         double sum_YL1 = 0, sum_YL2 = 0, sum_YL3 = 0;
         for (size_t index = 0; index < temperatures.size (); index ++) {
               if (!isTemperatureReasonable (temperatures [index]))
-                  return String ("invalid temperature at index ") + IntToString (index);
+                  return String ("invalid temperature at index ") + ArithmeticToString (index);
               if (!isResistanceReasonable (resistances [index]))
-                  return String ("invalid resistance at index ") + IntToString (index);
+                  return String ("invalid resistance at index ") + ArithmeticToString (index);
               const double Y = 1.0 / (temperatures [index] + 273.15);
               const double L1 = std::log (static_cast <double> (resistances [index])), L2 = L1 * L1, L3 = L2 * L1;
               sum_Y += Y;
@@ -216,7 +216,7 @@ public:
         for (size_t index = 0; index < temperatures.size (); index ++) {
             float temperature;
             if (!calculate (temperature, resistances [index]) || std::abs (temperature - temperatures [index]) > 5.0f) // Allow 5 degrees of error
-                return String ("unreliable result, error = ") + FloatToString (std::abs (temperature - temperatures [index]));
+                return String ("unreliable result, error = ") + ArithmeticToString (std::abs (temperature - temperatures [index]));
         }
 
         return String ();
@@ -229,11 +229,11 @@ public:
         gaussian::vector4 <double> XtY = { 0 };
         for (size_t index = 0; index < collection.temperatures.size (); index ++) {
             if (!isTemperatureReasonable (collection.temperatures [index]))
-                return String ("invalid temperature at index ") + IntToString (index);
+                return String ("invalid temperature at index ") + ArithmeticToString (index);
             const double T = 1.0 / (collection.temperatures [index] + 273.15);
             for (size_t sensor = 0; sensor < collection.resistances.size (); sensor ++) {
                 if (!isResistanceReasonable (collection.resistances [sensor][index]))
-                    return String ("invalid resistance at index ") + IntToString (index);
+                    return String ("invalid resistance at index ") + ArithmeticToString (index);
                 const double lnR = std::log (static_cast <double> (collection.resistances [sensor][index]));
                 const std::array <double, 4> row = { 1, lnR, lnR * lnR, lnR * lnR * lnR };
                 for (int j = 0; j < 4; j ++) {
@@ -258,7 +258,7 @@ public:
             for (size_t sensor = 0; sensor < collection.resistances.size (); sensor ++) {
                 float temperature;
                 if (!calculate (temperature, collection.resistances [sensor] [index]) || std::abs (temperature - collection.temperatures [index]) > 10.0f) // Allow 10 degrees of error
-                    return String ("unreliable result, error = ") + FloatToString (std::abs (temperature - collection.temperatures [index]));
+                    return String ("unreliable result, error = ") + ArithmeticToString (std::abs (temperature - collection.temperatures [index]));
             }
         }
 
@@ -296,7 +296,7 @@ public:
         A = obj ["A"], B = obj ["B"], C = obj ["C"], D = obj ["D"];
     }
     String getName () const override { return NAME; }
-    String getDetails () const override { return "steinhart (A=" + FloatToString (A, 12) + ", B=" + FloatToString (B, 12) + ", C=" + FloatToString (C, 12) + ", D=" + FloatToString (D, 12) + ")"; }
+    String getDetails () const override { return "steinhart (A=" + ArithmeticToString (A, 12) + ", B=" + ArithmeticToString (B, 12) + ", C=" + ArithmeticToString (C, 12) + ", D=" + ArithmeticToString (D, 12) + ")"; }
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -371,7 +371,7 @@ public:
         JsonDocument doc;
 
         for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++) {
-            JsonObject sensorObj = doc ["sensor" + IntToString (sensor)].to <JsonObject> ();
+            JsonObject sensorObj = doc ["sensor" + ArithmeticToString (sensor)].to <JsonObject> ();
             for (const auto& strategy : calibrationStrategies [sensor]) {
                 JsonObject strategyDetails = sensorObj [String (strategy->getName ())].to <JsonObject> ();
                 strategy->serialize (strategyDetails);
@@ -401,7 +401,7 @@ public:
 
         int count = 0;
         for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor ++) {
-            JsonObject sensorObj = doc ["sensor" + IntToString (sensor)].as <JsonObject> ();
+            JsonObject sensorObj = doc ["sensor" + ArithmeticToString (sensor)].as <JsonObject> ();
             if (sensorObj) {
                 for (JsonPair kv : sensorObj) {
                     auto factoryIt = strategyFactories.find (String (kv.key ().c_str ()));

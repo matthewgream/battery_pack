@@ -128,13 +128,12 @@ public:
         return _mqttClient.connected ();
     }
     //
-    void serialize (JsonObject &obj) const override {
+    void serialize (JsonVariant &obj) const override {
         PubSubClient& mqttClient = const_cast <MQTTPublisher *> (this)->_mqttClient;
-        JsonObject mqtt = obj ["mqtt"].to <JsonObject> ();
-        if ((mqtt ["connected"] = mqttClient.connected ())) {
+        if ((obj ["connected"] = mqttClient.connected ())) {
             //
         }
-        mqtt ["state"] = __mqtt_state_to_string (mqttClient.state ());
+        obj ["state"] = __mqtt_state_to_string (mqttClient.state ());
     }
 
 private:
@@ -149,7 +148,7 @@ private:
           case MQTT_CONNECT_UNAVAILABLE: return "CONNECT_UNAVAILABLE";
           case MQTT_CONNECT_BAD_CREDENTIALS: return "CONNECT_BAD_CREDENTIALS";
           case MQTT_CONNECT_UNAUTHORIZED: return "CONNECT_UNAUTHORIZED";
-          default: return "UNDEFINED_(" + IntToString (state) + ")";
+          default: return "UNDEFINED_(" + ArithmeticToString (state) + ")";
         }
     }
 };
@@ -309,12 +308,11 @@ public:
         return _erase ();
     }
     //
-    void serialize (JsonObject &obj) const override {
-        JsonObject file = obj ["file"].to <JsonObject> ();
-        file ["mode"] = __file_mode_to_string ((int) _mode);
-        file ["size"] = size ();
-        file ["left"] = _totalBytes - _usedBytes;
-        file ["remains"] = remains ();
+    void serialize (JsonVariant &obj) const override {
+        obj ["mode"] = __file_mode_to_string ((int) _mode);
+        obj ["size"] = size ();
+        obj ["left"] = _totalBytes - _usedBytes;
+        obj ["remains"] = remains ();
     }
 
 private:

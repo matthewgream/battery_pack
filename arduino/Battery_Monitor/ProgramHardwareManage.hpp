@@ -63,7 +63,7 @@ public:
     inline float current () const { return _value.max (); } // XXX think about this ... max, average, etc
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
 //        JsonObject bat = obj ["bat"].to <JsonObject> ();
 //        _statsValues, _statsValueAvg, _statsValueMin, _statsValueMax
     }
@@ -99,7 +99,7 @@ public:
     inline float getTemperature () const { return _value; }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
 //        JsonObject env = obj ["env"].to <JsonObject> ();
 //        _stats
     }
@@ -121,8 +121,8 @@ private:
     const Config &config;
 
     FanInterface &_fan;
-    PidController <double> &_controllerAlgorithm;
-    AlphaSmoothing <double> &_smootherAlgorithm;
+    PidController <double> &_controllerAlgorithm; // XXX should be an abstract interface
+    AlphaSmoothing <double> &_smootherAlgorithm; // XXX should be an abstract interface
 
     const TargetSetFunc _targetValues;
     FanInterface::FanSpeedType _value = FanInterface::FanSpeedType (0);
@@ -150,10 +150,10 @@ public:
     }
 
 protected:
-    void collectDiagnostics (JsonDocument &obj) const override {
-//        JsonObject fan = obj ["fan"].to <JsonObject> ();
-//        _stats
-//        pid and smoothing diag
+    void collectDiagnostics (JsonVariant &obj) const override {
+        JsonObject sub = obj ["fan"].to <JsonObject> ();
+        sub ["pid"] = _controllerAlgorithm;
+        sub ["speed"] = _stats;
     }
 };
 
