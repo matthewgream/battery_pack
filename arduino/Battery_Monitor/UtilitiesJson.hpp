@@ -161,7 +161,14 @@ bool convertToJson (const Stats <T>& src, JsonVariant dst) {
 }
 template <typename T>
 bool convertToJson (const PidController <T>& src, JsonVariant dst) {
-    dst.set (src.toString ());
+    dst ["Kp"] = src._Kp;
+    dst ["Ki"] = src._Ki;
+    dst ["Kd"] = src._Kd;
+    dst ["p"] = src._p;
+    dst ["i"] = src._i;
+    dst ["d"] = src._d;
+    dst ["e"] = src._e;
+    dst ["t"] = src._t;
     return true;
 }
 bool convertToJson (const ActivationTrackerWithDetail& src, JsonVariant dst) {

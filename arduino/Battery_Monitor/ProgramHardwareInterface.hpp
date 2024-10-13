@@ -26,13 +26,13 @@ private:
     AdcHardware _hardware;
     const TemperatureCalculationFunc _calculator;
 
-    std::array <StatsWithValue <AdcValueType>, AdcHardware::CHANNELS> _stats;
-    inline void updateStats (const int channel, const AdcValueType value) {
-        _stats [channel] += value;
+    std::array <StatsWithValue <float>, AdcHardware::CHANNELS> _stats;
+    inline void updateStats (const int channel, const float temperature) {
+        _stats [channel] += temperature;
     }
 
 public:
-    TemperatureInterface (const Config& cfg, const TemperatureCalculationFunc calculator) : config (cfg), _hardware (cfg.hardware), _calculator (std::move (calculator)) {}
+    TemperatureInterface (const Config& cfg, const TemperatureCalculationFunc calculator) : config (cfg), _hardware (cfg.hardware), _calculator (calculator) {}
     void begin () override {
         analogReadResolution (AdcResolution);
         _hardware.enable ();
@@ -40,19 +40,20 @@ public:
     float getTemperature (const int channel) const {
         assert (channel >= 0 && channel < AdcHardware::CHANNELS && "Channel out of range");
         AdcValueType value = _hardware.get (channel);
-        const_cast <TemperatureInterface*> (this)->updateStats (channel, value);
 #ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION
-        return steinharthart_calculator (value, AdcValueMax, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
+        const float temperature = steinharthart_calculator (value, AdcValueMax, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
 #else
-        return _calculator (channel, value);
+        const float temperature = _calculator (channel, value);
 #endif
+        const_cast <TemperatureInterface*> (this)->updateStats (channel, temperature);
+        return temperature;
     }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
-        JsonObject tmp = obj ["tmp"].to <JsonObject> ();
-        for (int channel = 0; channel < AdcHardware::CHANNELS; channel ++)
-            tmp [ArithmeticToString (channel)] = ArithmeticToString (_stats [channel].val ()) + "," + ArithmeticToString (_stats [channel].min ()) + "," + ArithmeticToString (_stats [channel].max ());
+        JsonArray tmp = obj ["tmp"].to <JsonArray> ();
+        for (const auto& stats : _stats)
+            tmp.add (ArithmeticToString (stats.val ()) + "," + ArithmeticToString (stats.avg ()) + "," + ArithmeticToString (stats.min ()) + "," + ArithmeticToString (stats.max ()));
     }
 };
 

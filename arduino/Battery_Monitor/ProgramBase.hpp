@@ -57,12 +57,13 @@ typedef uint32_t _AlarmType;
 #define ALARM_STORAGE_FAIL          _ALARM_NUMB (6)
 #define ALARM_STORAGE_SIZE          _ALARM_NUMB (7)
 #define ALARM_PUBLISH_FAIL          _ALARM_NUMB (8)
-#define ALARM_DELIVER_SIZE          _ALARM_NUMB (9)
-#define ALARM_UPDATE_VERS           _ALARM_NUMB (10)
-#define ALARM_SYSTEM_MEMORYLOW      _ALARM_NUMB (11)
-#define ALARM_SYSTEM_BADRESET       _ALARM_NUMB (12)
-#define _ALARM_COUNT                 (13)
-static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_FAIL", "TEMP_MIN", "TEMP_WARN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "DELIVER_SIZE", "UPDATE_VERS", "SYSTEM_MEMLOW", "SYSTEM_BADRESET" };
+#define ALARM_PUBLISH_SIZE          _ALARM_NUMB (9)
+#define ALARM_DELIVER_SIZE          _ALARM_NUMB (10)
+#define ALARM_UPDATE_VERS           _ALARM_NUMB (11)
+#define ALARM_SYSTEM_MEMORYLOW      _ALARM_NUMB (12)
+#define ALARM_SYSTEM_BADRESET       _ALARM_NUMB (13)
+#define _ALARM_COUNT                 (14)
+static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_FAIL", "TEMP_MIN", "TEMP_WARN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "PUBLISH_SIZE", "DELIVER_SIZE", "UPDATE_VERS", "SYSTEM_MEMLOW", "SYSTEM_BADRESET" };
 #define _ALARM_NAME(x)               (_ALARM_NAMES [x])
 
 class AlarmSet {
@@ -98,7 +99,7 @@ private:
     CheckFunction _checkFunc;
 
 public:
-    AlarmCondition (_AlarmType type, CheckFunction checkFunc): _type (type), _checkFunc (std::move (checkFunc)) {}
+    AlarmCondition (_AlarmType type, CheckFunction checkFunc): _type (type), _checkFunc (checkFunc) {}
     inline bool check () const { return _checkFunc (); }
     inline _AlarmType getType () const { return _type; }
 };
@@ -110,7 +111,6 @@ protected:
 public:
     typedef std::vector <Alarmable*> List;
     Alarmable (const std::initializer_list <AlarmCondition>& conditions): _conditions (conditions) {}
-    // Alarmable () {}
     virtual ~Alarmable() {};
     void collectAlarms (AlarmSet& alarms) const {
 
@@ -150,7 +150,7 @@ public:
             _alarms = alarms;
         }
     }
-    inline String getAlarmsAsString () const { return _alarms.toString (); }
+    inline String toString () const { return _alarms.toString (); }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override { // XXX this is too large and needs reduction
@@ -201,7 +201,7 @@ private:
 public:
     UpdateManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
             AlarmCondition (ALARM_UPDATE_VERS, [this] () { return _available; })
-        }), config (cfg), _networkIsAvailable (std::move (networkIsAvailable)),
+        }), config (cfg), _networkIsAvailable (networkIsAvailable),
         _persistent_data ("updates"), _persistent_data_previous (_persistent_data, "previous", 0), _persistent_data_version (_persistent_data, "version", String ("")),
         _interval (config.intervalUpdate) {}
     void process () override {

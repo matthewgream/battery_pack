@@ -65,16 +65,16 @@ public:
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject system = obj ["system"].to <JsonObject> ();
-        JsonObject code = system ["code"].to <JsonObject> ();
-        code ["size"] = code_size;
-        JsonObject heap = system ["heap"].to <JsonObject> ();
-        heap ["size"] = heap_size;
-        heap ["free"] = esp_get_free_heap_size ();
-        heap ["min"] = esp_get_minimum_free_heap_size ();
-        JsonObject reset = system ["reset"].to <JsonObject> ();
-        reset ["okay"] = reset_okay;
-        reset ["reason"] = reset_details.first;
-        reset ["details"] = reset_details.second;
+            JsonObject code = system ["code"].to <JsonObject> ();
+                code ["size"] = code_size;
+            JsonObject heap = system ["heap"].to <JsonObject> ();
+                heap ["size"] = heap_size;
+                heap ["free"] = esp_get_free_heap_size ();
+                heap ["min"] = esp_get_minimum_free_heap_size ();
+            JsonObject reset = system ["reset"].to <JsonObject> ();
+                reset ["okay"] = reset_okay;
+                reset ["reason"] = reset_details.first;
+                reset ["details"] = reset_details.second;
     }
 };
 
@@ -187,8 +187,7 @@ public:
         diagnostics (config.diagnosticManager, { &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &network, &nettime, &deliver, &publish, &storage, &updater, &alarms, &platform, this }),
         operational (this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
-        components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager,
-            &alarms, &network, &nettime, &deliver, &publish, &storage, &updater, &diagnostics, this }) {
+        components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &network, &nettime, &deliver, &publish, &storage, &updater, &diagnostics, this }) {
         DEBUG_PRINTF ("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
 
@@ -211,16 +210,16 @@ protected:
 
 void Program::OperationalManager::collect (JsonVariant &obj) const {
     JsonObject tmp = obj ["tmp"].to <JsonObject> ();
-    tmp ["env"] = _program->temperatureManagerEnvironment.getTemperature ();
+        tmp ["env"] = _program->temperatureManagerEnvironment.getTemperature ();
     JsonObject bat = tmp ["bat"].to <JsonObject> ();
-    bat ["avg"] = _program->temperatureManagerBatterypack.avg ();
-    bat ["min"] = _program->temperatureManagerBatterypack.min ();
-    bat ["max"] = _program->temperatureManagerBatterypack.max ();
-    JsonArray val = bat ["val"].to <JsonArray> ();
-    for (const auto& v : _program->temperatureManagerBatterypack.getTemperatures ())
-        val.add (v);
+        bat ["avg"] = _program->temperatureManagerBatterypack.avg ();
+        bat ["min"] = _program->temperatureManagerBatterypack.min ();
+        bat ["max"] = _program->temperatureManagerBatterypack.max ();
+        JsonArray val = bat ["val"].to <JsonArray> ();
+        for (const auto& v : _program->temperatureManagerBatterypack.getTemperatures ())
+            val.add (v);
     obj ["fan"] = _program->fanInterface.getSpeed ();
-    obj ["alm"] = _program->alarms.getAlarmsAsString ();
+    obj ["alm"] = _program->alarms.toString ();
 }
 
 // -----------------------------------------------------------------------------------------------

@@ -20,7 +20,7 @@ private:
     std::array <MovingAverageWithValue <float, 16>, PROBE_COUNT> _values;
     using AggregateValue = Stats <float>;
     AggregateValue _value; // change to compute something more sophisticated
-    std::array <Stats <float>, PROBE_COUNT> _statsValues;
+    //std::array <Stats <float>, PROBE_COUNT> _statsValues;
     Stats <float> _statsValueAvg, _statsValueMin, _statsValueMax;
 
 public:
@@ -39,7 +39,7 @@ public:
         DEBUG_PRINTF ("TemperatureManagerBatterypack::process: temps=[");
         for (const auto channel : config.channels) {
               const float tmp = _interface.getTemperature (channel), val = (_values [cnt] = tmp);
-              _statsValues [cnt] += val;
+              //_statsValues [cnt] += val;
               _value += val;
               DEBUG_PRINTF ("%s%.2f<%.2f", (cnt > 0) ? ", " : "", val, tmp);
               cnt ++;
@@ -64,8 +64,13 @@ public:
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
-//        JsonObject bat = obj ["bat"].to <JsonObject> ();
-//        _statsValues, _statsValueAvg, _statsValueMin, _statsValueMax
+        JsonObject sub = obj ["bat"].to <JsonObject> ();
+        sub ["avg"] = _statsValueAvg;
+        sub ["min"] = _statsValueMin;
+        sub ["max"] = _statsValueMax;
+        // JsonArray map = obj ["map"].to <JsonArray> ();
+        // for (const auto& stats : _statsValues)
+        //     map.add (ArithmeticToString (stats.avg ()) + "," + ArithmeticToString (stats.min ()) + "," + ArithmeticToString (stats.max ()));
     }
 };
 
@@ -100,8 +105,8 @@ public:
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
-//        JsonObject env = obj ["env"].to <JsonObject> ();
-//        _stats
+        JsonObject sub = obj ["env"].to <JsonObject> ();
+        sub ["tmp"] = _stats;
     }
 };
 
@@ -129,7 +134,7 @@ private:
     Stats <FanInterface::FanSpeedType> _stats;
 
 public:
-    FanManager (const Config& cfg, FanInterface& fan, PidController <double>& controller, AlphaSmoothing <double>& smoother, const TargetSetFunc targetValues): config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _targetValues (std::move (targetValues)) {
+    FanManager (const Config& cfg, FanInterface& fan, PidController <double>& controller, AlphaSmoothing <double>& smoother, const TargetSetFunc targetValues): config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _targetValues (targetValues) {
         assert (config.NO_SPEED <= config.MIN_SPEED && config.MIN_SPEED < config.MAX_SPEED && "Bad configuration values");
     }
     void process () override {

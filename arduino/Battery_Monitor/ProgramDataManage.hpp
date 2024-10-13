@@ -66,8 +66,9 @@ private:
 
 public:
     explicit PublishManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
-            AlarmCondition (ALARM_PUBLISH_FAIL, [this] () { return _failures > config.failureLimit; })
-        }), config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _mqtt (cfg.mqtt) {}
+            AlarmCondition (ALARM_PUBLISH_FAIL, [this] () { return _failures > config.failureLimit; }),
+            AlarmCondition (ALARM_PUBLISH_SIZE, [this] () { return _mqtt.bufferexceeded (); })
+        }), config (cfg), _networkIsAvailable (networkIsAvailable), _mqtt (cfg.mqtt) {}
     void begin () override {
         _mqtt.setup ();
     }

@@ -172,6 +172,7 @@ using StatsWithValue = TypeOfStatsWithValue <Stats, T>;
 
 template <typename T>
 class PidController {
+public: // for serialization
     const T _Kp, _Ki, _Kd;
     T _p = T (0), _i = T (0), _d = T (0), _e = T (0);
     interval_t _t = 0;
@@ -188,11 +189,6 @@ public:
         _t = t;
         _e = e;
         return _p + _i + _d;
-    }
-    String toString () const {
-        return "Kp=" + ArithmeticToString (_Kp, 12, true) + ",Ki=" + ArithmeticToString (_Ki, 12, true) + ",Kd=" + ArithmeticToString (_Kd, 12, true) +
-            ",p=" + ArithmeticToString (_p, 12, true) + ",i=" + ArithmeticToString (_i, 12, true) + ",d=" + ArithmeticToString (_d, 12, true) +
-            ",e=" + ArithmeticToString (_e, 12, true) + ",t=" + ArithmeticToString (_t);
     }
 };
 

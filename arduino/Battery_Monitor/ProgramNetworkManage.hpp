@@ -192,7 +192,7 @@ public:
     explicit NettimeManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
             AlarmCondition (ALARM_TIME_SYNC, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_TIME_DRIFT, [this] () { return _drifter.isHighDrift (); })
-        }), config (cfg), _networkIsAvailable (std::move (networkIsAvailable)), _fetcher (cfg.useragent, cfg.server),
+        }), config (cfg), _networkIsAvailable (networkIsAvailable), _fetcher (cfg.useragent, cfg.server),
             _persistentData ("nettime"), _persistentDrift (_persistentData, "drift", 0), _drifter (_persistentDrift), _persistentTime (_persistentData, "time", 0) {
         if (_persistentTime > 0UL) {
             struct timeval tv = { .tv_sec = _persistentTime, .tv_usec = 0 };

@@ -101,6 +101,7 @@ private:
 
     WiFiClient _wifiClient;
     PubSubClient _mqttClient;
+    size_t _bufferExceeded = 0;
 
     bool connect () {
         const bool result = _mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ());
@@ -115,6 +116,11 @@ public:
             .setBufferSize (config.bufferSize);
     }
     bool publish (const String& topic, const String& data) {
+        if (data.length () > config.bufferSize) {
+            _bufferExceeded = data.length ();
+            DEBUG_PRINTF ("MQTTPublisher::publish: failed, length %u would exceed buffer size %u\n", data.length (), config.bufferSize);
+            return false;
+        }
         const bool result = _mqttClient.publish (topic.c_str (), data.c_str ());
         DEBUG_PRINTF ("MQTTPublisher::publish: length=%u, result=%d\n", data.length (), result);
         return result;
@@ -134,6 +140,11 @@ public:
             //
         }
         obj ["state"] = __mqtt_state_to_string (mqttClient.state ());
+        if (_bufferExceeded > 0)
+            obj ["bufferExceeded"] = _bufferExceeded;
+    }
+    inline bool bufferexceeded () const {
+        return _bufferExceeded > 0;
     }
 
 private:
