@@ -32,7 +32,7 @@ typedef unsigned long counter_t;
 template <typename T>
 inline String ArithmeticToString (const T n, const int x = -1, const bool t = false) {
     static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
-    char s [64 + 1]; 
+    char s [64 + 1];
     if constexpr (std::is_integral_v <T>)
         return (x == -1 || x == 10) ? String (n) : String (ltoa (static_cast <long> (n), s, x));
     else if constexpr (std::is_floating_point_v <T>) {
@@ -48,7 +48,7 @@ inline String ArithmeticToString (const T n, const int x = -1, const bool t = fa
             if (d)
                 while (e > d + 1 && *e == '0') *e -- = '\0';
             else
-                *e ++ = '.', *e ++ = '0', *e  = '\0';
+                *e ++ = '.', *e ++ = '0', *e = '\0';
         }
         return String (s);
     }
@@ -190,8 +190,8 @@ public:
         return _p + _i + _d;
     }
     String toString () const {
-        return "Kp=" + ArithmeticToString (_Kp, 12, true) + ",Ki=" + ArithmeticToString (_Ki, 12, true) + ",Kd=" + ArithmeticToString (_Kd, 12, true) + 
-            ",p=" + ArithmeticToString (_p, 12, true) + ",i=" + ArithmeticToString (_i, 12, true) + ",d=" + ArithmeticToString (_d, 12, true) + 
+        return "Kp=" + ArithmeticToString (_Kp, 12, true) + ",Ki=" + ArithmeticToString (_Ki, 12, true) + ",Kd=" + ArithmeticToString (_Kd, 12, true) +
+            ",p=" + ArithmeticToString (_p, 12, true) + ",i=" + ArithmeticToString (_i, 12, true) + ",d=" + ArithmeticToString (_d, 12, true) +
             ",e=" + ArithmeticToString (_e, 12, true) + ",t=" + ArithmeticToString (_t);
     }
 };
