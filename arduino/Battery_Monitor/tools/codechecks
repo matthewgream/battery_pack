@@ -22,5 +22,6 @@ done
 
 jscpd $files
 
-cppcheck --enable=all --suppress=postfixOperator --suppress=syntaxError:Utilities.hpp --suppress=unusedStructMember:ProgramTemperatureCalibration.hpp --suppress=useStlAlgorithm:ProgramBase.hpp --suppress=missingIncludeSystem --std=c++21 *.hpp Battery_Monitor.ino
+cppcheck --enable=all --suppress=postfixOperator --suppress=syntaxError:Utilities.hpp --suppress=unusedStructMember:ProgramTemperatureCalibration.hpp --suppress=useStlAlgorithm:ProgramBase.hpp --suppress=missingIncludeSystem --std=c++21 $files
 
+egrep -n '^[^/].*[^ ] {2,}[^ ]' $files | egrep -v '^\s*\/\/'

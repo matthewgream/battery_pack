@@ -90,7 +90,7 @@ inline bool operator!= (const AlarmSet &a, const AlarmSet &b) { return (_AlarmTy
 // -----------------------------------------------------------------------------------------------
 
 class AlarmCondition {
-public:  
+public:
     using CheckFunction = std::function <bool ()>;
 
 private:
@@ -182,7 +182,7 @@ public:
         time_t intervalCheck;
         String json, type, vers;
     } Config;
-    
+
     using BooleanFunc = std::function <bool ()>;
 
 private:

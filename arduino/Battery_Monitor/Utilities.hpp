@@ -195,7 +195,7 @@ public:
 class Initialisable {
     bool initialised = false;
 
-public:    
+public:
     operator bool () {
         if (!initialised) {
             initialised = true;

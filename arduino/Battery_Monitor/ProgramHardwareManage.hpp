@@ -125,7 +125,7 @@ private:
     AlphaSmoothing <double> &_smootherAlgorithm;
 
     const TargetSetFunc _targetValues;
-    FanInterface::FanSpeedType _value = FanInterface::FanSpeedType  (0);
+    FanInterface::FanSpeedType _value = FanInterface::FanSpeedType (0);
     Stats <FanInterface::FanSpeedType> _stats;
 
 public:

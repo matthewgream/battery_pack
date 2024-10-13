@@ -697,7 +697,7 @@ public:
         return calibrateTemperaturesFromData (*calibrationData);
     }
 
-private:    
+private:
     bool calibrateTemperaturesFromData (const Collector::Collection& calibrationData) {
         Calculator calculator;
         std::shared_ptr <typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_shared <typename Calculator::CalibrationStrategies> ();

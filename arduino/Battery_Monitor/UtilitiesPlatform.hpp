@@ -10,7 +10,7 @@ public:
     static inline constexpr int SPACE_SIZE_MAXIMUM = 15, NAME_SIZE_MAXIMUM = 15, VALUE_STRING_SIZE_MAXIMUM = 4000 - 1;
 
 private:
-    static bool __initialise () { 
+    static bool __initialise () {
         static Initialisable initialised;
         if (!initialised) {
             esp_err_t err = nvs_flash_init_partition (DEFAULT_PERSISTENT_PARTITION);
@@ -26,7 +26,7 @@ private:
     const bool _okay = false;
 public:
     explicit PersistentData (const char *space): _okay (__initialise () && nvs_open_from_partition (DEFAULT_PERSISTENT_PARTITION, space, NVS_READWRITE, &_handle) == ESP_OK) {
-        assert (strlen (space) <= SPACE_SIZE_MAXIMUM && "PersistentData namespace length > SPACE_SIZE_MAXIMUM");      
+        assert (strlen (space) <= SPACE_SIZE_MAXIMUM && "PersistentData namespace length > SPACE_SIZE_MAXIMUM");
     }
     ~PersistentData () { if (_okay) nvs_close (_handle); }
     inline bool get (const char *name, uint32_t *value) const { return (_okay && nvs_get_u32 (_handle, name, value) == ESP_OK); }
@@ -47,7 +47,7 @@ public:
         }
         return result;
     }
-    inline bool set (const char *name, const String &value) { 
+    inline bool set (const char *name, const String &value) {
         assert (value.length () <= VALUE_STRING_SIZE_MAXIMUM && "PersistentData String length > VALUE_STRING_SIZE_MAXIMUM");
         return (_okay && nvs_set_str (_handle, name, value.c_str ()) == ESP_OK);
     }
