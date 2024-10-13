@@ -467,8 +467,6 @@ public:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-//#define CALIBRATE_FROM_STATIC_DATA
-#ifdef CALIBRATE_FROM_STATIC_DATA
 static const char* temperatureCalibrationData_STATIC [] = {
 "0,5.01,3145,3078,3083,3081,3160,3084,3155,3168,3148,3094,2827,2925,2967,2924,3073,2991",
 "1,5.51,3133,3081,3079,3077,3156,3096,3160,3150,3126,3083,2864,2923,2960,2826,3064,2991",
@@ -620,7 +618,6 @@ public:
         return true;
     }
 };
-#endif
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
@@ -677,14 +674,16 @@ public:
         return runtime->calculateTemperature (index, resistance);
     }
 
-    bool calibrateTemperatures (const Collector::TemperatureReadFunc readTemperature, const Collector::ResistanceReadFunc readResistance) {
+    bool calibrateTemperatures () {
         std::shared_ptr <typename Collector::Collection> calibrationData = std::make_shared <typename Collector::Collection> ();
-#ifdef CALIBRATE_FROM_STATIC_DATA
         if (!TemperatureCalibrationStaticDataLoader <SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP> ().load (*calibrationData)) {
             DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - static load failed\n");
             return false;
         }
-#else
+        return calibrateTemperaturesFromData (*calibrationData);
+    }
+    bool calibrateTemperatures (const Collector::TemperatureReadFunc readTemperature, const Collector::ResistanceReadFunc readResistance) {
+        std::shared_ptr <typename Collector::Collection> calibrationData = std::make_shared <typename Collector::Collection> ();
         if (!Collector ().collect (*calibrationData, readTemperature, readResistance)) {
             DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - collector failed\n");
             return false;
@@ -695,11 +694,15 @@ public:
                 DEBUG_PRINTF (",%u", calibrationData->resistances [sensor] [index]);
             DEBUG_PRINTF ("\n");
         }
-#endif
+        return calibrateTemperaturesFromData (*calibrationData);
+    }
+
+private:    
+    bool calibrateTemperaturesFromData (const Collector::Collection& calibrationData) {
         Calculator calculator;
         std::shared_ptr <typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_shared <typename Calculator::CalibrationStrategies> ();
         StrategyDefault defaultStrategy;
-        if (!calculator.compute (*calibrationStrategies, *calibrationData, createStrategyFactoriesForCalibration ()) || !calculator.computeDefault (defaultStrategy, *calibrationData)) {
+        if (!calculator.compute (*calibrationStrategies, calibrationData, createStrategyFactoriesForCalibration ()) || !calculator.computeDefault (defaultStrategy, calibrationData)) {
             DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - calculator failed\n");
             return false;
         }

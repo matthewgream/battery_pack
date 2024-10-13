@@ -6,7 +6,6 @@
 #include <ctime>
 
 class NetworkTimeFetcher {
-
     const String _useragent, _server;
 
 public:
@@ -46,9 +45,7 @@ https://github.com/espressif/esp-idf/blob/v4.3/examples/protocols/sntp/main/sntp
 #include <ctime>
 
 class TimeDriftCalculator {
-
     static inline constexpr long MAX_DRIFT_MS = 60 * 1000;
-
     long _driftMs;
     bool _isHighDrift = false;
 
@@ -92,7 +89,6 @@ public:
 #include <PubSubClient.h>
 
 class MQTTPublisher: public JsonSerializable {
-
 public:
     typedef struct {
         String client, host, user, pass, topic;
@@ -111,6 +107,7 @@ private:
         DEBUG_PRINTF ("MQTTPublisher::connect: host=%s, port=%u, client=%s, user=%s, pass=%s, bufferSize=%u, result=%d\n", config.host.c_str (), config.port, config.client.c_str (), config.user.c_str (), config.pass.c_str (), config.bufferSize, result);
         return result;
     }
+
 public:
     explicit MQTTPublisher (const Config& cfg) : config (cfg), _mqttClient (_wifiClient) {}
     void setup () {
@@ -152,7 +149,7 @@ private:
           case MQTT_CONNECT_UNAVAILABLE: return "CONNECT_UNAVAILABLE";
           case MQTT_CONNECT_BAD_CREDENTIALS: return "CONNECT_BAD_CREDENTIALS";
           case MQTT_CONNECT_UNAUTHORIZED: return "CONNECT_UNAUTHORIZED";
-          default: return "UNDEFINED";
+          default: return "UNDEFINED_(" + IntToString (state) + ")";
         }
     }
 };
@@ -164,7 +161,6 @@ private:
 
 // should be two classes
 class SPIFFSFile: public JsonSerializable {
-
 public:
     class LineCallback {
     public:
@@ -184,7 +180,6 @@ private:
     mode_t _mode = MODE_ERROR;
     File _file;
 
-private:
     bool _init () {
         if (!SPIFFS.begin (true)) {
             DEBUG_PRINTF ("SPIFFSFile[%s]::begin: failed on SPIFFS.begin (), file activity not available\n", _filename.c_str ());
@@ -270,6 +265,8 @@ public:
     }
     //
     inline long size () const {
+        if (_mode == MODE_CLOSED)   const_cast <SPIFFSFile *> (this)->_open (MODE_READING);
+        if (_mode == MODE_ERROR)    return -1;
         return _size;
     }
     inline float remains () const {
@@ -277,7 +274,6 @@ public:
     }
     template <typename T>
     size_t append (const T& data) {
-        if (_mode == MODE_ERROR)    return 0;
         if (_mode == MODE_READING)  _close ();
         if (_mode == MODE_CLOSED)   _open (MODE_WRITING);
         if (_mode == MODE_ERROR)    return 0;
@@ -285,7 +281,6 @@ public:
     }
     template <typename T>
     size_t write (const T& data) {
-        if (_mode == MODE_ERROR)    return 0;
         if (_mode == MODE_READING)  _close ();
         if (_mode == MODE_CLOSED)   if (_erase ()) _open (MODE_WRITING);
         if (_mode == MODE_ERROR)    return 0;
@@ -294,7 +289,6 @@ public:
     template <typename T>
     size_t read (T& vessel) { // XXX const
         DEBUG_PRINTF ("SPIFFSFile[%s]::read: size=%ld\n", _filename.c_str (), _size);
-        if (_mode == MODE_ERROR)    return 0;
         if (_mode == MODE_WRITING)  _close ();
         if (_mode == MODE_CLOSED)   _open (MODE_READING);
         if (_mode == MODE_ERROR)    return 0;
@@ -302,7 +296,6 @@ public:
     }
     bool close () {
         DEBUG_PRINTF ("SPIFFSFile[%s]::close\n", _filename.c_str ());
-        if (_mode == MODE_ERROR)    return false;
         if (_mode == MODE_WRITING)  _close ();
         if (_mode == MODE_READING)  _close ();
         if (_mode == MODE_ERROR)    return false;
@@ -310,7 +303,6 @@ public:
     }
     bool erase () {
         DEBUG_PRINTF ("SPIFFSFile[%s]::erase\n", _filename.c_str ());
-        if (_mode == MODE_ERROR)    return false;
         if (_mode == MODE_WRITING)  _close ();
         if (_mode == MODE_READING)  _close ();
         if (_mode == MODE_ERROR)    return false;

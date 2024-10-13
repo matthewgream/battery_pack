@@ -183,7 +183,7 @@ public:
         deliver (config.deliver), publish (config.publish, [&] () { return network.isAvailable (); }), storage (config.storage),
         updater (config.updateManager, [&] () { return network.isAvailable (); }),
         alarmInterface (config.alarmInterface), alarms (config.alarmManager, alarmInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
-        diagnostics (config.diagnosticManager, { &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &network, &nettime, &deliver, &publish, &storage, &updater, &alarms, &platform, this }),
+        diagnostics (config.diagnosticManager, { &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &network, &nettime, &deliver, &publish, &storage, &updater, &alarms, &platform, this }),
         operational (this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
         components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager,

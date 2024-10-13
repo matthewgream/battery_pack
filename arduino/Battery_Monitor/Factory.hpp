@@ -78,16 +78,22 @@ void factory_hardwareInterfaceTest () {
 
 // -----------------------------------------------------------------------------------------------
 
-void factory_temperatureCalibration () {
+void factory_temperatureCalibration (bool use_static = false) {
+
     const Config config;
 
-    TemperatureSensor_DS18B20 ds18b20 (config.ds18b20);
-    analogReadResolution (TemperatureInterface::AdcResolution);
-    MuxInterface_CD74HC4067 <TemperatureInterface::AdcValueType> interface (config.temperatureInterface.hardware);
-    interface.enable ();
     TemperatureCalibrator calibrator (config.temperatureCalibrator);
 
-    calibrator.calibrateTemperatures ([&] () { return ds18b20.getTemperature (); }, [&] (size_t channel) { return interface.get (channel); });
+    if (use_static) {
+        calibrator.calibrateTemperatures ();
+    } else {
+        TemperatureSensor_DS18B20 ds18b20 (config.ds18b20);
+        analogReadResolution (TemperatureInterface::AdcResolution);
+        MuxInterface_CD74HC4067 <TemperatureInterface::AdcValueType> interface (config.temperatureInterface.hardware);
+        interface.enable ();
+
+        calibrator.calibrateTemperatures ([&] () { return ds18b20.getTemperature (); }, [&] (size_t channel) { return interface.get (channel); });
+    }
 }
 
 // -----------------------------------------------------------------------------------------------

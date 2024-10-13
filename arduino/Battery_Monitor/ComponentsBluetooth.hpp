@@ -77,7 +77,6 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 class BluetoothNotifier: private Singleton <BluetoothNotifier>, public JsonSerializable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks {
-
 public:
     static inline constexpr uint16_t MAX_MTU = 517;
 
@@ -269,7 +268,7 @@ private:
           case ESP_GATT_CONN_LMP_TIMEOUT: return "LMP_TIMEOUT";
           case ESP_GATT_CONN_CONN_CANCEL: return "CANCELLED";
           case ESP_GATT_CONN_NONE: return "NONE";
-          default: return "UNDEFINED";
+          default: return "UNDEFINED_(" + IntToString (static_cast <int> (reason)) + ")";
         }
     }
     static String __ble_address_to_string (const esp_bd_addr_t bleaddr) {
@@ -289,7 +288,7 @@ private:
           case BLECharacteristicCallbacks::Status::ERROR_INDICATE_TIMEOUT: return "INDICATE_TIMEOUT";
           case BLECharacteristicCallbacks::Status::ERROR_INDICATE_FAILURE: return "INDICATE_FAILURE";
           case BLECharacteristicCallbacks::Status::SUCCESS_INDICATE: return "INDICATE_SUCCESS";
-          default: return "UNDEFINED";
+          default: return "UNDEFINED_(" + IntToString (static_cast <int> (status)) + ")";
         }
     }
 };

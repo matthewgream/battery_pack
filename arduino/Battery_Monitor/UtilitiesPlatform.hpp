@@ -5,42 +5,53 @@
 #include <nvs_flash.h>
 
 class PersistentData {
-
-    static inline constexpr const char* DEFAULT_PERSISTENT_PARTITION = "nvs";
-
 public:
-    static int _initialised;
-    static bool _initialise () { return _initialised || (++ _initialised && nvs_flash_init_partition (DEFAULT_PERSISTENT_PARTITION) == ESP_OK); }
+    static inline constexpr const char* DEFAULT_PERSISTENT_PARTITION = "nvs";
+    static inline constexpr int SPACE_SIZE_MAXIMUM = 15, NAME_SIZE_MAXIMUM = 15, VALUE_STRING_SIZE_MAXIMUM = 4000 - 1;
+
+private:
+    static bool __initialise () { 
+        static Initialisable initialised;
+        if (!initialised) {
+            esp_err_t err = nvs_flash_init_partition (DEFAULT_PERSISTENT_PARTITION);
+            if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+                if (nvs_flash_erase_partition (DEFAULT_PERSISTENT_PARTITION) != ESP_OK || nvs_flash_init_partition (DEFAULT_PERSISTENT_PARTITION) != ESP_OK)
+                    return false;
+        }
+        return initialised;
+    }
+
 private:
     nvs_handle_t _handle;
     const bool _okay = false;
 public:
-    explicit PersistentData (const char *space): _okay (_initialise () && nvs_open_from_partition (DEFAULT_PERSISTENT_PARTITION, space, NVS_READWRITE, &_handle) == ESP_OK) {}
+    explicit PersistentData (const char *space): _okay (__initialise () && nvs_open_from_partition (DEFAULT_PERSISTENT_PARTITION, space, NVS_READWRITE, &_handle) == ESP_OK) {
+        assert (strlen (space) <= SPACE_SIZE_MAXIMUM && "PersistentData namespace length > SPACE_SIZE_MAXIMUM");      
+    }
     ~PersistentData () { if (_okay) nvs_close (_handle); }
     inline bool get (const char *name, uint32_t *value) const { return (_okay && nvs_get_u32 (_handle, name, value) == ESP_OK); }
     inline bool set (const char *name, uint32_t value) { return (_okay && nvs_set_u32 (_handle, name, value) == ESP_OK); }
     inline bool get (const char *name, int32_t *value) const { return (_okay && nvs_get_i32 (_handle, name, value) == ESP_OK); }
     inline bool set (const char *name, int32_t value) { return (_okay && nvs_set_i32 (_handle, name, value) == ESP_OK); }
+    // float, double
     inline bool get (const char *name, String *value) const {
         size_t size;
+        bool result = false;
         if (_okay && nvs_get_str (_handle, name, NULL, &size) == ESP_OK) {
             char *buffer = new char [size];
             if (buffer) {
-              if (nvs_get_str (_handle, name, buffer, &size) == ESP_OK) {
-                  (*value) = buffer;
-                  delete [] buffer;
-                  return true;
-              }
-              delete [] buffer;
+                if (nvs_get_str (_handle, name, buffer, &size) == ESP_OK)
+                    (*value) = buffer, result = true;
+                delete [] buffer;
             }
         }
-        return false;
+        return result;
     }
-    inline bool set (const char *name, const String &value) { return (_okay && nvs_set_str (_handle, name, value.c_str ()) == ESP_OK); }
-
+    inline bool set (const char *name, const String &value) { 
+        assert (value.length () <= VALUE_STRING_SIZE_MAXIMUM && "PersistentData String length > VALUE_STRING_SIZE_MAXIMUM");
+        return (_okay && nvs_set_str (_handle, name, value.c_str ()) == ESP_OK);
+    }
 };
-
-int PersistentData::_initialised = 0;
 
 template <typename T>
 class PersistentValue {
@@ -49,7 +60,9 @@ class PersistentValue {
     const T _value_default;
 
 public:
-    explicit PersistentValue (PersistentData& data, const char *name, const T value_default): _data (data), _name (name), _value_default (value_default) {}
+    explicit PersistentValue (PersistentData& data, const char *name, const T value_default): _data (data), _name (name), _value_default (value_default) {
+        assert (_name.length () <= PersistentData::NAME_SIZE_MAXIMUM && "PersistentValue name length > NAME_SIZE_MAXIMUM");
+    }
     inline operator T () const { T value; return _data.get (_name.c_str (), &value) ? value : _value_default; }
     inline bool operator= (const T value) { return _data.set (_name.c_str (), value); }
     inline bool operator+= (const T value2) { T value = _value_default; _data.get (_name.c_str (), &value); value += value2; return _data.set (_name.c_str (), value); }
@@ -90,6 +103,7 @@ String getTimeString (time_t timet = 0) {
 class Watchdog {
     const int _timeout;
     bool _started;
+
 public:
     explicit Watchdog (const int timeout): _timeout (timeout), _started (false) {};
     void start () {

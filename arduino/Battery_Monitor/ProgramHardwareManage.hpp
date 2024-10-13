@@ -4,9 +4,9 @@
 
 template <size_t PROBE_COUNT>
 class TemperatureManagerBatterypackTemplate: public Component, public Alarmable, public Diagnosticable {
-
 public:
     using ChannelList = std::array <int, PROBE_COUNT>;
+
     typedef struct {
         ChannelList channels;
         float SETPOINT;
@@ -27,9 +27,10 @@ public:
     TemperatureManagerBatterypackTemplate (const Config& cfg, TemperatureInterface& interface): Alarmable ({
             AlarmCondition (ALARM_TEMPERATURE_FAILURE, [this] () { return _value.min () <= config.FAILURE; }),
             AlarmCondition (ALARM_TEMPERATURE_MINIMAL, [this] () { return _value.min () > config.FAILURE && _value.min () <= config.MINIMAL; }),
+            AlarmCondition (ALARM_TEMPERATURE_WARNING, [this] () { return _value.max () >= config.WARNING && _value.max () < config.MAXIMAL; }),
             AlarmCondition (ALARM_TEMPERATURE_MAXIMAL, [this] () { return _value.max () >= config.MAXIMAL; }),
-            AlarmCondition (ALARM_TEMPERATURE_WARNING, [this] () { return _value.max () < config.MAXIMAL && _value.max () >= config.WARNING; })
         }), config (cfg), _interface (interface), _values () {
+        assert (config.FAILURE < config.MINIMAL && config.MINIMAL < config.WARNING && config.WARNING < config.MAXIMAL && "Bad configuration values");
         _values.fill (MovingAverageWithValue <float, 16> (round2places));
     };
     void process () override {
@@ -73,7 +74,6 @@ protected:
 
 template <size_t PROBE_COUNT>
 class TemperatureManagerEnvironmentTemplate : public Component, public Alarmable, public Diagnosticable {
-
 public:
     typedef struct {
         int channel;
@@ -99,7 +99,7 @@ public:
     inline float getTemperature () const { return _value; }
 
 protected:
-   void collectDiagnostics (JsonDocument &obj) const override {
+    void collectDiagnostics (JsonDocument &obj) const override {
 //        JsonObject env = obj ["env"].to <JsonObject> ();
 //        _stats
     }
@@ -108,12 +108,12 @@ protected:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class FanManager : public Component {
-
+class FanManager : public Component, public Diagnosticable {
 public:
     typedef struct {
         FanInterface::FanSpeedType NO_SPEED, MIN_SPEED, MAX_SPEED;
     } Config;
+
     using TargetSet = std::pair <float, float>;
     using TargetSetFunc = std::function <TargetSet ()>;
 
@@ -125,9 +125,13 @@ private:
     AlphaSmoothing <double> &_smootherAlgorithm;
 
     const TargetSetFunc _targetValues;
+    FanInterface::FanSpeedType _value = FanInterface::FanSpeedType  (0);
+    Stats <FanInterface::FanSpeedType> _stats;
 
 public:
-    FanManager (const Config& cfg, FanInterface& fan, PidController <double>& controller, AlphaSmoothing <double>& smoother, const TargetSetFunc targetValues): config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _targetValues (std::move (targetValues)) {}
+    FanManager (const Config& cfg, FanInterface& fan, PidController <double>& controller, AlphaSmoothing <double>& smoother, const TargetSetFunc targetValues): config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _targetValues (std::move (targetValues)) {
+        assert (config.NO_SPEED <= config.MIN_SPEED && config.MIN_SPEED < config.MAX_SPEED && "Bad configuration values");
+    }
     void process () override {
         const TargetSet targets (_targetValues ());
         const float &setpoint = targets.first, &current = targets.second;
@@ -138,9 +142,18 @@ public:
             const double speedCalculated = _controllerAlgorithm.apply (setpoint, current);
             const double speedConstrained = std::clamp (map <double> (speedCalculated, -100.0, 100.0, static_cast <double> (config.MIN_SPEED), static_cast <double> (config.MAX_SPEED)), static_cast <double> (config.MIN_SPEED), static_cast <double> (config.MAX_SPEED));
             const double speedSmoothed = _smootherAlgorithm.apply (speedConstrained);
-            _fan.setSpeed (static_cast <FanInterface::FanSpeedType> (speedSmoothed));
+            _value = static_cast <FanInterface::FanSpeedType> (speedSmoothed);
+            _fan.setSpeed (_value);
+            _stats += _value;
             DEBUG_PRINTF ("FanManager::process: setpoint=%.2f, current=%.2f --> calculated=%.2e, constrained=%.2e, smoothed=%.2e\n", setpoint, current, speedCalculated, speedConstrained, speedSmoothed);
         }
+    }
+
+protected:
+    void collectDiagnostics (JsonDocument &obj) const override {
+//        JsonObject fan = obj ["fan"].to <JsonObject> ();
+//        _stats
+//        pid and smoothing diag
     }
 };
 

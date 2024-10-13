@@ -107,7 +107,6 @@ namespace JsonFunctions {
 #include <vector>
 
 class JsonSplitter {
-private:
     const int splitLength;
     const std::vector <String> commonElements;
 

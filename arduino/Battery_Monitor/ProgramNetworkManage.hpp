@@ -3,7 +3,6 @@
 // -----------------------------------------------------------------------------------------------
 
 class ConnectManager: private Singleton <ConnectManager>, public Component, public Diagnosticable {
-
 public:
     typedef struct {
         String client, ssid, pass;
@@ -36,29 +35,32 @@ private:
             DEBUG_PRINTF ("ConnectManager::events: WIFI_ALLOCATED, address=%s\n", IPAddress (info.got_ip.ip_info.ip.addr).toString ().c_str ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
             const String reason = __wifi_error_to_string ((wifi_err_reason_t) info.wifi_sta_disconnected.reason);
-            _available = false; _connected = false; _disconnections += reason;
+            _intervalConnectionCheck.reset (); _available = false; _connected = false; _disconnections += reason;
             DEBUG_PRINTF ("ConnectManager::events: WIFI_DISCONNECTED, ssid=%s, bssid=%s, reason=%s\n",
                 __wifi_ssid_to_string (info.wifi_sta_disconnected.ssid, info.wifi_sta_disconnected.ssid_len).c_str (),
-                __wifi_bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (),
-                reason.c_str ());
+                __wifi_bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (), reason.c_str ());
         }
     }
+
 public:
     explicit ConnectManager (const Config& cfg, const ConnectionQualityTracker::Callback connectionQualityCallback = nullptr) : Singleton <ConnectManager> (this), config (cfg), _connectionQualityTracker (connectionQualityCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
     void begin () override {
+        WiFi.persistent (false);
         WiFi.onEvent (__wiFiEventHandler);
         WiFi.setHostname (config.client.c_str ());
         WiFi.setAutoReconnect (true);
         WiFi.mode (WIFI_STA);
+        connect ();
+    }
+    void connect () {
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
-        DEBUG_PRINTF ("ConnectManager::begin: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddress ().c_str (), config.client.c_str ());
+        DEBUG_PRINTF ("ConnectManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddress ().c_str (), config.client.c_str ());
     }
     void reset () {
         DEBUG_PRINTF ("ConnectManager::reset\n");
         const String reason = "LOCAL_TIMEOUT";
         _available = false; _connected = false; _disconnections += reason;
-        WiFi.disconnect ();
-        // XXX begin () again?
+        WiFi.disconnect (true);
     }
     void process () override {
         if (_connected && _intervalConnectionCheck) {
@@ -69,6 +71,9 @@ public:
                 _connectionQualityTracker.update (WiFi.RSSI ());
                 DEBUG_PRINTF ("ConnectManager::process: rssi=%d (%s)\n", _connectionQualityTracker.rssi (), _connectionQualityTracker.toString ().c_str ());
             }
+        // } else if (!_connected && _intervalConnectionCheck) {
+        //     WiFi.disconnect (true);
+        //     connect ();
         }
     }
     inline bool isAvailable () const {
@@ -109,9 +114,10 @@ private:
             case WIFI_AUTH_WPA2_PSK: return "WPA2-PSK";
             case WIFI_AUTH_WPA_WPA2_PSK: return "WPA/2-PSK";
             case WIFI_AUTH_WPA2_ENTERPRISE: return "ENTERPRISE";
-            default: return "UNDEFINED";
+            default: return "UNDEFINED_(" + IntToString (static_cast <int> (authmode)) + ")";
         }
     }
+    // note: WiFi.disconnectReasonName
     static String __wifi_error_to_string (const wifi_err_reason_t reason) {
         switch (reason) {
             case WIFI_REASON_UNSPECIFIED: return "UNSPECIFIED";
@@ -143,7 +149,7 @@ private:
             case WIFI_REASON_ASSOC_FAIL: return "ASSOC_FAIL";
             case WIFI_REASON_HANDSHAKE_TIMEOUT: return "HANDSHAKE_TIMEOUT";
             case WIFI_REASON_CONNECTION_FAIL: return "CONNECTION_FAIL";
-            default: return "UNDEFINED";
+            default: return "UNDEFINED_(" + IntToString (static_cast <int> (reason)) + ")";
         }
     }
 };
@@ -152,13 +158,13 @@ private:
 // -----------------------------------------------------------------------------------------------
 
 class NettimeManager : public Component, public Alarmable, public Diagnosticable {
-
 public:
     typedef struct {
         String useragent, server;
         interval_t intervalUpdate, intervalAdjust;
         int failureLimit;
     } Config;
+
     using BooleanFunc = std::function <bool ()>;
 
 private:

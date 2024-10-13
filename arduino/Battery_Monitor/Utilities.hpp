@@ -76,6 +76,7 @@ template <template <typename, int> class BaseAverage, typename T = float, int WI
 class TypeOfAverageWithValue: public BaseAverage <T, WINDOW> {
     T val = T (0);
     std::function <T (T)> process;
+
 public:
     explicit TypeOfAverageWithValue (std::function <T (T)> proc = [] (T x) { return x; }): process (proc) {}
     T update (const T value) override {
@@ -106,6 +107,7 @@ class Stats {
     S _sum = S (0);
     T _min = std::numeric_limits <T>::max (), _max = std::numeric_limits <T>::min (), _avg = T (0);
     size_t _cnt = 0;
+
 public:
     inline void reset () { _cnt = 0; _avg = T (0); }
     inline Stats <T>& operator+= (const T& val) {
@@ -132,6 +134,7 @@ public:
 template <template <typename> class BaseStats, typename T>
 class TypeOfStatsWithValue: public BaseStats <T> {
     T _val = T (0);
+
 public:
     inline T val () const { return _val; }
     inline TypeOfStatsWithValue& operator+= (const T& val) {
@@ -168,6 +171,9 @@ public:
         _e = e;
         return _p + _i + _d;
     }
+    std::tuple <T, T, T> get () const {
+        return std::tuple <T, T, T> (_p, _i, _d);
+    }
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -181,6 +187,21 @@ public:
     explicit AlphaSmoothing (const T alpha) : _alpha (alpha) {}
     inline T apply (const T value) {
         return (_value = (_alpha * value + (1.0 - _alpha) * _value));
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+
+class Initialisable {
+    bool initialised = false;
+
+public:    
+    operator bool () {
+        if (!initialised) {
+            initialised = true;
+            return false;
+        }
+        return true;
     }
 };
 
@@ -299,6 +320,7 @@ template <typename T>
 class Singleton {
     static_assert (std::is_class_v <T>, "T must be a class type");
     inline static T* _instance = nullptr;
+
 public:
     inline static T* instance () { return _instance; }
     explicit Singleton (T* t) {

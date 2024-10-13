@@ -3,7 +3,6 @@
 // -----------------------------------------------------------------------------------------------
 
 class DeliverManager : public Component, public Alarmable, public Diagnosticable {
-
 public:
     typedef struct {
         BluetoothNotifier::Config blue;
@@ -47,12 +46,12 @@ protected:
 // -----------------------------------------------------------------------------------------------
 
 class PublishManager : public Component, public Alarmable, public Diagnosticable {
-
 public:
     typedef struct {
         MQTTPublisher::Config mqtt;
-        int failureLimit;
+        counter_t failureLimit;
     } Config;
+
     using BooleanFunc = std::function <bool ()>;
 
 private:
@@ -105,12 +104,11 @@ protected:
 // -----------------------------------------------------------------------------------------------
 
 class StorageManager : public Component, public Alarmable, public Diagnosticable {
-
 public:
     typedef struct {
         String filename ;
         float remainLimit;
-        int failureLimit;
+        counter_t failureLimit;
     } Config;
 
 private:

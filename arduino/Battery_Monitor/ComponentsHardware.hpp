@@ -5,7 +5,6 @@
 #include <Arduino.h>
 
 class AlarmInterface_SinglePIN {
-
 public:
     typedef struct {
         int PIN_ALARM;
@@ -93,7 +92,6 @@ private:
 // https://deepbluembedded.com/arduino-cd74hc4067-analog-multiplexer-library-code/
 template <typename ADC_VALUE_TYPE>
 class MuxInterface_CD74HC4067 { // technically this is ADC as well due to PIN_SIG
-
 public:
     static inline constexpr int ADDRESS_WIDTH = 4;
     static inline constexpr int CHANNELS = (1 << ADDRESS_WIDTH);
@@ -139,7 +137,6 @@ public:
 // https://www.aliexpress.com/item/1005002430639515.html
 // max frequency 5kHz
 class OpenSmart_QuadMotorDriver {
-
 public:
     static inline constexpr int MotorCount = 4;
     static inline constexpr uint8_t I2cAddress = 0x20;

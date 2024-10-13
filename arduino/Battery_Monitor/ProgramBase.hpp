@@ -25,7 +25,6 @@ public:
 };
 
 class DiagnosticManager : public Component {
-
 public:
     typedef struct {
     } Config;
@@ -67,7 +66,6 @@ static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "
 #define _ALARM_NAME(x)               (_ALARM_NAMES [x])
 
 class AlarmSet {
-
     _AlarmType _alarms = ALARM_NONE;
 
 public:
@@ -92,14 +90,17 @@ inline bool operator!= (const AlarmSet &a, const AlarmSet &b) { return (_AlarmTy
 // -----------------------------------------------------------------------------------------------
 
 class AlarmCondition {
-public:
+public:  
     using CheckFunction = std::function <bool ()>;
-    AlarmCondition (_AlarmType type, CheckFunction checkFunc): _type (type), _checkFunc (std::move (checkFunc)) {}
-    inline bool check () const { return _checkFunc (); }
-    inline _AlarmType getType () const { return _type; }
+
 private:
     _AlarmType _type;
     CheckFunction _checkFunc;
+
+public:
+    AlarmCondition (_AlarmType type, CheckFunction checkFunc): _type (type), _checkFunc (std::move (checkFunc)) {}
+    inline bool check () const { return _checkFunc (); }
+    inline _AlarmType getType () const { return _type; }
 };
 
 class Alarmable {
@@ -120,7 +121,6 @@ public:
 };
 
 class AlarmManager : public Component, public Diagnosticable {
-
 public:
     typedef struct {
     } Config;
@@ -176,13 +176,13 @@ protected:
 extern String ota_image_check (const String& json, const String& type, const String& vers, const String& addr);
 
 class UpdateManager: public Component, public Alarmable, public Diagnosticable {
-
 public:
     typedef struct {
         interval_t intervalUpdate;
         time_t intervalCheck;
         String json, type, vers;
     } Config;
+    
     using BooleanFunc = std::function <bool ()>;
 
 private:
