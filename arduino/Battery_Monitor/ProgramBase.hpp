@@ -201,7 +201,7 @@ public:
             AlarmCondition (ALARM_UPDATE_VERS, [this] () { return _available; })
         }), config (cfg), _networkIsAvailable (networkIsAvailable),
         _persistent_data ("updates"), _persistent_data_previous (_persistent_data, "previous", 0), _persistent_data_version (_persistent_data, "version", String ("")),
-        _available (!static_cast <String> (_persistent_data_version).isEmpty ()), 
+        _available (!static_cast <String> (_persistent_data_version).isEmpty ()),
         _interval (config.intervalUpdate) {}
     void process () override {
         if (static_cast <bool> (_interval)) {

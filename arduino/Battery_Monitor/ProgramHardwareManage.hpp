@@ -158,7 +158,7 @@ public:
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
-        JsonObject sub = obj ["fan"].to <JsonObject> ();        
+        JsonObject sub = obj ["fan"].to <JsonObject> ();
             sub ["pid"] = _controllerAlgorithm;
             sub ["speed"] = _statsValue;
     }

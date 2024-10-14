@@ -273,13 +273,13 @@ public:
         return _init ();
     }
     //
-    inline long size () const {
+    long size () const {
         if (_mode == MODE_CLOSED)   const_cast <SPIFFSFile *> (this)->_open (MODE_READING);
         if (_mode == MODE_ERROR)    return -1;
         return _size;
     }
-    inline float remains () const {
-        return (float) ((_totalBytes - _usedBytes) * 100.0) / (float) _totalBytes;
+    float remains () const {
+        return round2places ((float) ((_totalBytes - _usedBytes) * 100.0f) / (float) _totalBytes);
     }
     template <typename T>
     size_t append (const T& data) {

@@ -144,19 +144,21 @@ public:
 
 template <typename T>
 bool convertToJson (const StatsWithValue <T>& src, JsonVariant dst) {
-    dst ["val"] = src.val ();
-    dst ["avg"] = src.avg ();
-    dst ["min"] = src.min ();
-    dst ["max"] = src.max ();
-    dst ["cnt"] = src.cnt ();
+    if ((dst ["cnt"] = src.cnt ()) > 0) {
+        dst ["val"] = src.val ();
+        dst ["avg"] = src.avg ();
+        dst ["min"] = src.min ();
+        dst ["max"] = src.max ();
+    }
     return true;
 }
 template <typename T>
 bool convertToJson (const Stats <T>& src, JsonVariant dst) {
-    dst ["avg"] = src.avg ();
-    dst ["min"] = src.min ();
-    dst ["max"] = src.max ();
-    dst ["cnt"] = src.cnt ();
+    if ((dst ["cnt"] = src.cnt ()) > 0) {
+        dst ["avg"] = src.avg ();
+        dst ["min"] = src.min ();
+        dst ["max"] = src.max ();
+    }
     return true;
 }
 template <typename T>
@@ -164,23 +166,27 @@ bool convertToJson (const PidController <T>& src, JsonVariant dst) {
     dst ["Kp"] = src._Kp;
     dst ["Ki"] = src._Ki;
     dst ["Kd"] = src._Kd;
-    dst ["p"] = src._p;
-    dst ["i"] = src._i;
-    dst ["d"] = src._d;
-    dst ["e"] = src._e;
-    dst ["t"] = src._t;
+    if (src._t > 0) {
+        dst ["p"] = src._p;
+        dst ["i"] = src._i;
+        dst ["d"] = src._d;
+        dst ["e"] = src._e;
+        dst ["t"] = src._t;
+    }
     return true;
 }
 bool convertToJson (const ActivationTrackerWithDetail& src, JsonVariant dst) {
-    dst ["last"] = src.seconds ();
-    dst ["count"] = src.count ();
-    if (!src.detail ().isEmpty ())
-        dst ["detail"] = src.detail ();
+    if (dst ["count"] = src.count () > 0) {
+        dst ["last"] = src.seconds ();
+        if (!src.detail ().isEmpty ())
+            dst ["detail"] = src.detail ();
+    }
     return true;
 }
 bool convertToJson (const ActivationTracker& src, JsonVariant dst) {
-    dst ["last"] = src.seconds ();
-    dst ["count"] = src.count ();
+    if (dst ["count"] = src.count () > 0) {
+        dst ["last"] = src.seconds ();
+    }
     return true;
 }
 bool convertToJson (const Uptime& src, JsonVariant dst) {

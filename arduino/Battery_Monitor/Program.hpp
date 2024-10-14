@@ -72,7 +72,7 @@ protected:
             JsonObject reset = system ["reset"].to <JsonObject> ();
                 reset ["okay"] = reset_okay;
                 reset ["reason"] = reset_details.first;
-                reset ["details"] = reset_details.second;
+                //reset ["details"] = reset_details.second;
     }
 };
 
