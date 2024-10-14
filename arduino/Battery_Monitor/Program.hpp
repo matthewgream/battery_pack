@@ -93,7 +93,7 @@ class Program: public Component, public Diagnosticable {
     FanInterface fanInterface;
     FanManager fanManager;
 
-    ConnectManager network;
+    NetwerkManager network;
     NettimeManager nettime;
     DeliverManager deliver;
     PublishManager publish;
@@ -138,6 +138,7 @@ class Program: public Component, public Diagnosticable {
         if (publish.connected ()) {
             if (storage.size () > 0) {
                 DEBUG_PRINTF ("Program::doCapture: publish.connected () && storage.size () > 0\n");
+                // probably needs to be time bound and recall and reuse an offset
                 StorageLineHandler handler (publish);
                 if (storage.retrieve (handler))
                     storage.erase ();

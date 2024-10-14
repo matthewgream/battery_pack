@@ -50,20 +50,20 @@ private:
     static inline constexpr int DS1820_INDEX = 0;
     OneWire oneWire;
     DallasTemperature sensors;
-    bool _found;
+    bool _available;
     DeviceAddress _address;
 
 public:
     explicit TemperatureSensor_DS18B20 (const Config& cfg): config (cfg), oneWire (config.PIN_DAT), sensors (&oneWire) {
         sensors.begin ();
         DEBUG_PRINTF ("TemperatureSensor_DS18B20::init: (DAT=%d) found %d devices on bus, %d are DS18", config.PIN_DAT, sensors.getDeviceCount (), sensors.getDS18Count ());
-        if ((_found = sensors.getAddress (_address, DS1820_INDEX)))
+        if ((_available = sensors.getAddress (_address, DS1820_INDEX)))
             DEBUG_PRINTF (" [0] = %s", __ds1820_address_to_string (_address).c_str ());
         DEBUG_PRINTF ("\n");
     }
     float getTemperature () {
         float temp = -273.15;
-        if (!_found || !sensors.requestTemperaturesByAddress (_address) || (temp = sensors.getTempC (_address)) == DEVICE_DISCONNECTED_C)
+        if (!_available || !sensors.requestTemperaturesByAddress (_address) || (temp = sensors.getTempC (_address)) == DEVICE_DISCONNECTED_C)
             DEBUG_PRINTF ("TemperatureSensor_DS18B20::getTemperature: device is disconnected\n");
         return temp;
     }
@@ -77,11 +77,9 @@ public:
 
 private:
     static String __ds1820_address_to_string (const DeviceAddress& addr) {
-        #define NIBBLE_TO_HEX_CHAR(nibble) ((char) ((nibble) < 10 ? '0' + (nibble) : 'A' + ((nibble) - 10)))
-        #define BYTE_TO_HEX(byte) NIBBLE_TO_HEX_CHAR ((byte) >> 4), NIBBLE_TO_HEX_CHAR ((byte) & 0x0F)
-        #define __DS18_BYTETOSTRING(byte) String (NIBBLE_TO_HEX_CHAR ((byte) >> 4)) + String (NIBBLE_TO_HEX_CHAR ((byte) & 0xF))
-        #define __DS18_FORMAT_ADDRESS(addr) __DS18_BYTETOSTRING ((addr) [0]) + __DS18_BYTETOSTRING ((addr) [1]) + __DS18_BYTETOSTRING ((addr) [2]) + __DS18_BYTETOSTRING ((addr) [3]) + __DS18_BYTETOSTRING ((addr) [4]) + __DS18_BYTETOSTRING ((addr) [5]) + __DS18_BYTETOSTRING ((addr) [6]) + __DS18_BYTETOSTRING ((addr) [7])
-        return __DS18_FORMAT_ADDRESS(addr);
+        char buffer [2*8+1];
+        sprintf (buffer, "%02x%02x%02x%02x%02x%02x%02x%02x", addr [0], addr [1], addr [2], addr [3], addr [4], addr [5], addr [6], addr [7]);
+        return String (buffer);
     }
 };
 

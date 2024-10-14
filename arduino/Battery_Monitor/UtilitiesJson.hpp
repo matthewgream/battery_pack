@@ -11,11 +11,11 @@ class JsonCollector {
     JsonDocument doc;
 
 public:
-    JsonCollector (const String &type, const String &time) {
+    explicit JsonCollector (const String &type, const String &time) {
         doc ["type"] = type;
         doc ["time"] = time;
     }
-    JsonDocument& document () { return doc; }
+    inline JsonDocument& document () { return doc; }
     operator String () const {
         String output;
         serializeJson (doc, output);
@@ -27,16 +27,16 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 namespace JsonFunctions {
-    inline int findValueKey (const String& json, const String& key) {
+    int findValueKey (const String& json, const String& key) {
         return (json.isEmpty () || key.isEmpty ()) ? -1 : json.indexOf ("\"" + key + "\":");
     }
-    inline int findValueStart (const String& json, const int keyPos) {
+    int findValueStart (const String& json, const int keyPos) {
         int valueStart = json.indexOf (":", keyPos);
         if (valueStart != -1)
             do valueStart ++; while (valueStart < json.length () && isSpace (json.charAt (valueStart)));
         return valueStart;
     }
-    inline int findValueEnd (const String& json, const int valueStart) {
+    int findValueEnd (const String& json, const int valueStart) {
         int valueEnd;
         if (valueStart >= json.length ()) return -1;
         if (json.charAt (valueStart) == '"') {
@@ -53,7 +53,7 @@ namespace JsonFunctions {
         }
         return valueEnd;
     }
-    inline int findValue (const String& json, const String& key, String& value) {
+    int findValue (const String& json, const String& key, String& value) {
         const int keyPos = findValueKey (json, key);
         if (keyPos >= 0) {
             const int valueStart = findValueStart (json, keyPos);
@@ -67,7 +67,7 @@ namespace JsonFunctions {
         }
         return -1;
     }
-    inline int findNextElement (const String& json, const int startPos, String& element) {
+    int findNextElement (const String& json, const int startPos, String& element) {
         int braceCount = 0;
         bool inQuotes = false;
         for (int i = startPos, j = startPos; i < json.length (); i ++) {

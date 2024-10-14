@@ -6,18 +6,20 @@ class DeliverManager : public Component, public Alarmable, public Diagnosticable
 public:
     typedef struct {
         BluetoothNotifier::Config blue;
+        counter_t failureLimit;
     } Config;
 
 private:
     const Config &config;
 
     BluetoothNotifier _blue;
-
     ActivationTrackerWithDetail _delivers;
+    ActivationTracker _failures;
 
 public:
     explicit DeliverManager (const Config& cfg): Alarmable ({
-            AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.mtuexceeded (); })
+            AlarmCondition (ALARM_DELIVER_FAIL, [this] () { return _failures > config.failureLimit; }),
+            AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.mtuExceeded (); })
         }), config (cfg), _blue (cfg.blue) {}
     void begin () override {
         _blue.advertise ();
@@ -27,8 +29,11 @@ public:
     }
     bool deliver (const String& data) {
         if (_blue.connected ()) {
-            _delivers += ArithmeticToString (data.length ()), _blue.notify (data);
-            return true;
+            if (_blue.notify (data)) {
+                _delivers += ArithmeticToString (data.length ());
+                _failures = 0;
+                return true;
+            } else _failures ++;
         }
         return false;
     }
@@ -36,9 +41,14 @@ public:
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["deliver"].to <JsonObject> ();
-        if (_delivers.count () > 0)
-            sub ["delivers"] = _delivers;
-        sub ["bluetooth"] = _blue;
+            if (_delivers)
+                sub ["delivers"] = _delivers;
+            if (_failures) {
+                sub ["failures"] = _failures;
+                JsonObject failures = sub ["failures"].as <JsonObject> ();
+                failures ["limit"] = config.failureLimit;
+            }
+            sub ["blue"] = _blue;
     }
 };
 
@@ -56,18 +66,16 @@ public:
 
 private:
     const Config &config;
-
     const BooleanFunc _networkIsAvailable;
 
     MQTTPublisher _mqtt;
-
     ActivationTrackerWithDetail _publishes;
-    counter_t _failures = 0;
+    ActivationTracker _failures;
 
 public:
     explicit PublishManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
             AlarmCondition (ALARM_PUBLISH_FAIL, [this] () { return _failures > config.failureLimit; }),
-            AlarmCondition (ALARM_PUBLISH_SIZE, [this] () { return _mqtt.bufferexceeded (); })
+            AlarmCondition (ALARM_PUBLISH_SIZE, [this] () { return _mqtt.bufferExceeded (); })
         }), config (cfg), _networkIsAvailable (networkIsAvailable), _mqtt (cfg.mqtt) {}
     void begin () override {
         _mqtt.setup ();
@@ -78,8 +86,9 @@ public:
     }
     bool publish (const String& data, const String& subtopic) {
         if (_networkIsAvailable ()) {
-          if (_mqtt.connected () && _mqtt.publish (config.mqtt.topic + "/" + subtopic, data)) {
-              _publishes += ArithmeticToString (data.length ()), _failures = 0;
+          if (_mqtt.connected () && _mqtt.publish (config.mqtt.topic + "/" + subtopic, data)) { // XXX
+              _publishes += ArithmeticToString (data.length ());
+              _failures = 0;
               return true;
           } else _failures ++;
         }
@@ -90,14 +99,14 @@ public:
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["publish"].to <JsonObject> ();
-        if (_publishes.count () > 0)
-            sub ["publishes"] = _publishes;
-        if (_failures > 0) {
-            JsonObject failures = sub ["failures"].to <JsonObject> ();
-            failures ["count"] = _failures;
-            failures ["limit"] = config.failureLimit;
-        }
-        sub ["mqtt"] = _mqtt;
+            if (_publishes)
+                sub ["publishes"] = _publishes;
+            if (_failures) {
+                sub ["failures"] = _failures;
+                JsonObject failures = sub ["failures"].as <JsonObject> ();
+                failures ["limit"] = config.failureLimit;
+            }
+            sub ["mqtt"] = _mqtt;
     }
 };
 
@@ -111,30 +120,30 @@ public:
         float remainLimit;
         counter_t failureLimit;
     } Config;
+    typedef SPIFFSFile::LineCallback LineCallback;
 
 private:
     const Config &config;
 
     SPIFFSFile _file;
-
     ActivationTrackerWithDetail _appends;
-    counter_t _failures = 0, _erasures = 0;
+    ActivationTracker _failures, _erasures;
 
 public:
-    typedef SPIFFSFile::LineCallback LineCallback;
     explicit StorageManager (const Config& cfg): Alarmable ({
             AlarmCondition (ALARM_STORAGE_FAIL, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_STORAGE_SIZE, [this] () { return _file.remains () < config.remainLimit; })
         }), config (cfg), _file (config.filename) {}
     void begin () override {
-        _failures = _file.begin () ? 0 : _failures + 1;
+        if (!_file.begin ()) _failures ++;
     }
     inline long size () const {
         return _file.size ();
     }
     bool append (const String& data) {
         if (_file.append (data)) {
-            _appends += ArithmeticToString (data.length ()), _failures = 0;
+            _appends += ArithmeticToString (data.length ());
+            _failures = 0;
             return true;
         } else _failures ++;
         return false;
@@ -143,24 +152,24 @@ public:
         return _file.read (callback);
     }
     void erase () {
-        _erasures ++;
         _file.erase ();
+        _erasures ++;
     }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["storage"].to <JsonObject> ();
-        sub ["critical"] = config.remainLimit;
-        if (_erasures > 0)
-            sub ["erasures"] = _erasures;
-        if (_failures > 0) {
-            JsonObject failures = sub ["failures"].to <JsonObject> ();
-            failures ["count"] = _failures;
-            failures ["limit"] = config.failureLimit;
-        }
-        if (_appends.count () > 0)
-            sub ["appends"] = _appends;
-        sub ["file"] = _file;
+            sub ["critical"] = config.remainLimit;
+            if (_appends)
+                sub ["appends"] = _appends;
+            if (_failures) {
+                sub ["failures"] = _failures;
+                JsonObject failures = sub ["failures"].as <JsonObject> ();
+                failures ["limit"] = config.failureLimit;
+            }
+            if (_erasures)
+                sub ["erasures"] = _erasures;
+            sub ["file"] = _file;
     }
 };
 

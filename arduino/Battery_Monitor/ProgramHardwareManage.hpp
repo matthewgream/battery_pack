@@ -17,7 +17,7 @@ private:
     const Config& config;
 
     TemperatureInterface& _interface;
-    std::array <MovingAverageWithValue <float, 16>, PROBE_COUNT> _values;
+    std::array <MovingAverage <float, 16>, PROBE_COUNT> _values;
     using AggregateValue = Stats <float>;
     AggregateValue _value; // change to compute something more sophisticated
     //std::array <Stats <float>, PROBE_COUNT> _statsValues;
@@ -31,7 +31,7 @@ public:
             AlarmCondition (ALARM_TEMPERATURE_MAXIMAL, [this] () { return _value.max () >= config.MAXIMAL; }),
         }), config (cfg), _interface (interface), _values () {
         assert (config.FAILURE < config.MINIMAL && config.MINIMAL < config.WARNING && config.WARNING < config.MAXIMAL && "Bad configuration values");
-        _values.fill (MovingAverageWithValue <float, 16> (round2places));
+        _values.fill (MovingAverage <float, 16> (round2places));
     };
     void process () override {
         _value.reset ();
@@ -52,7 +52,7 @@ public:
     inline float max () const { return _value.max (); }
     inline float avg () const { return round2places (_value.avg ()); }
     using TemperatureArray = std::array <float, PROBE_COUNT>;
-    inline const TemperatureArray getTemperatures () const {
+    inline TemperatureArray getTemperatures () const {
         TemperatureArray result;
         auto it = result.begin ();
         for (const auto& value : _values)
@@ -65,12 +65,13 @@ public:
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["bat"].to <JsonObject> ();
-        sub ["avg"] = _statsValueAvg;
-        sub ["min"] = _statsValueMin;
-        sub ["max"] = _statsValueMax;
-        // JsonArray map = obj ["map"].to <JsonArray> ();
-        // for (const auto& stats : _statsValues)
-        //     map.add (ArithmeticToString (stats.avg ()) + "," + ArithmeticToString (stats.min ()) + "," + ArithmeticToString (stats.max ()));
+            JsonObject tmp = sub ["tmp"].to <JsonObject> ();
+                tmp ["avg"] = _statsValueAvg;
+                tmp ["min"] = _statsValueMin;
+                tmp ["max"] = _statsValueMax;
+                // JsonArray val = tmp ["val"].to <JsonArray> ();
+                // for (const auto& stats : _statsValues)
+                //     val.add (ArithmeticToString (stats.avg ()) + "," + ArithmeticToString (stats.min ()) + "," + ArithmeticToString (stats.max ()));
     }
 };
 
@@ -89,8 +90,9 @@ private:
     const Config &config;
 
     TemperatureInterface& _interface;
-    MovingAverageWithValue <float, 16> _value;
-    Stats <float> _stats;
+
+    MovingAverage <float, 16> _value;
+    Stats <float> _statsValue;
 
 public:
     TemperatureManagerEnvironmentTemplate (const Config& cfg, TemperatureInterface& interface): Alarmable ({
@@ -98,7 +100,7 @@ public:
         }), config (cfg), _interface (interface), _value (round2places) {};
     void process () override {
         _value = _interface.getTemperature (config.channel);
-        _stats += _value;
+        _statsValue += _value;
         DEBUG_PRINTF ("TemperatureManagerEnvironment::process: temp=%.2f\n", static_cast <float> (_value));
     }
     inline float getTemperature () const { return _value; }
@@ -106,7 +108,7 @@ public:
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["env"].to <JsonObject> ();
-        sub ["tmp"] = _stats;
+            sub ["tmp"] = _statsValue;
     }
 };
 
@@ -131,7 +133,7 @@ private:
 
     const TargetSetFunc _targetValues;
     FanInterface::FanSpeedType _value = FanInterface::FanSpeedType (0);
-    Stats <FanInterface::FanSpeedType> _stats;
+    Stats <FanInterface::FanSpeedType> _statsValue;
 
 public:
     FanManager (const Config& cfg, FanInterface& fan, PidController <double>& controller, AlphaSmoothing <double>& smoother, const TargetSetFunc targetValues): config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _targetValues (targetValues) {
@@ -149,16 +151,16 @@ public:
             const double speedSmoothed = _smootherAlgorithm.apply (speedConstrained);
             _value = static_cast <FanInterface::FanSpeedType> (speedSmoothed);
             _fan.setSpeed (_value);
-            _stats += _value;
+            _statsValue += _value;
             DEBUG_PRINTF ("FanManager::process: setpoint=%.2f, current=%.2f --> calculated=%.2e, constrained=%.2e, smoothed=%.2e\n", setpoint, current, speedCalculated, speedConstrained, speedSmoothed);
         }
     }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
-        JsonObject sub = obj ["fan"].to <JsonObject> ();
-        sub ["pid"] = _controllerAlgorithm;
-        sub ["speed"] = _stats;
+        JsonObject sub = obj ["fan"].to <JsonObject> ();        
+            sub ["pid"] = _controllerAlgorithm;
+            sub ["speed"] = _statsValue;
     }
 };
 

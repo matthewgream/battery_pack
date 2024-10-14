@@ -22,7 +22,7 @@ public:
             header = client.header ("Date");
             if (!header.isEmpty ()) {
                 struct tm timeinfo;
-                if (strptime (header.c_str (), "%a, %d %b %Y %H:%M:%S GMT", &timeinfo) != NULL)
+                if (strptime (header.c_str (), "%a, %d %b %Y %H:%M:%S GMT", &timeinfo) != nullptr)
                     time = mktime (&timeinfo);
             }
         }
@@ -46,15 +46,14 @@ https://github.com/espressif/esp-idf/blob/v4.3/examples/protocols/sntp/main/sntp
 
 class TimeDriftCalculator {
     static inline constexpr long MAX_DRIFT_MS = 60 * 1000;
-    long _driftMs;
-    bool _isHighDrift = false;
+    long _driftMs, _highDrift = 0;
 
 public:
     explicit TimeDriftCalculator (const long driftMs) : _driftMs (driftMs) {}
-    long updateDrift (time_t periodSecs, const interval_t periodMs) {
+    long updateDrift (const time_t periodSecs, const interval_t periodMs) {
         long driftMs = (((periodSecs * 1000) - periodMs) * (60 * 60 * 1000)) / periodMs; // ms per hour
         driftMs = (_driftMs * 3 + driftMs) / 4; // 75% old value, 25% new value
-        if (driftMs > MAX_DRIFT_MS || driftMs < -MAX_DRIFT_MS) _isHighDrift = true;
+        if (driftMs > MAX_DRIFT_MS || driftMs < -MAX_DRIFT_MS) _highDrift = driftMs;
         _driftMs = std::clamp (driftMs, -MAX_DRIFT_MS, MAX_DRIFT_MS);
         DEBUG_PRINTF ("TimeDriftCalculator::updateDrift: driftMs=%ld\n", _driftMs);
         return _driftMs;
@@ -73,8 +72,8 @@ public:
         DEBUG_PRINTF ("TimeDriftCalculator::applyDrift: adjustMs=%ld\n", adjustMs);
         return adjustMs;
     }
-    inline bool isHighDrift () const {
-      return _isHighDrift;
+    inline long highDrift () const {
+      return _highDrift;
     }
     inline long drift () const {
       return _driftMs;
@@ -101,7 +100,7 @@ private:
 
     WiFiClient _wifiClient;
     PubSubClient _mqttClient;
-    size_t _bufferExceeded = 0;
+    ActivationTrackerWithDetail _bufferExceeded;
 
     bool connect () {
         const bool result = _mqttClient.connect (config.client.c_str (), config.user.c_str (), config.pass.c_str ());
@@ -117,7 +116,7 @@ public:
     }
     bool publish (const String& topic, const String& data) {
         if (data.length () > config.bufferSize) {
-            _bufferExceeded = data.length ();
+            _bufferExceeded += ArithmeticToString (data.length ());
             DEBUG_PRINTF ("MQTTPublisher::publish: failed, length %u would exceed buffer size %u\n", data.length (), config.bufferSize);
             return false;
         }
@@ -140,11 +139,11 @@ public:
             //
         }
         obj ["state"] = __mqtt_state_to_string (mqttClient.state ());
-        if (_bufferExceeded > 0)
+        if (_bufferExceeded)
             obj ["bufferExceeded"] = _bufferExceeded;
     }
-    inline bool bufferexceeded () const {
-        return _bufferExceeded > 0;
+    inline bool bufferExceeded () const {
+        return _bufferExceeded;
     }
 
 private:
@@ -219,7 +218,7 @@ private:
             DEBUG_PRINTF ("SPIFFSFile[%s]::_open: %s, failed on SPIFFS.open (), file activity not available\n", _filename.c_str (), mode == MODE_WRITING ? "WRITING" : "READING");
         }
     }
-    size_t _append (const char * type, std::function <size_t ()> impl, size_t length) {
+    size_t _append (const char * type, const std::function <size_t ()> impl, const size_t length) {
         DEBUG_PRINTF ("SPIFFSFile[%s]::append[%s]: size=%ld, length=%u\n", _filename.c_str (), type, _size, length);
         if (length > (_totalBytes - _usedBytes)) {
             DEBUG_PRINTF ("SPIFFSFile[%s]::_append: erasing, as size %ld would exceed %ld\n", _filename.c_str (), _size + length, _totalBytes);
@@ -230,10 +229,10 @@ private:
             if (_mode == MODE_ERROR)
                 return 0;
         }
-        length = impl ();
-        _size += length;
-        _usedBytes += length; // probably is not 100% correct due to metadata (e.g. FAT)
-        return length;
+        size_t length_actual = impl ();
+        _size += length_actual;
+        _usedBytes += length_actual; // probably is not 100% correct due to metadata (e.g. FAT)
+        return length_actual;
     }
     size_t _append (const String& data) { return _append ("String", [&] () { return _file.println (data); }, data.length () + 2); }
     size_t _append (const JsonDocument& doc) { return _append ("JsonDocument", [&] () { return serializeJson (doc, _file); }, measureJson (doc)); }

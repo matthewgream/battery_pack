@@ -33,7 +33,7 @@ typedef unsigned long counter_t;
 #include <Arduino.h>
 
 template <typename T>
-inline String ArithmeticToString (const T n, const int x = -1, const bool t = false) {
+String ArithmeticToString (const T& n, const int x = -1, const bool t = false) {
     static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
     char s [64 + 1];
     if constexpr (std::is_integral_v <T>)
@@ -67,53 +67,41 @@ inline String ArithmeticToString (const T n, const int x = -1, const bool t = fa
 
 template <typename T, int WINDOW = 16>
 class MovingAverage {
+public:
+    using ProcessFunc = std::function <T (const T&)>;
+
+private:
     static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
     static_assert (WINDOW > 0, "WINDOW size must be positive");
-    using S = std::conditional_t <std::is_integral_v <T>, std::conditional_t <sizeof (T) < sizeof (int32_t), int32_t, int64_t>, double>;
+    using U = std::conditional_t <std::is_integral_v <T>, std::conditional_t <sizeof (T) < sizeof (int32_t), int32_t, int64_t>, double>;
     std::array <T, WINDOW> values;
-    S sum = S (0);
-    size_t count = 0;
+    U sum = U (0), cnt = U (0);
+    T val = T (0);
+    ProcessFunc postprocessor;
 
 public:
-    virtual T update (const T value) {
-        if (count < WINDOW) {
-            values [count] = value;
-            sum += static_cast <S> (value);
-            count ++;
+    explicit MovingAverage (ProcessFunc proc = [] (const T& t) { return t; }): postprocessor (proc) {}
+    const T& update (const T& value) {
+        if (cnt < WINDOW) {
+            sum = sum + static_cast <U> (value);
+            values [cnt ++] = value;
         } else {
-            sum -= static_cast <S> (values [0]);
+            sum = sum - static_cast <U> (values [0]) + static_cast <U> (value);
             for (size_t i = 1; i < WINDOW; i ++)
                 values [i - 1] = values [i];
             values [WINDOW - 1] = value;
-            sum += static_cast <S> (value);
         }
-        return static_cast <T> (sum / static_cast <S> (count));
+        return (val = postprocessor (static_cast <T> (sum / cnt)));
     }
-};
-
-template <template <typename, int> class BaseAverage, typename T = float, int WINDOW = 16>
-class TypeOfAverageWithValue: public BaseAverage <T, WINDOW> {
-    T val = T (0);
-    std::function <T (T)> process;
-
-public:
-    explicit TypeOfAverageWithValue (std::function <T (T)> proc = [] (T x) { return x; }): process (proc) {}
-    T update (const T value) override {
-        val = process (BaseAverage <T, WINDOW>::update (value));
-        return val;
-    }
-    inline TypeOfAverageWithValue& operator= (const T value) { update (value); return *this; }
+    MovingAverage& operator= (const T& value) { update (value); return *this; }
     inline operator const T& () const { return val; }
 };
-
-template <typename T, int WINDOW = 16>
-using MovingAverageWithValue = TypeOfAverageWithValue <MovingAverage, T, WINDOW>;
 
 // -----------------------------------------------------------------------------------------------
 
 #include <cmath>
 
-inline float round2places (float value) {
+inline float round2places (const float& value) {
     return std::round (value * 100.0f) / 100.0f;
 }
 
@@ -130,8 +118,8 @@ class Stats {
     size_t _cnt = 0;
 
 public:
-    inline void reset () { _cnt = 0; _avg = T (0); }
-    inline Stats <T>& operator+= (const T& val) {
+    void reset () { _cnt = 0; _avg = T (0); }
+    Stats <T>& operator+= (const T& val) {
         if (_cnt ++ == 0)
             _sum = static_cast <S> (_min = _max = val);
         else {
@@ -141,10 +129,10 @@ public:
         }
         return *this;
     }
-    inline size_t cnt () const { return _cnt; }
-    inline T min () const { return _min; }
-    inline T max () const { return _max; }
-    inline T avg () const {
+    inline const size_t& cnt () const { return _cnt; }
+    inline const T& min () const { return _min; }
+    inline const T& max () const { return _max; }
+    inline const T& avg () const {
         if (_cnt > 0) {
             const_cast <Stats <T> *> (this)->_avg = static_cast <T> (_sum / static_cast <S> (_cnt));
             const_cast <Stats <T> *> (this)->_cnt = 0;
@@ -157,8 +145,8 @@ class TypeOfStatsWithValue: public BaseStats <T> {
     T _val = T (0);
 
 public:
-    inline T val () const { return _val; }
-    inline TypeOfStatsWithValue& operator+= (const T& val) {
+    inline const T& val () const { return _val; }
+    TypeOfStatsWithValue& operator+= (const T& val) {
         _val = val;
         BaseStats <T>::operator+= (val);
         return *this;
@@ -181,8 +169,8 @@ public: // for serialization
     interval_t _t = 0;
 
 public:
-    PidController (const T kp, const T ki, const T kd) : _Kp (kp), _Ki (ki), _Kd (kd) {}
-    T apply (const T setpoint, const T current) {
+    PidController (const T& kp, const T& ki, const T& kd) : _Kp (kp), _Ki (ki), _Kd (kd) {}
+    T apply (const T& setpoint, const T& current) {
         const interval_t t = millis ();
         const T d = (t - _t) / 1000.0;
         const T e = setpoint - current;
@@ -200,12 +188,12 @@ public:
 template <typename T>
 class AlphaSmoothing {
     const T _alpha;
-    T _value = T (0);
+    T _val = T (0);
 
 public:
-    explicit AlphaSmoothing (const T alpha) : _alpha (alpha) {}
-    inline T apply (const T value) {
-        return (_value = (_alpha * value + (1.0 - _alpha) * _value));
+    explicit AlphaSmoothing (const T& alpha) : _alpha (alpha) {}
+    const T& apply (const T& val) {
+        return (_val = (_alpha * val + (1.0 - _alpha) * _val));
     }
 };
 
@@ -241,6 +229,16 @@ public:
         }
         return false;
     }
+    bool passed (interval_t *interval = nullptr, const bool atstart = false) {
+        const interval_t current = millis ();
+        if ((atstart && _previous == 0) || current - _previous > _interval) {
+            if (interval != nullptr)
+                (*interval) = current - _previous;
+            _previous = current;
+            return true;
+        }
+        return false;
+    }
     void reset (const interval_t interval = std::numeric_limits <interval_t>::max ()) {
         if (interval != std::numeric_limits <interval_t>::max ())
             _interval = interval;
@@ -268,15 +266,23 @@ public:
 
 class ActivationTracker {
     counter_t _count = 0;
-    unsigned long _millis = 0;
+    interval_t _seconds = 0;
 
 public:
-    inline interval_t seconds () const { return _millis / 1000; }
-    inline counter_t count () const { return _count; }
+    inline const interval_t& seconds () const { return _seconds; }
+    inline const counter_t& count () const { return _count; }
     ActivationTracker& operator ++ (int) {
-        _millis = millis ();
+        _seconds = millis () / 1000;
         _count ++;
         return *this;
+    }
+    ActivationTracker& operator = (const counter_t count) {
+        _seconds = millis () / 1000;
+        _count = count;
+        return *this;
+    }
+    inline operator counter_t () const {
+        return _count;
     }
 };
 
@@ -284,10 +290,15 @@ class ActivationTrackerWithDetail: public ActivationTracker {
     String _detail;
 
 public:
-    const String& detail () const { return _detail; }
+    inline const String& detail () const { return _detail; }
     ActivationTrackerWithDetail& operator += (const String& detail) {
         ActivationTracker::operator++ (1);
         _detail = detail;
+        return *this;
+    }
+    ActivationTrackerWithDetail& operator = (const counter_t count) {
+        ActivationTracker::operator= (count);
+        _detail = "";
         return *this;
     }
 };
@@ -297,7 +308,7 @@ public:
 #include <type_traits>
 
 template <typename T>
-inline T map (const T x, const T in_min, const T in_max, const T out_min, const T out_max) {
+T map (const T& x, const T& in_min, const T& in_max, const T& out_min, const T& out_max) {
     static_assert (std::is_arithmetic_v <T>, "T must be an arithmetic type");
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
@@ -435,7 +446,7 @@ String getTimeString (time_t timet = 0) {
     struct tm timeinfo;
     char timeString [sizeof ("yyyy-mm-ddThh:mm:ssZ") + 1] = { '\0' };
     if (timet == 0) time (&timet);
-    if (gmtime_r (&timet, &timeinfo) != NULL)
+    if (gmtime_r (&timet, &timeinfo) != nullptr)
         strftime (timeString, sizeof (timeString), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
     return timeString;
 }

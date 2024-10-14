@@ -27,7 +27,7 @@ public:
 
     bool collect (Collection &collection, const TemperatureReadFunc readTemperature, const ResistanceReadFunc readResistance) {
         static constexpr int DELAY = 100, COUNT = 5*1000/DELAY, AVG_MASTER = 12, AVG_SAMPLE = 6;
-        MovingAverageWithValue <float, AVG_MASTER> temperature;
+        MovingAverage <float, AVG_MASTER> temperature;
 
         static constexpr float temperatureBegin = (TEMP_START - TEMP_STEP);
         if ((temperature = readTemperature ()) > temperatureBegin) {
@@ -714,8 +714,8 @@ private:
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
-        JsonObject cal = obj ["cal"].to <JsonObject> ();
-        cal ["loaded"] = _loaded;
+        JsonObject sub = obj ["cal"].to <JsonObject> ();
+        sub ["loaded"] = _loaded;
     }
 };
 

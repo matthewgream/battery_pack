@@ -51,9 +51,9 @@ public:
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
-        JsonArray tmp = obj ["tmp"].to <JsonArray> ();
-        for (const auto& stats : _stats)
-            tmp.add (ArithmeticToString (stats.val ()) + "," + ArithmeticToString (stats.avg ()) + "," + ArithmeticToString (stats.min ()) + "," + ArithmeticToString (stats.max ()));
+        JsonArray sub = obj ["tmp"].to <JsonArray> ();
+            for (const auto& stats : _stats)
+                sub.add (ArithmeticToString (stats.val ()) + "," + ArithmeticToString (stats.avg ()) + "," + ArithmeticToString (stats.min ()) + "," + ArithmeticToString (stats.max ()));
     }
 };
 
@@ -89,8 +89,8 @@ private:
 
     FanSpeedType _speed = 0;
     bool _active = false;
-    StatsWithValue <FanSpeedType> _stats;
-    ActivationTracker _sets;
+    StatsWithValue <FanSpeedType> _speedStats;
+    ActivationTracker _actives;
 
 public:
     FanInterface (const Config& cfg, FanInterfaceStrategy& strategy): config (cfg), _strategy (strategy), _hardware (config.hardware) {
@@ -113,8 +113,8 @@ public:
             DEBUG_PRINTF ("FanInterface::setSpeed: %d\n", speedNew);
             bool active = _strategy.setSpeed (_speed = speedNew);
             if (!_active && active)
-                _sets ++, _active = active;
-            _stats += _speed;
+                _actives ++, _active = active;
+            _speedStats += _speed;
         }
     }
     inline FanSpeedType getSpeed () const {
@@ -125,11 +125,11 @@ public:
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
-        JsonObject fan = obj ["fan"].to <JsonObject> ();
-        fan ["speed"] = _stats;
-        if (_sets.count () > 0)
-            fan ["active"] = _sets;
-        // % duty
+        JsonObject sub = obj ["fan"].to <JsonObject> ();
+            sub ["speed"] = _speedStats;
+            if (_actives)
+                sub ["actives"] = _actives;
+            // % duty
     }
 };
 

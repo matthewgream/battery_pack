@@ -21,7 +21,7 @@ public:
         FAIR,
         POOR
     };
-    using Callback = std::function <void (const RssiType rssi, const QualityType quality)>;
+    using Callback = std::function <void (const RssiType, const QualityType)>;
     static constexpr RssiType RSSI_THRESHOLD_EXCELLENT = RssiType (-50);
     static constexpr RssiType RSSI_THRESHOLD_GOOD      = RssiType (-60);
     static constexpr RssiType RSSI_THRESHOLD_FAIR      = RssiType (-70);
@@ -92,7 +92,8 @@ private:
     bool _advertising = false;
 
     esp_bd_addr_t _peerAddress;
-    int _mtuNegotiated = -1, _mtuExceeded = 0;
+    int _mtuNegotiated = -1;
+    ActivationTrackerWithDetail _mtuExceeded;
     ConnectionSignalTracker _connectionSignalTracker;
     bool _connected = false;
     Intervalable _intervalConnectionCheck;
@@ -102,7 +103,7 @@ private:
         DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CONNECTED, %s (conn_id=%d, role=%s)\n",
             __ble_address_to_string (param->connect.remote_bda).c_str (), param->connect.conn_id, __ble_linkrole_to_string (param->connect.link_role).c_str ());
         advertise (false);
-        _mtuNegotiated = -1; _mtuExceeded = 0;
+        _mtuNegotiated = -1;
         _connectionSignalTracker.reset ();
         memcpy (_peerAddress, param->connect.remote_bda, sizeof (esp_bd_addr_t));
         _intervalConnectionCheck.reset (); _connections ++; _connected = true;
@@ -131,7 +132,7 @@ private:
         if (s != BLECharacteristicCallbacks::Status::SUCCESS_NOTIFY && s != BLECharacteristicCallbacks::Status::SUCCESS_INDICATE)
             DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_STATUS, (uuid=%s, status=%s. code=%lu)\n", characteristic->getUUID ().toString ().c_str (), __ble_status_to_string (s).c_str (), code);
     }
-    void onRssiRead (esp_ble_gap_cb_param_t *param) {
+    void onRssiRead (const esp_ble_gap_cb_param_t *param) {
         if (param->read_rssi_cmpl.status == ESP_BT_STATUS_SUCCESS) {
             _connectionSignalTracker.update (param->read_rssi_cmpl.rssi);
             DEBUG_PRINTF ("BluetoothNotifier::onRssiRead: rssi=%d (%s)\n", param->read_rssi_cmpl.rssi, _connectionSignalTracker.toString ().c_str ());
@@ -142,7 +143,7 @@ private:
         BluetoothNotifier *bluetoothNotifier = Singleton <BluetoothNotifier>::instance ();
         if (bluetoothNotifier != nullptr) bluetoothNotifier->events (event, param);
     }
-    void events (esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
+    void events (const esp_gap_ble_cb_event_t event, const esp_ble_gap_cb_param_t *param) {
         if (event == ESP_GAP_BLE_READ_RSSI_COMPLETE_EVT)
             onRssiRead (param);
     }
@@ -187,30 +188,33 @@ public:
         return true;
     }
     // json only
-    void notify (const String& data) {
+    bool notify (const String& data) {
         if (!_connected || _mtuNegotiated == -1) {
             DEBUG_PRINTF ("BluetoothNotifier::notify: not in notifying state");
-            return;
+            return false;
         }
         const uint16_t maxPayloadSize = static_cast <uint16_t> (_mtuNegotiated - 3);
         if (data.length () <= maxPayloadSize) {
             _characteristic->setValue (data.c_str ());
             _characteristic->notify ();
             DEBUG_PRINTF ("BluetoothNotifier::notify: length=%u\n", data.length ());
+            return true;
         } else {
+            bool result = true;
             JsonSplitter splitter (maxPayloadSize, { "type", "time" });
             splitter.splitJson (data, [&] (const String& part, const int elements) {
                 const size_t length = part.length ();
                 _characteristic->setValue (part.c_str ());
                 _characteristic->notify ();
                 DEBUG_PRINTF ("BluetoothNotifier::notify: data=%u, part=%u, elements=%d\n", data.length (), length, elements);
-                if (length > maxPayloadSize && length > _mtuExceeded)
-                    _mtuExceeded = length;
+                if (length > maxPayloadSize)
+                    _mtuExceeded += ArithmeticToString (length), result = false;
                 delay (20);
             });
+            return result;
         }
     }
-    inline bool mtuexceeded () const {
+    inline bool mtuExceeded () const {
         return _mtuExceeded > 0;
     }
     inline bool connected () const {
@@ -245,11 +249,11 @@ public:
             obj ["mtu"] = _mtuNegotiated;
             obj ["signal"] = _connectionSignalTracker;
         }
-        if (_mtuExceeded > 0)
+        if (_mtuExceeded)
             obj ["mtuExceeded"] = _mtuExceeded;
-        if (_connections.count () > 0)
+        if (_connections)
             obj ["connects"] = _connections;
-        if (_disconnections.count () > 0)
+        if (_disconnections)
             obj ["disconnects"] = _disconnections;
     }
 

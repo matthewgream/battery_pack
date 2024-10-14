@@ -58,12 +58,13 @@ typedef uint32_t _AlarmType;
 #define ALARM_STORAGE_SIZE          _ALARM_NUMB (7)
 #define ALARM_PUBLISH_FAIL          _ALARM_NUMB (8)
 #define ALARM_PUBLISH_SIZE          _ALARM_NUMB (9)
-#define ALARM_DELIVER_SIZE          _ALARM_NUMB (10)
-#define ALARM_UPDATE_VERS           _ALARM_NUMB (11)
-#define ALARM_SYSTEM_MEMORYLOW      _ALARM_NUMB (12)
-#define ALARM_SYSTEM_BADRESET       _ALARM_NUMB (13)
-#define _ALARM_COUNT                 (14)
-static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_FAIL", "TEMP_MIN", "TEMP_WARN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "PUBLISH_SIZE", "DELIVER_SIZE", "UPDATE_VERS", "SYSTEM_MEMLOW", "SYSTEM_BADRESET" };
+#define ALARM_DELIVER_FAIL          _ALARM_NUMB (10)
+#define ALARM_DELIVER_SIZE          _ALARM_NUMB (11)
+#define ALARM_UPDATE_VERS           _ALARM_NUMB (12)
+#define ALARM_SYSTEM_MEMORYLOW      _ALARM_NUMB (13)
+#define ALARM_SYSTEM_BADRESET       _ALARM_NUMB (14)
+#define _ALARM_COUNT                 (15)
+static const char * _ALARM_NAMES [_ALARM_COUNT] = { "TIME_SYNC", "TIME_DRIFT", "TEMP_FAIL", "TEMP_MIN", "TEMP_WARN", "TEMP_MAX", "STORE_FAIL", "STORE_SIZE", "PUBLISH_FAIL", "PUBLISH_SIZE", "DELIVER_FAIL", "DELIVER_SIZE", "UPDATE_VERS", "SYSTEM_MEMLOW", "SYSTEM_BADRESET" };
 #define _ALARM_NAME(x)               (_ALARM_NAMES [x])
 
 class AlarmSet {
@@ -96,10 +97,10 @@ public:
 
 private:
     _AlarmType _type;
-    CheckFunction _checkFunc;
+    const CheckFunction _checkFunc;
 
 public:
-    AlarmCondition (_AlarmType type, CheckFunction checkFunc): _type (type), _checkFunc (checkFunc) {}
+    AlarmCondition (_AlarmType type, const CheckFunction checkFunc): _type (type), _checkFunc (checkFunc) {}
     inline bool check () const { return _checkFunc (); }
     inline _AlarmType getType () const { return _type; }
 };
@@ -113,7 +114,6 @@ public:
     Alarmable (const std::initializer_list <AlarmCondition>& conditions): _conditions (conditions) {}
     virtual ~Alarmable() {};
     void collectAlarms (AlarmSet& alarms) const {
-
         for (const auto& condition : _conditions)
             if (condition.check ())
                 alarms += condition.getType ();
@@ -154,17 +154,17 @@ public:
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override { // XXX this is too large and needs reduction
-        JsonObject alarms = obj ["alarms"].to <JsonObject> ();
-        for (int number = 0; number < _alarms.size (); number ++) {
-            JsonObject alarm = alarms [_alarms.name (number)].to <JsonObject> ();
-            const int _now = _alarms.isSet (number) ? 1 : 0;
-            const counter_t _cnt = _activations [number].count ();
-            if (_now || _cnt > 0) {
-                alarm ["now"] = _now;
-                alarm ["for"] = _now ? _activations [number].seconds () : _deactivations [number].seconds ();
-                if (_cnt > 0) alarm ["cnt"] = _cnt;
+        JsonObject sub = obj ["alarms"].to <JsonObject> ();
+            for (int number = 0; number < _alarms.size (); number ++) {
+                const int _now = _alarms.isSet (number) ? 1 : 0;
+                const counter_t _cnt = _activations [number];
+                if (_now || _cnt > 0) {
+                    JsonObject alarm = sub [_alarms.name (number)].to <JsonObject> ();
+                    alarm ["now"] = _now;
+                    alarm ["for"] = _now ? _activations [number].seconds () : _deactivations [number].seconds ();
+                    if (_cnt > 0) alarm ["cnt"] = _cnt;
+                }
             }
-        }
     }
 };
 
@@ -187,31 +187,33 @@ public:
 
 private:
     const Config& config;
-
     const BooleanFunc _networkIsAvailable;
 
     PersistentData _persistent_data;
     PersistentValue <uint32_t> _persistent_data_previous;
     PersistentValue <String> _persistent_data_version;
+    bool _available;
 
     Intervalable _interval;
-
-    bool _available = false;
 
 public:
     UpdateManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
             AlarmCondition (ALARM_UPDATE_VERS, [this] () { return _available; })
         }), config (cfg), _networkIsAvailable (networkIsAvailable),
         _persistent_data ("updates"), _persistent_data_previous (_persistent_data, "previous", 0), _persistent_data_version (_persistent_data, "version", String ("")),
+        _available (!static_cast <String> (_persistent_data_version).isEmpty ()), 
         _interval (config.intervalUpdate) {}
     void process () override {
         if (static_cast <bool> (_interval)) {
             if (_networkIsAvailable ()) {
-                time_t previous = (time_t) static_cast <uint32_t> (_persistent_data_previous), current = time (NULL);
+                time_t previous = (time_t) static_cast <uint32_t> (_persistent_data_previous), current = time (nullptr);
                 if ((current > 0 && (current - previous) > (config.intervalCheck / 1000)) || (previous > current)) {
-                    _persistent_data_version = ota_image_check (config.json, config.type, config.vers, getMacAddress ());
+                    String version = ota_image_check (config.json, config.type, config.vers, getMacAddress ());
+                    if (_persistent_data_version != version) {
+                        _persistent_data_version = version;
+                        _available = !version.isEmpty ();
+                    }
                     _persistent_data_previous = current;
-                    _available = true;
                 }
             }
         }
@@ -219,12 +221,13 @@ public:
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
-        JsonObject updates = obj ["updates"].to <JsonObject> ();
-        updates ["current"] = config.vers;
-        updates ["available"] = static_cast <String> (_persistent_data_version);
-        const time_t time = (time_t) static_cast <uint32_t> (_persistent_data_previous);
-        if (time > 0)
-            updates ["checked"] = getTimeString (time);
+        JsonObject sub = obj ["updates"].to <JsonObject> ();
+            sub ["current"] = config.vers;
+            if (_available)
+                sub ["available"] = static_cast <String> (_persistent_data_version);
+            const time_t time = (time_t) static_cast <uint32_t> (_persistent_data_previous);
+            if (time)
+                sub ["checked"] = getTimeString (time);
     }
 };
 

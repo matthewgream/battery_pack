@@ -29,12 +29,12 @@ public:
         assert (strlen (space) <= SPACE_SIZE_MAXIMUM && "PersistentData namespace length > SPACE_SIZE_MAXIMUM");
     }
     ~PersistentData () { if (_okay) nvs_close (_handle); }
-    inline bool get (const char *name, uint32_t *value) const { return (_okay && nvs_get_u32 (_handle, name, value) == ESP_OK); }
-    inline bool set (const char *name, uint32_t value) { return (_okay && nvs_set_u32 (_handle, name, value) == ESP_OK); }
-    inline bool get (const char *name, int32_t *value) const { return (_okay && nvs_get_i32 (_handle, name, value) == ESP_OK); }
-    inline bool set (const char *name, int32_t value) { return (_okay && nvs_set_i32 (_handle, name, value) == ESP_OK); }
+    bool get (const char *name, uint32_t *value) const { return (_okay && nvs_get_u32 (_handle, name, value) == ESP_OK); }
+    bool set (const char *name, uint32_t value) { return (_okay && nvs_set_u32 (_handle, name, value) == ESP_OK); }
+    bool get (const char *name, int32_t *value) const { return (_okay && nvs_get_i32 (_handle, name, value) == ESP_OK); }
+    bool set (const char *name, int32_t value) { return (_okay && nvs_set_i32 (_handle, name, value) == ESP_OK); }
     // float, double
-    inline bool get (const char *name, String *value) const {
+    bool get (const char *name, String *value) const {
         size_t size;
         bool result = false;
         if (_okay && nvs_get_str (_handle, name, NULL, &size) == ESP_OK) {
@@ -47,7 +47,7 @@ public:
         }
         return result;
     }
-    inline bool set (const char *name, const String &value) {
+    bool set (const char *name, const String &value) {
         assert (value.length () <= VALUE_STRING_SIZE_MAXIMUM && "PersistentData String length > VALUE_STRING_SIZE_MAXIMUM");
         return (_okay && nvs_set_str (_handle, name, value.c_str ()) == ESP_OK);
     }
@@ -60,14 +60,14 @@ class PersistentValue {
     const T _value_default;
 
 public:
-    explicit PersistentValue (PersistentData& data, const char *name, const T value_default): _data (data), _name (name), _value_default (value_default) {
+    explicit PersistentValue (PersistentData& data, const char *name, const T& value_default): _data (data), _name (name), _value_default (value_default) {
         assert (_name.length () <= PersistentData::NAME_SIZE_MAXIMUM && "PersistentValue name length > NAME_SIZE_MAXIMUM");
     }
-    inline operator T () const { T value; return _data.get (_name.c_str (), &value) ? value : _value_default; }
-    inline bool operator= (const T value) { return _data.set (_name.c_str (), value); }
-    inline bool operator+= (const T value2) { T value = _value_default; _data.get (_name.c_str (), &value); value += value2; return _data.set (_name.c_str (), value); }
-    inline bool operator>= (const T value2) const { T value = _value_default; _data.get (_name.c_str (), &value); return value >= value2; }
-    inline bool operator> (const T value2) const { T value = _value_default; _data.get (_name.c_str (), &value); return value > value2; }
+    operator T () const { T value; return _data.get (_name.c_str (), &value) ? value : _value_default; }
+    bool operator= (const T value) { return _data.set (_name.c_str (), value); }
+    bool operator+= (const T value2) { T value = _value_default; _data.get (_name.c_str (), &value); value += value2; return _data.set (_name.c_str (), value); }
+    bool operator>= (const T value2) const { T value = _value_default; _data.get (_name.c_str (), &value); return value >= value2; }
+    bool operator> (const T value2) const { T value = _value_default; _data.get (_name.c_str (), &value); return value > value2; }
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -108,7 +108,7 @@ public:
             }
         }
     }
-    void reset () {
+    inline void reset () {
         esp_task_wdt_reset ();
     }
 };
@@ -118,7 +118,7 @@ public:
 #include <esp_system.h>
 #include <esp_rom_sys.h>
 
-int getResetReason () {
+inline int getResetReason () {
     return esp_rom_get_reset_reason (0);
 }
 std::pair <String, String> getResetDetails (const int reason = getResetReason ()) {
