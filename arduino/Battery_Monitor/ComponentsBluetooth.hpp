@@ -27,7 +27,7 @@ public:
 
 class BluetoothDevice: private Singleton <BluetoothDevice>, public JsonSerializable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks {
 public:
-    static inline constexpr uint16_t MAX_MTU = 517;
+    static inline constexpr uint16_t MIN_MTU = 32, MAX_MTU = 517;
 
     typedef struct {
         String name, serviceUUID, characteristicUUID;
@@ -45,24 +45,17 @@ private:
             __ble_address_to_string (param->connect.remote_bda).c_str (), param->connect.conn_id, __ble_linkrole_to_string (param->connect.link_role).c_str ());
         _connected (param->connect.conn_id, param->connect.remote_bda);
     }
-    void onDisconnect (BLEServer *, esp_ble_gatts_cb_param_t *param) override {
-        const String reason = __ble_disconnect_reason ((esp_gatt_conn_reason_t) param->disconnect.reason);
-        DEBUG_PRINTF ("BluetoothDevice::events: BLE_DISCONNECTED, %s (conn_id=%d, reason=%s)\n",
-            __ble_address_to_string (param->disconnect.remote_bda).c_str (), param->disconnect.conn_id, reason.c_str ());
-        _disconnected (param->disconnect.conn_id, param->disconnect.remote_bda, reason);
-    }
     void onMtuChanged (BLEServer *, esp_ble_gatts_cb_param_t *param) override {
         DEBUG_PRINTF ("BluetoothDevice::events: BLE_MTU_CHANGED, (conn_id=%d, mtu=%u)\n", param->mtu.conn_id, param->mtu.mtu);
-        _connection_mtuNegotiated (param->mtu.mtu);
+        _connected_mtuChanged (param->mtu.mtu);
     }
-    // https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/bluetooth/esp_gatts.html#_CPPv424esp_ble_gatts_cb_param_t
     void onRead (BLECharacteristic *characteristic, esp_ble_gatts_cb_param_t *) override {
         DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_READ, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
     }
     void onWrite (BLECharacteristic *characteristic, esp_ble_gatts_cb_param_t *) override {
         // param->write.offset, param->write.len, param->write.value
         DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_WRITE, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
-        _writeManager.insert (characteristic->getValue ());
+        _connected_writeReceived (characteristic->getValue ());
     }
     void onNotify (BLECharacteristic *characteristic) override {
         DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_NOTIFY, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
@@ -71,13 +64,18 @@ private:
         if (s != BLECharacteristicCallbacks::Status::SUCCESS_NOTIFY)
             DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_STATUS, (uuid=%s, status=%s. code=%lu)\n", characteristic->getUUID ().toString ().c_str (), __ble_status_to_string (s).c_str (), code);
     }
-
+    void onDisconnect (BLEServer *, esp_ble_gatts_cb_param_t *param) override {
+        const String reason = __ble_disconnect_reason ((esp_gatt_conn_reason_t) param->disconnect.reason);
+        DEBUG_PRINTF ("BluetoothDevice::events: BLE_DISCONNECTED, %s (conn_id=%d, reason=%s)\n",
+            __ble_address_to_string (param->disconnect.remote_bda).c_str (), param->disconnect.conn_id, reason.c_str ());
+        _disconnected (param->disconnect.conn_id, param->disconnect.remote_bda, reason);
+    }
     void events (const esp_gap_ble_cb_event_t event, const esp_ble_gap_cb_param_t *param) {
         if (event == ESP_GAP_BLE_READ_RSSI_COMPLETE_EVT) {
             if (param->read_rssi_cmpl.status == ESP_BT_STATUS_SUCCESS) {
                 DEBUG_PRINTF ("BluetoothDevice::events: BLE_READ_RSSI_COMPLETE, (rssi=%d, quality=%s)\n", param->read_rssi_cmpl.rssi,
                     ConnectionSignalTracker::toString (ConnectionSignalTracker::signalQuality (param->read_rssi_cmpl.rssi)).c_str ());
-                _connection_rssiResponse (param->read_rssi_cmpl.rssi);
+                _connected_rssiResponse (param->read_rssi_cmpl.rssi);
             }
         }
     }
@@ -134,69 +132,8 @@ private:
 
     //
 
-    esp_bd_addr_t _peerAddress;
-    String _peerDetails;
-    uint16_t _peerConnId = 0;
-    uint16_t _mtuNegotiated = 0;
-    ConnectionSignalTracker _connectionSignalTracker;
-    Intervalable _intervalConnectionCheck;
-    ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
-    bool _connectionActive = false;
-    void _connection_process () {
-        if (_connectionActive) {
-            if (_intervalConnectionCheck) {
-                if (!_mtuNegotiated) {
-                    DEBUG_PRINTF ("BluetoothDevice::process: connection timeout waiting for MTU, resetting\n");
-                    reset ();
-                } else {
-                    esp_ble_gap_read_rssi (_peerAddress);
-                }
-            }
-        }
-    }
-    void _connection_mtuNegotiated (const uint16_t mtu) {
-        if (_connectionActive) {
-            _mtuNegotiated = mtu;
-        }
-    }
-    void _connection_rssiResponse (const int8_t rssi) {
-        if (_connectionActive) {
-            _connectionSignalTracker.update (rssi);
-        }
-    }
-
-    void _connected (const uint16_t conn_id, const esp_bd_addr_t& addr) {
-        if (!_connectionActive) {
-            _advertisingDisable ();
-            _mtuNegotiated = 0;
-            _peerConnId = conn_id;
-            memcpy (_peerAddress, addr, sizeof (esp_bd_addr_t));
-            _peerDetails = "";
-            _connectionSignalTracker.reset ();
-            _intervalConnectionCheck.reset ();
-            _connections ++; _connectionActive = true;
-            _server->updatePeerMTU (_peerConnId, MAX_MTU);
-            esp_ble_gap_read_rssi (_peerAddress);
-        }
-    }
-    void _disconnect (const bool hard = false) {
-        if (_connectionActive || hard) {
-            _server->disconnect (_peerConnId);
-            if (hard) delay (500);
-            _connectionActive = false;
-        }
-    }
-    void _disconnected (const uint16_t conn_id, const esp_bd_addr_t& addr, const String& reason) {
-        if (_connectionActive) {
-            _connectionActive = false; _disconnections += reason;
-            _advertisingEnable ();
-        }
-    }
-
-    //
-
     friend class BluetoothWriteHandler_TypeInfo;
-    class WriteManager {
+    class ConnectionWriteManager {
     public:
         using Queue = QueueSimpleConcurrentSafe <String>;
         using Handlers = std::map <String, std::shared_ptr <BluetoothWriteHandler>>;
@@ -224,7 +161,7 @@ private:
         }
     public:
         ActivationTrackerWithDetail _failures;
-        explicit WriteManager (BluetoothDevice* device, const Handlers& handlers): _device (device), _handlers (handlers) {}
+        explicit ConnectionWriteManager (BluetoothDevice* device, const Handlers& handlers): _device (device), _handlers (handlers) {}
         void insert (const String& str) {
             _queue.push (str);
         }
@@ -237,13 +174,15 @@ private:
                 else _failures += String ("write failed to identify as Json or have leading 'type'");
             }
         }
+        void drain () {
+            _queue.drain ();
+        }
     };
-    WriteManager _writeManager;
 
     //
 
     ActivationTrackerWithDetail _notify_payloadExceeded;
-    bool _notify_process (const String& data, const uint16_t maxPayloadSize) {
+    bool _connectionNotifyManager_notify (const String& data, const uint16_t maxPayloadSize) {
         bool result = true;
         if (data.length () <= maxPayloadSize) {
             _characteristic->setValue (data.c_str ());
@@ -264,64 +203,143 @@ private:
         return result;
     }
 
+    //
+
+    esp_bd_addr_t _peerAddress;
+    String _peerDetails;
+    uint16_t _peerConnId = 0;
+    uint16_t _peerMtu = 0;
+    Intervalable _connectionActiveChecker;
+    ConnectionSignalTracker _connectionSignalTracker;
+    ConnectionWriteManager _connectionWriteManager;
+    ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
+    bool _connectionActive = false;
+    void _connect () {
+         _advertisingEnable ();
+    }
+    void _connected (const uint16_t conn_id, const esp_bd_addr_t& addr) {
+        if (!_connectionActive) {
+            _advertisingDisable ();
+            _peerMtu = 0;
+            _peerConnId = conn_id;
+            memcpy (_peerAddress, addr, sizeof (esp_bd_addr_t));
+            _peerDetails = "";
+            _connectionSignalTracker.reset ();
+            _connectionActiveChecker.reset ();
+            _connections ++; _connectionActive = true;
+            _server->updatePeerMTU (_peerConnId, MAX_MTU);
+            esp_ble_gap_read_rssi (_peerAddress);
+        }
+    }
+    void _connected_mtuChanged (const uint16_t mtu) {
+        if (_connectionActive) {
+            _peerMtu = mtu;
+        }
+    }
+    void _connected_rssiResponse (const int8_t rssi) {
+        if (_connectionActive) {
+            _connectionSignalTracker.update (rssi);
+        }
+    }
+    void _connected_writeReceived (const String& str) {
+        if (_connectionActive) {
+            _connectionWriteManager.insert (str);
+        }
+    }
+    bool _connected_notify (const String& data) {
+        if (_connectionActive) {
+            if (!_peerMtu) {
+                DEBUG_PRINTF ("BluetoothDevice::notify: awaiting peer MTU negotiation, sliently discarding");
+                return true;
+            } else if (_peerMtu < MIN_MTU) {
+                DEBUG_PRINTF ("BluetoothDevice::notify: peer MTU size (%u) is below minimum (%u)", _peerMtu, MIN_MTU);
+                return false;
+            }
+            return _connectionNotifyManager_notify (data, _peerMtu - 3);
+        } else {
+            DEBUG_PRINTF ("BluetoothDevice::notify: not connected");
+            return false;
+        }
+    }
+    void _disconnect (const bool forced = false) { // in case of weird situation
+        if (_connectionActive || forced) {
+            if (!_connectionActive && forced) _advertisingDisable ();
+            _server->disconnect (_peerConnId);
+            _connectionActive = false; _disconnections += String ("Locally initiated");
+            if (forced) delay (500);
+            _connectionWriteManager.drain ();
+            _connect ();
+        }
+    }
+    void _disconnected (const uint16_t conn_id, const esp_bd_addr_t& addr, const String& reason) {
+        if (_connectionActive) {
+            _connectionActive = false; _disconnections += reason;
+            _connectionWriteManager.drain ();
+            _connect ();
+        }
+    }
+    void _connection_init () {
+        _advertisingInit ();
+    }
+    void _connection_process () {
+        if (_connectionActive) {
+            if (_connectionActiveChecker) {
+                if (!_peerMtu) {
+                    DEBUG_PRINTF ("BluetoothDevice::process: connection timeout waiting for MTU, resetting\n");
+                    _disconnect (true);
+                } else {
+                    esp_ble_gap_read_rssi (_peerAddress);
+                }
+            }
+            _connectionWriteManager.process ();
+        }
+    }
+
+    //
+
 public:
     explicit BluetoothDevice (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr): Singleton <BluetoothDevice> (this), config (cfg),
-        _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck),
-        _writeManager (this, {
+         _connectionActiveChecker (config.intervalConnectionCheck), _connectionSignalTracker (connectionSignalCallback), 
+         _connectionWriteManager (this, {
             { String ("info"), std::make_shared <BluetoothWriteHandler_TypeInfo> () }
         }) {}
 
     void begin () {
         _serverInitAndStartService ();
-        _advertisingInit ();
-        _advertisingEnable ();
+        _connection_init ();
+        _connect ();
     }
     // json only
-    bool notify (const String& data) {
-        if (!_connectionActive) {
-            DEBUG_PRINTF ("BluetoothDevice::notify: not connected");
-            return false;
-        }
-        if (!_mtuNegotiated) {
-            DEBUG_PRINTF ("BluetoothDevice::notify: waiting on MTU negotiation");
-            return true; // should actually cache if it was important
-        }
-        return _notify_process (data, _mtuNegotiated - 3);
+    inline bool notify (const String& data) {
+        return _connected_notify (data);
     }
-    inline bool notifyExceeded () const {
+    inline bool payloadExceeded () const {
         return _notify_payloadExceeded > 0;
     }
     inline bool connected () const {
         return _connectionActive;
     }
-    void reset () {
-        DEBUG_PRINTF ("BluetoothDevice::reset\n");
-        _advertisingDisable ();
-        _disconnect (true);
-        _advertisingEnable ();
-    }
     void process () {
         if (!_connectionActive && !_advertisingActive) {
             DEBUG_PRINTF ("BluetoothDevice::process: not connected and not advertising, resetting\n");
-            reset ();
+            _disconnect (true);
             return;
         }
         _connection_process ();
-        _writeManager.process ();
     }
     //
     void serialize (JsonVariant &obj) const override {
         if ((obj ["connected"] = _connectionActive)) {
-            obj ["address"] = BLEDevice::getAddress ().toString ();
+            obj ["address"] = __ble_address_to_string (_peerAddress);
             if (!_peerDetails.isEmpty ())
                 obj ["details"] = _peerDetails;
-            obj ["mtu"] = _mtuNegotiated;
+            obj ["mtu"] = _peerMtu;
             obj ["signal"] = _connectionSignalTracker;
         }
         if (_notify_payloadExceeded)
-            obj ["notifyExceeded"] = _notify_payloadExceeded;
-        if (_writeManager._failures)
-            obj ["writeFailures"] = _writeManager._failures;
+            obj ["payloadExceeded"] = _notify_payloadExceeded;
+        if (_connectionWriteManager._failures)
+            obj ["writeFailures"] = _connectionWriteManager._failures;
         if (_connections)
             obj ["connects"] = _connections;
         if (_disconnections)

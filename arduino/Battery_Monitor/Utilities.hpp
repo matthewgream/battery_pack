@@ -373,6 +373,11 @@ public:
         }
         return false;
     }
+    void drain () {
+        std::lock_guard <std::mutex> guard (_mutex);
+        while (!_queue.empty ())
+            _queue.pop ();
+    }
 };
 
 // -----------------------------------------------------------------------------------------------

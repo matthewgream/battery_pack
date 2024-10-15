@@ -19,7 +19,7 @@ private:
 public:
     explicit DeliverManager (const Config& cfg): Alarmable ({
             AlarmCondition (ALARM_DELIVER_FAIL, [this] () { return _failures > config.failureLimit; }),
-            AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.notifyExceeded (); })
+            AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.payloadExceeded (); })
         }), config (cfg), _blue (cfg.blue) {}
     void begin () override {
         _blue.begin ();

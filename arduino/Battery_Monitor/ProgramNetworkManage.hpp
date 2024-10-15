@@ -21,10 +21,6 @@ private:
     Intervalable _intervalConnectionCheck;
     ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
 
-    static void __wiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info) {
-        NetwerkManager *connectManager = Singleton <NetwerkManager>::instance ();
-        if (connectManager != nullptr) connectManager->events (event, info);
-    }
     void events (const WiFiEvent_t event, const WiFiEventInfo_t info) {
         if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED) {
             _connectionSignalTracker.reset ();
@@ -45,9 +41,14 @@ private:
                 __wifi_bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (), reason.c_str ());
         }
     }
+    static void __wiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info) {
+        NetwerkManager *manager = Singleton <NetwerkManager>::instance ();
+        if (manager != nullptr) manager->events (event, info);
+    }
 
 public:
     explicit NetwerkManager (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+    
     void begin () override {
         WiFi.persistent (false);
         WiFi.onEvent (__wiFiEventHandler);
