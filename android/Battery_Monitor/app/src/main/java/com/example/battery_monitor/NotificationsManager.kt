@@ -7,7 +7,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 
-@SuppressLint("MissingPermission", "InlinedApi")
+@SuppressLint("MissingPermission")
 class NotificationsManager (private val activity: Activity) {
 
     private val permissions: PermissionsManager = PermissionsManagerFactory (activity).create (

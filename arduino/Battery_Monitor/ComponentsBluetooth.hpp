@@ -92,12 +92,14 @@ private:
     bool _advertising = false;
 
     esp_bd_addr_t _peerAddress;
+    String _peerDetails;
     int _mtuNegotiated = -1;
     ActivationTrackerWithDetail _mtuExceeded;
     ConnectionSignalTracker _connectionSignalTracker;
     bool _connected = false;
     Intervalable _intervalConnectionCheck;
     ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
+    ProtectedSimpleQueue <String> _writesQueue;
 
     void onConnect (BLEServer * server, esp_ble_gatts_cb_param_t* param) override {
         DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CONNECTED, %s (conn_id=%d, role=%s)\n",
@@ -106,6 +108,7 @@ private:
         _mtuNegotiated = -1;
         _connectionSignalTracker.reset ();
         memcpy (_peerAddress, param->connect.remote_bda, sizeof (esp_bd_addr_t));
+        _peerDetails = "";
         _intervalConnectionCheck.reset (); _connections ++; _connected = true;
         esp_ble_gap_read_rssi (_peerAddress);
         server->updatePeerMTU (param->connect.conn_id, MAX_MTU);
@@ -122,8 +125,14 @@ private:
         _mtuNegotiated = static_cast <int> (param->mtu.mtu);
     }
 
-    void onWrite (BLECharacteristic *) override {
-        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_WRITE\n");
+    // https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/bluetooth/esp_gatts.html#_CPPv424esp_ble_gatts_cb_param_t
+    void onRead (BLECharacteristic *characteristic, esp_ble_gatts_cb_param_t *) override {
+        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_READ, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
+    }
+    void onWrite (BLECharacteristic *characteristic,  esp_ble_gatts_cb_param_t *) override {
+        // param->write.offset, param->write.len, param->write.value
+        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_WRITE, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
+        _writesQueue.insert (characteristic->getValue ());
     }
     void onNotify (BLECharacteristic *characteristic) override {
         DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_NOTIFY, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
@@ -165,17 +174,16 @@ public:
 
     bool advertise () {
         BLEDevice::init (config.name);
-        if (!(_server = BLEDevice::createServer ())) {
-            DEBUG_PRINTF ("BluetoothNotifier::advertise unable to create BLE server\n");
-            return false;
-        }
+        _server = BLEDevice::createServer ();
+        // BLEDevice::setEncryptionLevel (ESP_BLE_SEC_ENCRYPT);
         esp_ble_gap_register_callback (__gapEventHandler);
         _server->setCallbacks (this);
         BLEService *service = _server->createService (config.serviceUUID);
         _characteristic = service->createCharacteristic (config.characteristicUUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY);
         _characteristic->setCallbacks (this);
         _characteristic->addDescriptor (new BLE2902 ());
-        _characteristic->setAccessPermissions (ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
+        // _characteristic->setAccessPermissions (ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED); // must enable BLEDevice::setEncryptionLevel (ESP_BLE_SEC_ENCRYPT)
+        _characteristic->setAccessPermissions (ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE); // no need for encryption
         service->start ();
         BLESecurity *security = new BLESecurity ();
         security->setStaticPIN (config.pin);
@@ -228,24 +236,28 @@ public:
         _connected = false;
         advertise (true);
     }
-    void check () {
+    void process () {
         if (!_connected && !_advertising) {
-            DEBUG_PRINTF ("BluetoothNotifier::check: not connected and not advertising, resetting\n");
+            DEBUG_PRINTF ("BluetoothNotifier::process: not connected and not advertising, resetting\n");
             reset ();
         } else if (_connected && _intervalConnectionCheck) {
             if (_mtuNegotiated == -1) {
-                DEBUG_PRINTF ("BluetoothNotifier::check: connection timeout, resetting\n");
+                DEBUG_PRINTF ("BluetoothNotifier::process: connection timeout, resetting\n");
                 reset ();
             } else {
                 esp_ble_gap_read_rssi (_peerAddress);
             }
         }
+        String write;
+        while (_writesQueue.obtain (write))
+            processWrite (write);
     }
     //
     void serialize (JsonVariant &obj) const override {
         if ((obj ["connected"] = _connected)) {
             obj ["address"] = BLEDevice::getAddress ().toString ();
-            obj ["devices"] = _server->getPeerDevices (true).size ();
+            if (!_peerDetails.isEmpty ())
+                obj ["details"] = _peerDetails;
             obj ["mtu"] = _mtuNegotiated;
             obj ["signal"] = _connectionSignalTracker;
         }
@@ -255,6 +267,28 @@ public:
             obj ["connects"] = _connections;
         if (_disconnections)
             obj ["disconnects"] = _disconnections;
+    }
+
+protected:
+    void processWrite (JsonDocument& doc) {
+        const char *type = doc ["type"];
+        if (type != nullptr && String (type) == String ("info")) {
+            const char *time = doc ["time"], *info = doc ["info"];
+            if (time != nullptr && info != nullptr) {
+                _peerDetails = info;
+                DEBUG_PRINTF ("BluetoothNotifier::processWrite[Json]: type=info, time=%s, info=%s\n", time, info);
+            }
+        }
+    }
+    void processWrite (const String& str) {
+        DEBUG_PRINTF ("BluetoothNotifier::processWrite: content=<<<%s>>>\n", str.c_str ());
+        if (str.startsWith ("{\"type\"")) {
+            JsonDocument doc;
+            DeserializationError error;
+            if ((error = deserializeJson (doc, str)) != DeserializationError::Ok)
+                DEBUG_PRINTF ("BluetoothNotifier::processWrite: deserializeJson fault: %s\n", error.c_str ());
+            else processWrite (doc);
+        }
     }
 
 private:

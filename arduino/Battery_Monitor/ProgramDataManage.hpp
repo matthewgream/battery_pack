@@ -25,7 +25,7 @@ public:
         _blue.advertise ();
     }
     void process () override {
-        _blue.check ();
+        _blue.process ();
     }
     bool deliver (const String& data) {
         if (_blue.connected ()) {

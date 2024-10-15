@@ -25,10 +25,10 @@ class DataViewBatteryTemperature @JvmOverloads constructor (
         strokeWidth = 4f
         color = context.getColor (R.color.graph_line_color)
     }
-    private val paintPoint = Paint ().apply {
-        style = Paint.Style.FILL
-        color = context.getColor (R.color.graph_point_color)
-    }
+//    private val paintPoint = Paint ().apply {
+//        style = Paint.Style.FILL
+//        color = context.getColor (R.color.graph_point_color)
+//    }
     private val paintText = Paint ().apply {
         textSize = 30f
         color = context.getColor (R.color.graph_text_color)
@@ -44,6 +44,18 @@ class DataViewBatteryTemperature @JvmOverloads constructor (
         strokeWidth = 2f
         color = context.getColor (android.R.color.holo_red_light)
     }
+    private val paintLinePath = Paint ().apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+        color = Color.rgb (64, 64, 64)
+        pathEffect = DashPathEffect (floatArrayOf (20f, 10f), 0f)
+    }
+
+    private val thresholds = listOf (
+        Triple (25f, "25°C", context.getColor (R.color.threshold_min)),
+        Triple (35f, "35°C", context.getColor (R.color.threshold_warning)),
+        Triple (45f, "45°C", context.getColor (R.color.threshold_max))
+    )
 
     private var temperatureValues: List<Float> = emptyList ()
     private var temperatureHistoryValues: MutableList<List<Float>> = mutableListOf ()
@@ -85,11 +97,6 @@ class DataViewBatteryTemperature @JvmOverloads constructor (
 
         val maxTemp = temperatureHistoryValues.flatten ().maxOrNull () ?: 0f
         val minTemp = temperatureHistoryValues.flatten ().minOrNull () ?: 0f
-        val thresholds = listOf (
-            Triple (25f, "25°C", context.getColor (R.color.threshold_min)),
-            Triple (35f, "35°C", context.getColor (R.color.threshold_warning)),
-            Triple (45f, "45°C", context.getColor (R.color.threshold_max))
-        )
 
         val width = width.toFloat ()
         val height = height.toFloat ()
@@ -153,22 +160,16 @@ class DataViewBatteryTemperature @JvmOverloads constructor (
             val y = paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
             if (index == 0) linePath.moveTo (x, y) else linePath.lineTo (x, y)
         }
-        val linePaint = Paint (paintLine).apply {
-            color = Color.rgb (64, 64, 64)
-            strokeWidth = 4f
-            style = Paint.Style.STROKE
-            pathEffect = DashPathEffect (floatArrayOf (20f, 10f), 0f)
-        }
-        canvas.drawPath (linePath, linePaint)
+        canvas.drawPath (linePath, paintLinePath)
 
         temperatureValues.forEachIndexed { index, temp ->
             val x = paddingHorizontal + (drawableWidth * index / (count - 1))
             val y = paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
             canvas.drawLine (x, paddingTop, x, height - paddingBottom, paintLineDashed)
-            canvas.drawLine (x - 5, y - 5, x + 5, y + 5, paintPoint)
-            canvas.drawLine (x - 5, y + 5, x + 5, y - 5, paintPoint)
+//            canvas.drawLine (x - 5, y - 5, x + 5, y + 5, paintPoint)
+//            canvas.drawLine (x - 5, y + 5, x + 5, y - 5, paintPoint)
             val text = String.format ("%.1f°C", temp)
-            val textWidth = getTextWidth (paintText, text)
+            val textWidth = paintText.measureText (text)
             var textX = x - (textWidth / 2)
             if (textX < paddingHorizontal)
                 textX = paddingHorizontal
@@ -178,9 +179,6 @@ class DataViewBatteryTemperature @JvmOverloads constructor (
         }
     }
 
-    private fun getTextWidth (paint: Paint, text: String): Float {
-        return paint.measureText (text)
-    }
     private fun interpolateColor (fraction: Float): Int {
         return Color.rgb (255, (255 * fraction).toInt (), (255 * fraction).toInt ())
     }

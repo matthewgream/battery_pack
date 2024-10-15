@@ -351,6 +351,32 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
+#include <mutex>
+#include <queue>
+
+template <typename T>
+class ProtectedSimpleQueue {
+    std::mutex _mutex;
+    std::queue <T> _queue;
+
+public:    
+    void insert (const T& t) {
+        std::lock_guard <std::mutex> guard (_mutex);
+        _queue.push (t);
+    }
+    bool obtain (T& t) {
+        std::lock_guard <std::mutex> guard (_mutex);
+        if (!_queue.empty ()) {
+            t = _queue.front ();
+            _queue.pop ();
+            return true;
+        }
+        return false;
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+
 #include <array>
 #include <cstdlib>
 

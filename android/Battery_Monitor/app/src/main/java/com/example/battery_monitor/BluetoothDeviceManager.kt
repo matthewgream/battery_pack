@@ -9,10 +9,15 @@ import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import org.json.JSONObject
+import java.nio.charset.StandardCharsets
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 
@@ -21,7 +26,7 @@ class BluetoothDeviceManagerConfig {
     val DEVICE_NAME = "BatteryMonitor"
     val SERVICE_UUID: UUID = UUID.fromString ("4fafc201-1fb5-459e-8fcc-c5c9c331914b")
     val CHARACTERISTIC_UUID: UUID = UUID.fromString ("beb5483e-36e1-4688-b7f5-ea07361b26a8")
-    val MTU = 512
+    val MTU = 517 // maximum
     val CONNECTION_TIMEOUT = 30000L // 30 seconds
     val DISCOVERY_TIMEOUT = 10000L // 10 seconds
 }
@@ -91,6 +96,15 @@ class BluetoothDeviceManager (
                 discovered (gatt)
             }
         }
+        override fun onCharacteristicWrite (gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int) {
+            super.onCharacteristicWrite (gatt, characteristic, status)
+            Log.d("Bluetooth", "onCharacteristicWrite callback - status: $status")
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d("Bluetooth", "Write successful")
+            } else {
+                Log.e("Bluetooth", "Write failed with status: $status")
+            }
+        }
         override fun onCharacteristicChanged (gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
             dataReceived (characteristic.uuid, value)
         }
@@ -104,6 +118,38 @@ class BluetoothDeviceManager (
         }
     }
 
+
+    @SuppressLint("MissingPermission")
+    fun writeClientInfo () {
+        val characteristic = bluetoothGatt?.getService(config.SERVICE_UUID)?.getCharacteristic(config.CHARACTERISTIC_UUID)
+        if (characteristic != null) {
+            if (characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE == 0) {
+                Log.e("Bluetooth", "writeClientInfo: Characteristic doesn't support WRITE")
+                return
+            }
+            val appVersion = try {
+                val pInfo = activity.packageManager.getPackageInfo (activity.packageName, PackageManager.PackageInfoFlags.of (0))
+                pInfo.versionName
+            } catch (e: PackageManager.NameNotFoundException) {
+                "Unknown"
+            }
+            val deviceInfo = "${Build.MANUFACTURER}+${Build.MODEL}" // Build.BRAND ... Build.DEVICE
+            val androidVer = "Android-${Build.VERSION.SDK_INT}(${Build.VERSION.RELEASE})"
+
+            val jsonString = JSONObject ().apply {
+                put ("type", "info")
+                put ("time", DateTimeFormatter.ISO_INSTANT.format (Instant.now ()))
+                put ("info", "$appVersion/$androidVer/$deviceInfo")
+            }.toString ()
+
+            Log.d("Bluetooth", "writeClientInfo: Sending JSON: $jsonString")
+            bluetoothGatt?.writeCharacteristic (
+                characteristic,
+                jsonString.toByteArray (StandardCharsets.UTF_8),
+                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            )
+        }
+    }
     fun permissionsAllowed () {
         statusCallback ()
         if (!isConnected)
@@ -127,17 +173,14 @@ class BluetoothDeviceManager (
         bluetoothGatt = device.connectGatt (activity, true, gattCallback)
     }
 
-    @SuppressLint("ObsoleteSdkInt")
     private fun connected (gatt: BluetoothGatt) {
         Log.d ("Bluetooth", "Device connected to GATT server")
         timeoutStop ()
         isConnected = true
         statusCallback ()
         checker.start ()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            gatt.requestConnectionPriority (BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER)
-            gatt.requestMtu (config.MTU)
-        }
+        gatt.requestConnectionPriority (BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER)
+        gatt.requestMtu (config.MTU)
         timeoutStart ("discovery", config.DISCOVERY_TIMEOUT)
         gatt.discoverServices ()
     }
@@ -156,6 +199,9 @@ class BluetoothDeviceManager (
                 @Suppress("DEPRECATION")
                 bluetoothGatt?.writeDescriptor (it)
             }
+            handler.postDelayed ({
+                writeClientInfo ()
+            }, 1000)
         } else {
             Log.e ("Bluetooth", "Device characteristic ${config.CHARACTERISTIC_UUID} or service ${config.SERVICE_UUID} not found")
             disconnect ()
