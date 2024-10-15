@@ -98,11 +98,8 @@ class BluetoothDeviceManager (
         }
         override fun onCharacteristicWrite (gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int) {
             super.onCharacteristicWrite (gatt, characteristic, status)
-            Log.d("Bluetooth", "onCharacteristicWrite callback - status: $status")
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.d("Bluetooth", "Write successful")
-            } else {
-                Log.e("Bluetooth", "Write failed with status: $status")
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                Log.e ("Bluetooth", "Device write error: $status")
             }
         }
         override fun onCharacteristicChanged (gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
@@ -110,7 +107,7 @@ class BluetoothDeviceManager (
         }
         override fun onMtuChanged (gatt: BluetoothGatt, mtu: Int, status: Int) {
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                Log.e ("Bluetooth", "Device MTU change failed: $status")
+                Log.e ("Bluetooth", "Device MTU change error: $status")
                 // disconnect ??
             } else {
                 Log.d ("Bluetooth", "Device MTU changed to $mtu")
@@ -120,34 +117,25 @@ class BluetoothDeviceManager (
 
 
     @SuppressLint("MissingPermission")
-    fun writeClientInfo () {
-        val characteristic = bluetoothGatt?.getService(config.SERVICE_UUID)?.getCharacteristic(config.CHARACTERISTIC_UUID)
+    fun transmitTypeInfo () {
+        val characteristic = bluetoothGatt?.getService (config.SERVICE_UUID)?.getCharacteristic (config.CHARACTERISTIC_UUID)
         if (characteristic != null) {
-            if (characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE == 0) {
-                Log.e("Bluetooth", "writeClientInfo: Characteristic doesn't support WRITE")
-                return
-            }
+            val appName = "batterymonitor"
             val appVersion = try {
-                val pInfo = activity.packageManager.getPackageInfo (activity.packageName, PackageManager.PackageInfoFlags.of (0))
-                pInfo.versionName
+                activity.packageManager.getPackageInfo (activity.packageName, PackageManager.PackageInfoFlags.of (0)).versionName
             } catch (e: PackageManager.NameNotFoundException) {
-                "Unknown"
+                "?.?.?"
             }
-            val deviceInfo = "${Build.MANUFACTURER}+${Build.MODEL}" // Build.BRAND ... Build.DEVICE
-            val androidVer = "Android-${Build.VERSION.SDK_INT}(${Build.VERSION.RELEASE})"
+            val appPlatform = "android${Build.VERSION.SDK_INT}"
+            val appDevice = "${Build.MANUFACTURER} ${Build.MODEL}"
 
             val jsonString = JSONObject ().apply {
                 put ("type", "info")
                 put ("time", DateTimeFormatter.ISO_INSTANT.format (Instant.now ()))
-                put ("info", "$appVersion/$androidVer/$deviceInfo")
+                put ("info", "$appName-$appPlatform-v$appVersion ($appDevice)")
             }.toString ()
 
-            Log.d("Bluetooth", "writeClientInfo: Sending JSON: $jsonString")
-            bluetoothGatt?.writeCharacteristic (
-                characteristic,
-                jsonString.toByteArray (StandardCharsets.UTF_8),
-                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            )
+            bluetoothGatt?.writeCharacteristic (characteristic, jsonString.toByteArray (StandardCharsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
         }
     }
     fun permissionsAllowed () {
@@ -161,10 +149,9 @@ class BluetoothDeviceManager (
         when {
             !adapter.isEnabled -> Log.e ("Bluetooth", "Bluetooth is not enabled")
             !isPermitted () -> Log.e ("Bluetooth", "Bluetooth is not permitted")
-            isConnected -> Log.d ("Bluetooth", "Bluetooth device is already connected, will not locate")
+            isConnected -> Log.d ("Bluetooth", "Device is already connected, will not locate")
             else -> scanner.start ()
         }
-        Log.d ("Bluetooth", "end of locate")
     }
 
     private fun connect (device: BluetoothDevice) {
@@ -192,27 +179,22 @@ class BluetoothDeviceManager (
         if (characteristic != null) {
             Log.d ("Bluetooth", "Device notifications enable for ${characteristic.uuid}")
             bluetoothGatt?.setCharacteristicNotification (characteristic, true)
-            val descriptor = characteristic.getDescriptor (UUID.fromString ("00002902-0000-1000-8000-00805f9b34fb")) //  "Client Characteristic Configuration"
-            descriptor?.let {
-                @Suppress("DEPRECATION")
-                it.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                @Suppress("DEPRECATION")
-                bluetoothGatt?.writeDescriptor (it)
-            }
+            val descriptor = characteristic.getDescriptor (UUID.fromString ("00002902-0000-1000-8000-00805f9b34fb"))
+            bluetoothGatt?.writeDescriptor (descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
             handler.postDelayed ({
-                writeClientInfo ()
+                transmitTypeInfo ()
             }, 1000)
         } else {
-            Log.e ("Bluetooth", "Device characteristic ${config.CHARACTERISTIC_UUID} or service ${config.SERVICE_UUID} not found")
+            Log.e ("Bluetooth", "Device service ${config.SERVICE_UUID} or characteristic ${config.CHARACTERISTIC_UUID} not found")
             disconnect ()
         }
     }
 
     private fun dataReceived (uuid: UUID, value: ByteArray) {
-        Log.d ("Bluetooth", "Device characteristic changed on ${uuid}: ${String(value)}")
+        Log.d ("Bluetooth", "Device characteristic changed on ${uuid}: ${String (value)}")
         checker.ping ()
         try {
-            dataCallback (String(value))
+            dataCallback (String (value))
         } catch (e: Exception) {
             Log.e ("Bluetooth", "Device data processing error", e)
         }

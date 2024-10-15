@@ -5,14 +5,14 @@
 class DeliverManager : public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
-        BluetoothNotifier::Config blue;
+        BluetoothDevice::Config blue;
         counter_t failureLimit;
     } Config;
 
 private:
     const Config &config;
 
-    BluetoothNotifier _blue;
+    BluetoothDevice _blue;
     ActivationTrackerWithDetail _delivers;
     ActivationTracker _failures;
 

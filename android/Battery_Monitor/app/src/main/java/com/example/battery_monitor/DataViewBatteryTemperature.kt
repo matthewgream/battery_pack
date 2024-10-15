@@ -25,10 +25,6 @@ class DataViewBatteryTemperature @JvmOverloads constructor (
         strokeWidth = 4f
         color = context.getColor (R.color.graph_line_color)
     }
-//    private val paintPoint = Paint ().apply {
-//        style = Paint.Style.FILL
-//        color = context.getColor (R.color.graph_point_color)
-//    }
     private val paintText = Paint ().apply {
         textSize = 30f
         color = context.getColor (R.color.graph_text_color)
@@ -53,7 +49,7 @@ class DataViewBatteryTemperature @JvmOverloads constructor (
 
     private val thresholds = listOf (
         Triple (25f, "25°C", context.getColor (R.color.threshold_min)),
-        Triple (35f, "35°C", context.getColor (R.color.threshold_warning)),
+        Triple (35f, "35°C", context.getColor (R.color.threshold_warn)),
         Triple (45f, "45°C", context.getColor (R.color.threshold_max))
     )
 
@@ -166,8 +162,6 @@ class DataViewBatteryTemperature @JvmOverloads constructor (
             val x = paddingHorizontal + (drawableWidth * index / (count - 1))
             val y = paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
             canvas.drawLine (x, paddingTop, x, height - paddingBottom, paintLineDashed)
-//            canvas.drawLine (x - 5, y - 5, x + 5, y + 5, paintPoint)
-//            canvas.drawLine (x - 5, y + 5, x + 5, y - 5, paintPoint)
             val text = String.format ("%.1f°C", temp)
             val textWidth = paintText.measureText (text)
             var textX = x - (textWidth / 2)

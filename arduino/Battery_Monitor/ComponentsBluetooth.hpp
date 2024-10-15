@@ -74,7 +74,21 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
-class BluetoothNotifier: private Singleton <BluetoothNotifier>, public JsonSerializable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks {
+class BluetoothDevice;
+class BluetoothWriteHandler {
+public:  
+    virtual void processWrite (BluetoothDevice&, JsonDocument&) = 0;
+    virtual ~BluetoothWriteHandler () {};
+};
+
+class BluetoothWriteHandler_TypeInfo: public BluetoothWriteHandler {
+public:
+    void processWrite (BluetoothDevice& notifier, JsonDocument& doc) override;
+};
+
+// -----------------------------------------------------------------------------------------------
+
+class BluetoothDevice: private Singleton <BluetoothDevice>, public JsonSerializable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks {
 public:
     static inline constexpr uint16_t MAX_MTU = 517;
 
@@ -99,10 +113,51 @@ private:
     bool _connected = false;
     Intervalable _intervalConnectionCheck;
     ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
-    ProtectedSimpleQueue <String> _writesQueue;
+
+    friend class BluetoothWriteHandler_TypeInfo;
+    class WriteManager {
+    public:
+        using Queue = QueueSimpleConcurrentSafe <String>;
+        using Handlers = std::map <String, std::shared_ptr <BluetoothWriteHandler>>;
+    private:
+        BluetoothDevice* const _device;
+        Queue _queue;
+        Handlers _handlers;
+        ActivationTrackerWithDetail _failures;
+    public:
+        explicit WriteManager (BluetoothDevice* device, const Handlers& handlers): _device (device), _handlers (handlers) {}
+        const ActivationTrackerWithDetail& failures () const { return _failures; }
+        void insert (const String& str) {
+            _queue.push (str);
+        }
+        void process () {
+            String str;
+            while (_queue.pull (str)) {
+                DEBUG_PRINTF ("BluetoothDeviceWriteManager::process: content=<<<%s>>>\n", str.c_str ());
+                if (str.startsWith ("{\"type\"")) {
+                    JsonDocument doc;
+                    DeserializationError error;
+                    if ((error = deserializeJson (doc, str)) != DeserializationError::Ok) {
+                        DEBUG_PRINTF ("BluetoothDeviceWriteManager::process: deserializeJson fault: %s\n", error.c_str ());
+                        _failures += String (error.c_str ());
+                    } else {
+                        const char *type = doc ["type"];
+                        if (type != nullptr) {
+                            auto handler = _handlers.find (String (type));
+                            if (handler != _handlers.end ())
+                                handler->second->processWrite (*_device, doc);
+                            else
+                                _failures += String ("write does not contain known 'type': ") + String (type);
+                        }
+                    }
+                } else _failures += String ("write does not contain leading 'type'");
+            }
+        }
+    };
+    WriteManager _writeManager;
 
     void onConnect (BLEServer * server, esp_ble_gatts_cb_param_t* param) override {
-        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CONNECTED, %s (conn_id=%d, role=%s)\n",
+        DEBUG_PRINTF ("BluetoothDevice::events: BLE_CONNECTED, %s (conn_id=%d, role=%s)\n",
             __ble_address_to_string (param->connect.remote_bda).c_str (), param->connect.conn_id, __ble_linkrole_to_string (param->connect.link_role).c_str ());
         advertise (false);
         _mtuNegotiated = -1;
@@ -115,42 +170,42 @@ private:
     }
     void onDisconnect (BLEServer *, esp_ble_gatts_cb_param_t* param) override {
         const String reason = __ble_disconnect_reason ((esp_gatt_conn_reason_t) param->disconnect.reason);
-        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_DISCONNECTED, %s (conn_id=%d, reason=%s)\n",
+        DEBUG_PRINTF ("BluetoothDevice::events: BLE_DISCONNECTED, %s (conn_id=%d, reason=%s)\n",
             __ble_address_to_string (param->disconnect.remote_bda).c_str (), param->disconnect.conn_id, reason.c_str ());
         _connected = false; _disconnections += reason;
         advertise (true);
     }
     void onMtuChanged (BLEServer *, esp_ble_gatts_cb_param_t *param) override {
-        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_MTU_CHANGED, (conn_id=%d, mtu=%u)\n", param->mtu.conn_id, param->mtu.mtu);
+        DEBUG_PRINTF ("BluetoothDevice::events: BLE_MTU_CHANGED, (conn_id=%d, mtu=%u)\n", param->mtu.conn_id, param->mtu.mtu);
         _mtuNegotiated = static_cast <int> (param->mtu.mtu);
     }
 
     // https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/bluetooth/esp_gatts.html#_CPPv424esp_ble_gatts_cb_param_t
     void onRead (BLECharacteristic *characteristic, esp_ble_gatts_cb_param_t *) override {
-        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_READ, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
+        DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_READ, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
     }
     void onWrite (BLECharacteristic *characteristic,  esp_ble_gatts_cb_param_t *) override {
         // param->write.offset, param->write.len, param->write.value
-        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_WRITE, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
-        _writesQueue.insert (characteristic->getValue ());
+        DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_WRITE, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
+        _writeManager.insert (characteristic->getValue ());
     }
     void onNotify (BLECharacteristic *characteristic) override {
-        DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_NOTIFY, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
+        DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_NOTIFY, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
     }
     void onStatus (BLECharacteristic* characteristic, Status s, uint32_t code) override {
         if (s != BLECharacteristicCallbacks::Status::SUCCESS_NOTIFY && s != BLECharacteristicCallbacks::Status::SUCCESS_INDICATE)
-            DEBUG_PRINTF ("BluetoothNotifier::events: BLE_CHARACTERISTIC_STATUS, (uuid=%s, status=%s. code=%lu)\n", characteristic->getUUID ().toString ().c_str (), __ble_status_to_string (s).c_str (), code);
+            DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_STATUS, (uuid=%s, status=%s. code=%lu)\n", characteristic->getUUID ().toString ().c_str (), __ble_status_to_string (s).c_str (), code);
     }
     void onRssiRead (const esp_ble_gap_cb_param_t *param) {
         if (param->read_rssi_cmpl.status == ESP_BT_STATUS_SUCCESS) {
             _connectionSignalTracker.update (param->read_rssi_cmpl.rssi);
-            DEBUG_PRINTF ("BluetoothNotifier::onRssiRead: rssi=%d (%s)\n", param->read_rssi_cmpl.rssi, _connectionSignalTracker.toString ().c_str ());
+            DEBUG_PRINTF ("BluetoothDevice::onRssiRead: rssi=%d (%s)\n", param->read_rssi_cmpl.rssi, _connectionSignalTracker.toString ().c_str ());
         }
     }
 
     static void __gapEventHandler (esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* param) {
-        BluetoothNotifier *bluetoothNotifier = Singleton <BluetoothNotifier>::instance ();
-        if (bluetoothNotifier != nullptr) bluetoothNotifier->events (event, param);
+        BluetoothDevice *bluetoothDevice = Singleton <BluetoothDevice>::instance ();
+        if (bluetoothDevice != nullptr) bluetoothDevice->events (event, param);
     }
     void events (const esp_gap_ble_cb_event_t event, const esp_ble_gap_cb_param_t *param) {
         if (event == ESP_GAP_BLE_READ_RSSI_COMPLETE_EVT)
@@ -161,16 +216,20 @@ private:
         if (enable && !_advertising) {
             _server->getAdvertising ()->start ();
             _advertising = true;
-            DEBUG_PRINTF ("BluetoothNotifier::advertising start\n");
+            DEBUG_PRINTF ("BluetoothDevice::advertising start\n");
         } else if (!enable && _advertising) {
             _server->getAdvertising ()->stop ();
             _advertising = false;
-            DEBUG_PRINTF ("BluetoothNotifier::advertising stop\n");
+            DEBUG_PRINTF ("BluetoothDevice::advertising stop\n");
         }
     }
 
 public:
-    explicit BluetoothNotifier (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr): Singleton <BluetoothNotifier> (this), config (cfg), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+    explicit BluetoothDevice (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr): Singleton <BluetoothDevice> (this), config (cfg),
+        _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck),
+        _writeManager (this, {
+            { String ("info"), std::make_shared <BluetoothWriteHandler_TypeInfo> () }
+        }) {}
 
     bool advertise () {
         BLEDevice::init (config.name);
@@ -198,14 +257,14 @@ public:
     // json only
     bool notify (const String& data) {
         if (!_connected || _mtuNegotiated == -1) {
-            DEBUG_PRINTF ("BluetoothNotifier::notify: not in notifying state");
+            DEBUG_PRINTF ("BluetoothDevice::notify: not in notifying state");
             return false;
         }
         const uint16_t maxPayloadSize = static_cast <uint16_t> (_mtuNegotiated - 3);
         if (data.length () <= maxPayloadSize) {
             _characteristic->setValue (data.c_str ());
             _characteristic->notify ();
-            DEBUG_PRINTF ("BluetoothNotifier::notify: length=%u\n", data.length ());
+            DEBUG_PRINTF ("BluetoothDevice::notify: length=%u\n", data.length ());
             return true;
         } else {
             bool result = true;
@@ -214,7 +273,7 @@ public:
                 const size_t length = part.length ();
                 _characteristic->setValue (part.c_str ());
                 _characteristic->notify ();
-                DEBUG_PRINTF ("BluetoothNotifier::notify: data=%u, part=%u, elements=%d\n", data.length (), length, elements);
+                DEBUG_PRINTF ("BluetoothDevice::notify: data=%u, part=%u, elements=%d\n", data.length (), length, elements);
                 if (length > maxPayloadSize)
                     _mtuExceeded += ArithmeticToString (length), result = false;
                 delay (20);
@@ -229,7 +288,7 @@ public:
         return _connected;
     }
     void reset () {
-        DEBUG_PRINTF ("BluetoothNotifier::reset\n");
+        DEBUG_PRINTF ("BluetoothDevice::reset\n");
         advertise (false);
         _server->disconnect (0);
         delay (500);
@@ -238,19 +297,17 @@ public:
     }
     void process () {
         if (!_connected && !_advertising) {
-            DEBUG_PRINTF ("BluetoothNotifier::process: not connected and not advertising, resetting\n");
+            DEBUG_PRINTF ("BluetoothDevice::process: not connected and not advertising, resetting\n");
             reset ();
         } else if (_connected && _intervalConnectionCheck) {
             if (_mtuNegotiated == -1) {
-                DEBUG_PRINTF ("BluetoothNotifier::process: connection timeout, resetting\n");
+                DEBUG_PRINTF ("BluetoothDevice::process: connection timeout, resetting\n");
                 reset ();
             } else {
                 esp_ble_gap_read_rssi (_peerAddress);
             }
         }
-        String write;
-        while (_writesQueue.obtain (write))
-            processWrite (write);
+        _writeManager.process ();
     }
     //
     void serialize (JsonVariant &obj) const override {
@@ -263,32 +320,12 @@ public:
         }
         if (_mtuExceeded)
             obj ["mtuExceeded"] = _mtuExceeded;
+        if (_writeManager.failures ())
+            obj ["writeFailures"] = _writeManager.failures ();
         if (_connections)
             obj ["connects"] = _connections;
         if (_disconnections)
             obj ["disconnects"] = _disconnections;
-    }
-
-protected:
-    void processWrite (JsonDocument& doc) {
-        const char *type = doc ["type"];
-        if (type != nullptr && String (type) == String ("info")) {
-            const char *time = doc ["time"], *info = doc ["info"];
-            if (time != nullptr && info != nullptr) {
-                _peerDetails = info;
-                DEBUG_PRINTF ("BluetoothNotifier::processWrite[Json]: type=info, time=%s, info=%s\n", time, info);
-            }
-        }
-    }
-    void processWrite (const String& str) {
-        DEBUG_PRINTF ("BluetoothNotifier::processWrite: content=<<<%s>>>\n", str.c_str ());
-        if (str.startsWith ("{\"type\"")) {
-            JsonDocument doc;
-            DeserializationError error;
-            if ((error = deserializeJson (doc, str)) != DeserializationError::Ok)
-                DEBUG_PRINTF ("BluetoothNotifier::processWrite: deserializeJson fault: %s\n", error.c_str ());
-            else processWrite (doc);
-        }
     }
 
 private:
@@ -325,6 +362,16 @@ private:
         }
     }
 };
+
+// -----------------------------------------------------------------------------------------------
+
+void BluetoothWriteHandler_TypeInfo::processWrite (BluetoothDevice& device, JsonDocument& doc) {
+    const char *time = doc ["time"], *info = doc ["info"];
+    if (time != nullptr && info != nullptr) {
+        device._peerDetails = info;
+        DEBUG_PRINTF ("BluetoothWriteHandler_TypeInfo:: type=info, time=%s, info='%s'\n", time, info);
+    }
+}
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------

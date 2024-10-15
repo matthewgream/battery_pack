@@ -355,16 +355,16 @@ public:
 #include <queue>
 
 template <typename T>
-class ProtectedSimpleQueue {
+class QueueSimpleConcurrentSafe {
     std::mutex _mutex;
     std::queue <T> _queue;
 
 public:    
-    void insert (const T& t) {
+    void push (const T& t) {
         std::lock_guard <std::mutex> guard (_mutex);
         _queue.push (t);
     }
-    bool obtain (T& t) {
+    bool pull (T& t) {
         std::lock_guard <std::mutex> guard (_mutex);
         if (!_queue.empty ()) {
             t = _queue.front ();

@@ -137,14 +137,10 @@ class BluetoothDeviceScanner (
 
     private val callback = object : ScanCallback () {
         override fun onScanResult (callbackType: Int, result: ScanResult) {
-            val device = result.device
-            if (device.name == config.name) {
+            if (result.scanRecord?.deviceName == config.name) {
                 stop ()
-                val deviceName = result.scanRecord?.deviceName
-                val txPower = result.scanRecord?.txPowerLevel
-                val rssi = result.rssi
-                Log.d ("Bluetooth", "Device scan located, device ${device.name} / ${device.address} [deviceName=$deviceName, txPower=$txPower, rssi=$rssi]")
-                onFound (device)
+                Log.d ("Bluetooth", "Device scan located, device ${result.scanRecord?.deviceName} / ${result.device.address} [txPower=${result.scanRecord?.txPowerLevel}, rssi=${result.rssi}]")
+                onFound (result.device)
             }
         }
         override fun onScanFailed (errorCode: Int) {

@@ -6,7 +6,7 @@
 #define DEFAULT_WATCHDOG_SECS 60
 
 #define DEFAULT_NAME "BatteryMonitor"
-#define DEFAULT_VERS "1.0.4"
+#define DEFAULT_VERS "1.0.5"
 #define DEFAULT_TYPE "batterymonitor-custom-esp32c3"
 #define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 

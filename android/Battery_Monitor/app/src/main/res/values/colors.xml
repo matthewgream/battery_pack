@@ -17,13 +17,12 @@
     <color name="alarm_active_color">#F44336</color>
     <color name="alarm_inactive_color">#4CAF50</color>
     <color name="graph_line_color">#FF5722</color>
-    <color name="graph_point_color">#2196F3</color>
     <color name="graph_text_color">#333333</color>
     <color name="graph_horizontal_line_color">#FF5722</color>
     <color name="connected_color">#4CAF50</color>
     <color name="disconnected_color">#F44336</color>
-    <color name="threshold_min">#FF0000</color>     <!-- Red for 25°C -->
-    <color name="threshold_warning">#FFA500</color> <!-- Orange for 35°C -->
-    <color name="threshold_max">#8B0000</color>     <!-- Dark Red for 45°C -->
+    <color name="threshold_min">#FF0000</color> <!-- Red for 25°C -->
+    <color name="threshold_warn">#FFA500</color> <!-- Orange for 35°C -->
+    <color name="threshold_max">#8B0000</color> <!-- Dark Red for 45°C -->
     <color name="ic_launcher_background">#FFFFFF</color>
 </resources>
