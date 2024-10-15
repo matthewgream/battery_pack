@@ -2,6 +2,73 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+class ConnectionSignalTracker: public JsonSerializable {
+public:
+    using RssiType = int8_t;
+    enum class QualityType {
+        UNKNOWN,
+        EXCELLENT,
+        GOOD,
+        FAIR,
+        POOR
+    };
+    using Callback = std::function <void (const RssiType, const QualityType)>;
+    static constexpr RssiType RSSI_THRESHOLD_EXCELLENT = RssiType (-50);
+    static constexpr RssiType RSSI_THRESHOLD_GOOD      = RssiType (-60);
+    static constexpr RssiType RSSI_THRESHOLD_FAIR      = RssiType (-70);
+
+private:
+    const Callback _callback;
+    RssiType _rssiLast = std::numeric_limits <RssiType>::min ();
+    QualityType _qualityLast = QualityType::UNKNOWN;
+
+public:
+    static QualityType signalQuality (const RssiType rssi) {
+        if (rssi > RSSI_THRESHOLD_EXCELLENT) return QualityType::EXCELLENT;
+        else if (rssi > RSSI_THRESHOLD_GOOD) return QualityType::GOOD;
+        else if (rssi > RSSI_THRESHOLD_FAIR) return QualityType::FAIR;
+        else                                 return QualityType::POOR;
+    }
+    static String toString (const QualityType quality) {
+        switch (quality) {
+          case QualityType::UNKNOWN: return "UNKNOWN";
+          case QualityType::POOR: return "POOR";
+          case QualityType::FAIR: return "FAIR";
+          case QualityType::GOOD: return "GOOD";
+          case QualityType::EXCELLENT: return "EXCELLENT";
+          default: return "UNDEFINED";
+        }
+    }
+
+public:
+    explicit ConnectionSignalTracker (const Callback callback = nullptr): _callback (callback) {}
+    RssiType rssi () const {
+        return _rssiLast;
+    }
+    void update (const RssiType rssi) {
+        QualityType quality = signalQuality (_rssiLast = rssi);
+        if (quality != _qualityLast) {
+            _qualityLast = quality;
+            if (_callback)
+                _callback (rssi, quality);
+        }
+    }
+    void reset () {
+        _rssiLast = std::numeric_limits <RssiType>::min ();
+        _qualityLast = QualityType::UNKNOWN;
+    }
+    String toString () const {
+        return toString (_qualityLast);
+    }
+    //
+    void serialize (JsonVariant &obj) const override {
+        obj ["rssi"] = _rssiLast;
+        obj ["quality"] = toString (_qualityLast);
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+
 #include <HTTPClient.h>
 #include <ctime>
 

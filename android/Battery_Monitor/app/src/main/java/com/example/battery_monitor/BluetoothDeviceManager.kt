@@ -132,7 +132,7 @@ class BluetoothDeviceManager (
             val jsonString = JSONObject ().apply {
                 put ("type", "info")
                 put ("time", DateTimeFormatter.ISO_INSTANT.format (Instant.now ()))
-                put ("info", "$appName-$appPlatform-v$appVersion ($appDevice)")
+                put ("info", "$appName-custom-$appPlatform-v$appVersion ($appDevice)")
             }.toString ()
 
             bluetoothGatt?.writeCharacteristic (characteristic, jsonString.toByteArray (StandardCharsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)

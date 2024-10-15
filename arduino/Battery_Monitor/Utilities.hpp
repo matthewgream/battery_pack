@@ -359,7 +359,7 @@ class QueueSimpleConcurrentSafe {
     std::mutex _mutex;
     std::queue <T> _queue;
 
-public:    
+public:
     void push (const T& t) {
         std::lock_guard <std::mutex> guard (_mutex);
         _queue.push (t);
