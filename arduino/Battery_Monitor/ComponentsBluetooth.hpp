@@ -75,7 +75,7 @@ private:
     void events (const esp_gap_ble_cb_event_t event, const esp_ble_gap_cb_param_t *param) {
         if (event == ESP_GAP_BLE_READ_RSSI_COMPLETE_EVT) {
             if (param->read_rssi_cmpl.status == ESP_BT_STATUS_SUCCESS) {
-                DEBUG_PRINTF ("BluetoothDevice::events: BLE_READ_RSSI_COMPLETE, (rssi=%d, quality=%s)\n", param->read_rssi_cmpl.rssi, 
+                DEBUG_PRINTF ("BluetoothDevice::events: BLE_READ_RSSI_COMPLETE, (rssi=%d, quality=%s)\n", param->read_rssi_cmpl.rssi,
                     ConnectionSignalTracker::toString (ConnectionSignalTracker::signalQuality (param->read_rssi_cmpl.rssi)).c_str ());
                 _connection_rssiResponse (param->read_rssi_cmpl.rssi);
             }
@@ -136,8 +136,8 @@ private:
 
     esp_bd_addr_t _peerAddress;
     String _peerDetails;
-    uint16_t _peerConnId;
-    uint16_t _mtuNegotiated;
+    uint16_t _peerConnId = 0;
+    uint16_t _mtuNegotiated = 0;
     ConnectionSignalTracker _connectionSignalTracker;
     Intervalable _intervalConnectionCheck;
     ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
