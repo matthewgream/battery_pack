@@ -5,8 +5,8 @@
 
 <table>
   <tr><td>
-    
-<video src="materials/v1_0_0_android.mp4"></video>
+
+[![Android](materials/v1_0_0_android.jpg)](materials/v1_0_0_android.mp4)
 
   </td><td>
   </td></tr>
