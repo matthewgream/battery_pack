@@ -6,13 +6,13 @@
 <table>
   <tr><td>
     
-![Android](images/v1_0_0_android.png)
+![Android](materials/v1_0_0_android.mp4)
 
   </td><td>
   </td></tr>
   <tr><td colspan="2">
 
-![Arduino](images/v1_0_0_arduino.jpg)
+![Arduino](materials/v1_0_0_arduino.jpg)
   
   </td></tr>
   <tr><td colspan="2">
