@@ -6,7 +6,7 @@
 #define DEFAULT_INITIAL_DELAY 5*1000L
 
 #define DEFAULT_NAME "BatteryMonitor"
-#define DEFAULT_VERS "1.1.0"
+#define DEFAULT_VERS "1.1.1"
 #define DEFAULT_TYPE "batterymonitor-custom-esp32c3"
 #define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 

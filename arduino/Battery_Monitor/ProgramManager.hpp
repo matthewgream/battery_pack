@@ -65,7 +65,7 @@ private:
     MQTTPublisher *__debugLoggerMQTTClient;
 
 public:
-    LoggingHandler (const Config& cfg, MQTTPublisher *loggingMQTTClient = nullptr): Singleton <LoggingHandler> (this), config (cfg), __debugLoggerMQTTClient (loggingMQTTClient) { init (); }
+    explicit LoggingHandler (const Config& cfg, MQTTPublisher *loggingMQTTClient = nullptr): Singleton <LoggingHandler> (this), config (cfg), __debugLoggerMQTTClient (loggingMQTTClient) { init (); }
     ~LoggingHandler () { term (); }
 
 protected:
@@ -128,7 +128,7 @@ private:
         }
     }
 #else
-    LoggingHandler (const Config&, MQTTPublisher *): Singleton <LoggingHandler> (this) {}
+    explicit LoggingHandler (const Config&, MQTTPublisher *): Singleton <LoggingHandler> (this) {}
 #endif
 };
 
