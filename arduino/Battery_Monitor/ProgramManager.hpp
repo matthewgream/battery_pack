@@ -125,7 +125,7 @@ private:
     }
 
     static std::mutex __debugLoggerBuffer_Mutex;
-    #define __debugPrintBuffer_Length (512+1)
+    #define __debugPrintBuffer_Length (1024+1)
     static char __debugLoggerBuffer_Content [__debugPrintBuffer_Length];
     static int __debugLoggerBuffer_Offset;
     static void __debugLoggerMQTT (const char* format, ...) {

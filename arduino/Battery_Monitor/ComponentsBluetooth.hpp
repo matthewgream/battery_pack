@@ -456,8 +456,8 @@ private:
 // -----------------------------------------------------------------------------------------------
 
 bool BluetoothWriteHandler_TypeInfo::process (BluetoothDevice& device, const String& time, const String& info, JsonDocument& doc) {
-    device._peerDetails = info;
-    DEBUG_PRINTF ("BluetoothWriteHandler_TypeInfo:: type=info, time=%s, info='%s'\n", time.c_str (), info.c_str ());
+    device._peerDetails = doc ["info"] | "(not provided)";
+    DEBUG_PRINTF ("BluetoothWriteHandler_TypeInfo:: type=info, time=%s, info='%s'\n", time.c_str (), device._peerDetails);
     return true;
 }
 
