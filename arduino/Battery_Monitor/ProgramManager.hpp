@@ -92,6 +92,7 @@ private:
     __DebugLoggerFunc __debugLoggerPrevious = nullptr;
     char __debugLoggerMQTTTopic [64+1];
     MQTTPublisher *__debugLoggerMQTTClient = nullptr;
+
     void logger_init (const bool loggingSerial, const bool loggingMQTT, const char *loggingMQTTTopic, MQTTPublisher *loggingMQTTClient) {
         if (loggingMQTT && loggingMQTTClient != nullptr) {
             snprintf (__debugLoggerMQTTTopic, sizeof (__debugLoggerMQTTTopic) - 1, "%s/logs", loggingMQTTTopic);
@@ -172,7 +173,7 @@ protected:
 
 #ifdef DEBUG
 std::mutex ControlManager::__debugLoggerBuffer_Mutex;
-char ControlManager::__debugLoggerBuffer_Content [512+1];
+char ControlManager::__debugLoggerBuffer_Content [__debugPrintBuffer_Length];
 int ControlManager::__debugLoggerBuffer_Offset = 0;
 #endif
 
