@@ -113,7 +113,7 @@ struct Config {
         .failureLimit = 3
     };
     PublishManager::Config publish = {
-        .topic = DEFAULT_NAME, 
+        .topic = DEFAULT_NAME,
         .failureLimit = 3
     };
     StorageManager::Config storage = {
@@ -123,7 +123,7 @@ struct Config {
 
     // program
     ControlManager::Config control = { };
-    UpdateManager::Config updater = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS };    
+    UpdateManager::Config updater = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS };
     AlarmManager::Config alarms = { }; ActivablePIN::Config alarmsInterface = { .PIN = -1, .ACTIVE = LOW };
     DiagnosticManager::Config diagnostics = { };
     interval_t intervalProcess = 5*1000, intervalDeliver = 5*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;

@@ -199,8 +199,7 @@ private:
         ActivationTrackerWithDetail _failures;
         explicit ConnectionWriteManager (BluetoothDevice* device): _device (device) {}
         ConnectionWriteManager& operator += (const Handlers& handlers) {
-            for (auto const& handler : handlers)
-              _handlers.insert (handler);
+            _handlers.insert (handlers.begin (), handlers.end ());
             return *this;
         }
         void insert (const String& str) {
@@ -231,8 +230,7 @@ private:
     public:
         explicit ConnectionReadManager (BluetoothDevice* device): _device (device) {}
         ConnectionReadManager& operator += (const Handlers& handlers) {
-            for (auto const& handler : handlers)
-              _handlers.push_back (handler);
+            _handlers.insert (_handlers.end (), handlers.begin (), handlers.end ());
             return *this;
         }
         void process (String& str) {
