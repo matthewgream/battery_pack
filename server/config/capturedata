@@ -1,4 +1,5 @@
 #!/usr/bin/bash
+# btrfs
 if ! mountpoint -q /mnt/database; then
 	sudo mount -o compress=zstd:9 /dev/mmcblk0p1 /mnt/database/
 fi
@@ -6,5 +7,5 @@ while [ true ]; do
 	FILENAME=session-`date -Iseconds|sed 's/[-:+/T]//g'`.json
 	FILEPATH=/mnt/database/BatteryMonitor/$FILENAME
 	echo Capturing to $FILEPATH
-	/usr/bin/mosquitto_sub -t BatteryMonitor/# | tee $FILEPATH
+	/usr/bin/mosquitto_sub -t BatteryMonitor/data -t BatteryMonitor/diag | tee $FILEPATH
 done

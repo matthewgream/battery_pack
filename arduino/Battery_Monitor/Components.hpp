@@ -344,7 +344,6 @@ private:
             _size = 0;
     }
 
-
 public:
     explicit SPIFFSFile (const String& filename): _filename (filename) {}
     ~SPIFFSFile () { close (); }

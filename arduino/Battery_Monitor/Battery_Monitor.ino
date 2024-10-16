@@ -18,7 +18,7 @@
         else if (func == NULL && __debugPrintfFunc == __debugPrintfSerial) Serial.flush (), Serial.end ();
         __debugPrintfFunc = func;
     }
-#ifdef DEBUG_PRINTF_INITIAL_SERIAL    
+#ifdef DEBUG_PRINTF_INITIAL_SERIAL
     #define DEBUG_START(...) __debugPrintfSet (__debugPrintfSerial)
 #else
     #define DEBUG_START(...) do {} while (0)
@@ -29,7 +29,7 @@
     #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD);
     #define DEBUG_END(...) Serial.flush (); Serial.end ();
     #define DEBUG_PRINTF Serial.printf
-#endif    
+#endif
 #else
     #define DEBUG_START(...)
     #define DEBUG_END(...)

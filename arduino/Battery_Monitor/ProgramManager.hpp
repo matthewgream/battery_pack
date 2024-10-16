@@ -113,7 +113,7 @@ private:
     static char __debugPrintfBuffer_Content [__debugPrintBuffer_Length];
     static int __debugPrintfBuffer_Offset;
     static void __debugPrintfMQTT (const char* format, ...) {
-        
+
         std::lock_guard <std::mutex> guard (__debugPrintfBuffer_Mutex);
 
         va_list args;
@@ -132,7 +132,7 @@ private:
             __debugPrintfBuffer_Offset = 0;
 
             auto control = Singleton <ControlManager>::instance ();
-            if (control) control->logger_send (__debugPrintfBuffer_Content);  
+            if (control) control->logger_send (__debugPrintfBuffer_Content);
         }
     }
 #else
