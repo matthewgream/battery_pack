@@ -51,18 +51,15 @@ protected:
 class ControlManager: private Singleton <ControlManager>, public Component, public Diagnosticable {
 public:
     typedef struct {
-        bool debugLoggingToSerial;
-        bool debugLoggingToMQTT;
-        String debugLoggingTopic;
+        bool debugLoggerSerial;
+        bool debugLoggerMQTT;
+        String debugLoggerMQTTTopic;
     } Config;
-
-    using BooleanFunc = std::function <bool ()>;
 
 private:
     const Config &config;
 
     DeviceManager& _devices;
-    const BooleanFunc _networkIsAvailable;
 
     class BluetoothWriteHandler_TypeCtrl: public BluetoothWriteHandler_TypeSpecific {
     public:
@@ -90,59 +87,82 @@ private:
     };
 
 #ifdef DEBUG
-    char _debugLoggingTopic [64+1];
-    void logger_init () {
-        snprintf (_debugLoggingTopic, sizeof (_debugLoggingTopic) - 1, "%s/logs", config.debugLoggingTopic.c_str ());
-        if (config.debugLoggingToMQTT) {
-            __debugPrintfSet (__debugPrintfMQTT);
-            DEBUG_PRINTF ("ControlManager::init: logging to Serial and MQTT (as topic '%s' when online)\n", _debugLoggingTopic);
-        } else if (config.debugLoggingToSerial) {
-            __debugPrintfSet (__debugPrintfSerial);
-            DEBUG_PRINTF ("ControlManager::init: logging to Serial\n");
+    // should be in its own class
+    bool __debugLoggerEnableSerial = false, __debugLoggerEnableMQTT = false;
+    __DebugLoggerFunc __debugLoggerPrevious = nullptr;
+    char __debugLoggerMQTTTopic [64+1];
+    MQTTPublisher *__debugLoggerMQTTClient = nullptr;
+    void logger_init (const bool loggingSerial, const bool loggingMQTT, const char *loggingMQTTTopic, MQTTPublisher *loggingMQTTClient) {
+        if (loggingMQTT && loggingMQTTClient != nullptr) {
+            snprintf (__debugLoggerMQTTTopic, sizeof (__debugLoggerMQTTTopic) - 1, "%s/logs", loggingMQTTTopic);
+            __debugLoggerMQTTClient = loggingMQTTClient;
+            __debugLoggerPrevious = __debugLoggerSet (__debugLoggerMQTT);
+            if (loggingSerial) __debugLoggerEnableSerial = true;
+            __debugLoggerEnableMQTT = true;
+            DEBUG_PRINTF ("ControlManager::init: logging directed to Serial and MQTT (as topic '%s' when online)\n", __debugLoggerMQTTTopic);
+        } else if (loggingSerial) {
+            __debugLoggerPrevious = __debugLoggerSet (__debugLoggerSerial);
+            __debugLoggerEnableSerial = true;
+            DEBUG_PRINTF ("ControlManager::init: logging directed to Serial\n");
+        } else {
+            DEBUG_PRINTF ("ControlManager::init: logging not directed\n");
         }
     }
+    void logger_term () { // not entirely thread safe
+      __debugLoggerSet (__debugLoggerPrevious);
+      __debugLoggerPrevious = nullptr;
+      __debugLoggerEnableSerial = false;
+      __debugLoggerEnableMQTT = false;
+      __debugLoggerMQTTTopic [0] = '\0';
+      __debugLoggerMQTTClient = nullptr;
+      DEBUG_PRINTF ("ControlManager::init: logging reverted to previous\n");
+    }
     void logger_send (const char *line) {
-        if (config.debugLoggingToSerial)
+        if (__debugLoggerEnableSerial)
             Serial.println (line);
-        if (line [0] != '\0' && config.debugLoggingToMQTT && _networkIsAvailable () && _devices.mqtt ().connected ())
-            _devices.mqtt ().publish_fast (_debugLoggingTopic, line);
+        if (__debugLoggerEnableMQTT && line [0] != '\0')
+            __debugLoggerMQTTClient->publish__native (__debugLoggerMQTTTopic, line);
     }
 
-    static std::mutex __debugPrintfBuffer_Mutex;
+    static std::mutex __debugLoggerBuffer_Mutex;
     #define __debugPrintBuffer_Length (512+1)
-    static char __debugPrintfBuffer_Content [__debugPrintBuffer_Length];
-    static int __debugPrintfBuffer_Offset;
-    static void __debugPrintfMQTT (const char* format, ...) {
+    static char __debugLoggerBuffer_Content [__debugPrintBuffer_Length];
+    static int __debugLoggerBuffer_Offset;
+    static void __debugLoggerMQTT (const char* format, ...) {
 
-        std::lock_guard <std::mutex> guard (__debugPrintfBuffer_Mutex);
+        std::lock_guard <std::mutex> guard (__debugLoggerBuffer_Mutex);
 
         va_list args;
         va_start (args, format);
-        int printed = vsnprintf (__debugPrintfBuffer_Content + __debugPrintfBuffer_Offset, (__debugPrintBuffer_Length - __debugPrintfBuffer_Offset), format, args);
+        int printed = vsnprintf (__debugLoggerBuffer_Content + __debugLoggerBuffer_Offset, (__debugPrintBuffer_Length - __debugLoggerBuffer_Offset), format, args);
         va_end (args);
         if (printed < 0)
             return;
 
-        __debugPrintfBuffer_Offset = (printed >= (__debugPrintBuffer_Length - __debugPrintfBuffer_Offset)) ? (__debugPrintBuffer_Length - 1) : (__debugPrintfBuffer_Offset + printed);
-        if (__debugPrintfBuffer_Offset == (__debugPrintBuffer_Length - 1) || (__debugPrintfBuffer_Offset > 0 && __debugPrintfBuffer_Content [__debugPrintfBuffer_Offset - 1] == '\n')) {
-            while (__debugPrintfBuffer_Offset > 0 && __debugPrintfBuffer_Content [__debugPrintfBuffer_Offset - 1] == '\n')
-                __debugPrintfBuffer_Content [-- __debugPrintfBuffer_Offset] = '\0';
-            __debugPrintfBuffer_Content [__debugPrintfBuffer_Offset] = '\0';
-            __debugPrintfBuffer_Offset = 0;
+        __debugLoggerBuffer_Offset = (printed >= (__debugPrintBuffer_Length - __debugLoggerBuffer_Offset)) ? (__debugPrintBuffer_Length - 1) : (__debugLoggerBuffer_Offset + printed);
+        if (__debugLoggerBuffer_Offset == (__debugPrintBuffer_Length - 1) || (__debugLoggerBuffer_Offset > 0 && __debugLoggerBuffer_Content [__debugLoggerBuffer_Offset - 1] == '\n')) {
+            while (__debugLoggerBuffer_Offset > 0 && __debugLoggerBuffer_Content [__debugLoggerBuffer_Offset - 1] == '\n')
+                __debugLoggerBuffer_Content [-- __debugLoggerBuffer_Offset] = '\0';
+            __debugLoggerBuffer_Content [__debugLoggerBuffer_Offset] = '\0';
+            __debugLoggerBuffer_Offset = 0;
 
             auto control = Singleton <ControlManager>::instance ();
-            if (control) control->logger_send (__debugPrintfBuffer_Content);
+            if (control) control->logger_send (__debugLoggerBuffer_Content);
         }
     }
 #else
-    void logger_init () {}
+    void logger_init (const bool, const bool, const char *, MQTTPublisher *) {}
+    void logger_term () {}
 #endif
 
 public:
-    explicit ControlManager (const Config& cfg, DeviceManager& devices, const BooleanFunc networkIsAvailable): Singleton <ControlManager> (this), config (cfg), _devices (devices), _networkIsAvailable (networkIsAvailable) {
+    explicit ControlManager (const Config& cfg, DeviceManager& devices): Singleton <ControlManager> (this), config (cfg), _devices (devices) {
         _devices.blue ().insert ({ { String ("ctrl"), std::make_shared <BluetoothWriteHandler_TypeCtrl> () } });
         _devices.blue ().insert ({ { std::make_shared <BluetoothReadHandler_TypeCtrl> () } });
-        logger_init ();
+        logger_init (config.debugLoggerSerial, config.debugLoggerMQTT, config.debugLoggerMQTTTopic.c_str (), &_devices.mqtt ());
+    }
+    ~ControlManager () {
+        logger_term ();
     }
 
 protected:
@@ -151,9 +171,9 @@ protected:
 };
 
 #ifdef DEBUG
-std::mutex ControlManager::__debugPrintfBuffer_Mutex;
-char ControlManager::__debugPrintfBuffer_Content [512+1];
-int ControlManager::__debugPrintfBuffer_Offset = 0;
+std::mutex ControlManager::__debugLoggerBuffer_Mutex;
+char ControlManager::__debugLoggerBuffer_Content [512+1];
+int ControlManager::__debugLoggerBuffer_Offset = 0;
 #endif
 
 // -----------------------------------------------------------------------------------------------

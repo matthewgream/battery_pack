@@ -190,8 +190,9 @@ public:
         DEBUG_PRINTF ("MQTTPublisher::publish: length=%u, result=%d\n", data.length (), result);
         return result;
     }
-    void publish_fast (const char *topic, const char *data) {
-        _mqttClient.publish (topic, data);
+    void publish__native (const char *topic, const char *data) { // no logging, silent dropping
+        if (_mqttClient.connected ())
+            _mqttClient.publish (topic, data);
     }
     void process () {
         _mqttClient.loop ();

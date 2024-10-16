@@ -5,28 +5,30 @@
 #include <Arduino.h>
 
 #define DEBUG
-#define DEBUG_PRINTF_INITIAL_SERIAL
-#define DEBUG_PRINTF_SERIAL_BAUD 115200
+#define DEBUG_LOGGER_INITIAL_SERIAL
+#define DEBUG_LOGGER_SERIAL_BAUD 115200
 
 #ifdef DEBUG
 #ifndef DEBUG_OLD
-    typedef void (*__DebugPrintfFunc) (const char*, ...);
-    __DebugPrintfFunc __debugPrintfFunc = NULL;
-    void __debugPrintfSerial (const char* format, ...) { va_list args; va_start (args, format); Serial.vprintf (format, args); va_end (args); }
-    void __debugPrintfSet (__DebugPrintfFunc func = NULL) {
-        if (func == __debugPrintfSerial && __debugPrintfFunc != __debugPrintfSerial) Serial.begin (DEBUG_PRINTF_SERIAL_BAUD);
-        else if (func == NULL && __debugPrintfFunc == __debugPrintfSerial) Serial.flush (), Serial.end ();
-        __debugPrintfFunc = func;
+    typedef void (*__DebugLoggerFunc) (const char*, ...);
+    __DebugLoggerFunc __debugLoggerFunc = NULL;
+    void __debugLoggerSerial (const char* format, ...) { va_list args; va_start (args, format); Serial.vprintf (format, args); va_end (args); }
+    __DebugLoggerFunc __debugLoggerSet (__DebugLoggerFunc func = NULL) {
+        if (func == __debugLoggerSerial && __debugLoggerFunc != __debugLoggerSerial) Serial.begin (DEBUG_LOGGER_SERIAL_BAUD);
+        else if (func == NULL && __debugLoggerFunc == __debugLoggerSerial) Serial.flush (), Serial.end ();
+        __DebugLoggerFunc prev = __debugLoggerFunc;
+        __debugLoggerFunc = func;
+        return prev;
     }
-#ifdef DEBUG_PRINTF_INITIAL_SERIAL
-    #define DEBUG_START(...) __debugPrintfSet (__debugPrintfSerial)
+#ifdef DEBUG_LOGGER_INITIAL_SERIAL
+    #define DEBUG_START(...) __debugLoggerSet (__debugLoggerSerial)
 #else
     #define DEBUG_START(...) do {} while (0)
 #endif
-    #define DEBUG_END(...) __debugPrintfSet ()
-    #define DEBUG_PRINTF(...) do { if (__debugPrintfFunc) __debugPrintfFunc (__VA_ARGS__); } while (0)
+    #define DEBUG_END(...) __debugLoggerSet ()
+    #define DEBUG_PRINTF(...) do { if (__debugLoggerFunc) __debugLoggerFunc (__VA_ARGS__); } while (0)
 #else
-    #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD);
+    #define DEBUG_START(...) Serial.begin (DEBUG_LOGGER_SERIAL_BAUD);
     #define DEBUG_END(...) Serial.flush (); Serial.end ();
     #define DEBUG_PRINTF Serial.printf
 #endif
