@@ -58,7 +58,7 @@
 struct Config {
 
     TemperatureSensor_DS18B20::Config ds18b20 = {
-        .PIN_DAT = 21
+        .PIN_DAT = 21, .INDEX = 0
     };
 
     // hardware interfaces
@@ -92,6 +92,12 @@ struct Config {
         .NO_SPEED = 0, .MIN_SPEED = 85, .MAX_SPEED = 255
     };
 
+    // devices
+    DeviceManager::Config devices = {
+        .blue = { .name = DEFAULT_NAME, .serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", .characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", .pin = DEFAULT_BLUE_PIN, .intervalConnectionCheck = 1*60*1000 },
+        .mqtt = { .client = DEFAULT_NAME, .host = "mqtt.local", .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .port = 1883, .bufferSize = 3*1024 },
+    };
+
     // network managers
     NetwerkManager::Config network = {
         .client = DEFAULT_NAME, .ssid = DEFAULT_WIFI_SSID, .pass = DEFAULT_WIFI_PASS, .intervalConnectionCheck = 1*60*1000
@@ -104,11 +110,10 @@ struct Config {
 
     // data managers
     DeliverManager::Config deliver = {
-        .blue = { .name = DEFAULT_NAME, .serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", .characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", .pin = DEFAULT_BLUE_PIN, .intervalConnectionCheck = 1*60*1000 },
         .failureLimit = 3
     };
     PublishManager::Config publish = {
-        .mqtt = { .client = DEFAULT_NAME, .host = "mqtt.local", .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .topic = DEFAULT_NAME, .port = 1883, .bufferSize = 3*1024 },
+        .topic = DEFAULT_NAME, 
         .failureLimit = 3
     };
     StorageManager::Config storage = {
@@ -117,10 +122,10 @@ struct Config {
     };
 
     // program
-    AlarmInterface_SinglePIN::Config alarmInterface = { .PIN_ALARM = -1 };
-    AlarmManager::Config alarmManager = { };
-    DiagnosticManager::Config diagnosticManager = { };
-    UpdateManager::Config updateManager = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS };
+    ControlManager::Config control = { };
+    UpdateManager::Config updater = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS };    
+    AlarmManager::Config alarms = { }; ActivablePIN::Config alarmsInterface = { .PIN = -1, .ACTIVE = LOW };
+    DiagnosticManager::Config diagnostics = { };
     interval_t intervalProcess = 5*1000, intervalDeliver = 5*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;
 };
 

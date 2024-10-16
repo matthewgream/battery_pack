@@ -6,7 +6,7 @@
 #define DEFAULT_WATCHDOG_SECS 60
 
 #define DEFAULT_NAME "BatteryMonitor"
-#define DEFAULT_VERS "1.0.6"
+#define DEFAULT_VERS "1.0.7"
 #define DEFAULT_TYPE "batterymonitor-custom-esp32c3"
 #define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 
@@ -25,11 +25,14 @@
 
 // -----------------------------------------------------------------------------------------------
 
+using AlarmInterface = ActivablePIN;
+
 #include "ProgramBase.hpp"
 #include "ProgramHardwareInterface.hpp"
 #include "ProgramHardwareManage.hpp"
 #include "ProgramNetworkManage.hpp"
 #include "ProgramDataManage.hpp"
+#include "ProgramManager.hpp"
 #include "ProgramTemperatureCalibration.hpp"
 #include "UtilitiesOTA.hpp" // breaks if included earlier due to SPIFFS headers
 
@@ -93,14 +96,17 @@ class Program: public Component, public Diagnosticable {
     FanInterface fanInterface;
     FanManager fanManager;
 
+    DeviceManager devices;
+
     NetwerkManager network;
     NettimeManager nettime;
     DeliverManager deliver;
     PublishManager publish;
     StorageManager storage;
+    ControlManager control;
 
     UpdateManager updater;
-    AlarmInterface_SinglePIN alarmInterface;
+    AlarmInterface alarmsInterface;
     AlarmManager alarms;
     PlatformArduino platform;
 
@@ -138,7 +144,7 @@ class Program: public Component, public Diagnosticable {
         if (publish.connected ()) {
             if (storage.size () > 0) {
                 DEBUG_PRINTF ("Program::doCapture: publish.connected () && storage.size () > 0\n");
-                // probably needs to be time bound and recall and reuse an offset
+                // probably needs to be time bound and recall and reuse an offset ... or this will cause infinite watchdog loop one day
                 StorageLineHandler handler (publish);
                 if (storage.retrieve (handler))
                     storage.erase ();
@@ -179,14 +185,16 @@ public:
         temperatureManagerBatterypack (config.temperatureManagerBatterypack, temperatureInterface), temperatureManagerEnvironment (config.temperatureManagerEnvironment, temperatureInterface),
         fanInterface (config.fanInterface, fanInterfaceSetrategy), fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm,
             [&] () { return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ()); }),
+        devices (config.devices, [&] () { return network.isAvailable (); }),
         network (config.network), nettime (config.nettime, [&] () { return network.isAvailable (); }),
-        deliver (config.deliver), publish (config.publish, [&] () { return network.isAvailable (); }), storage (config.storage),
-        updater (config.updateManager, [&] () { return network.isAvailable (); }),
-        alarmInterface (config.alarmInterface), alarms (config.alarmManager, alarmInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
-        diagnostics (config.diagnosticManager, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &network, &nettime, &deliver, &publish, &storage, &updater, &alarms, &platform, this }),
+        deliver (config.deliver, devices.blue ()), publish (config.publish, devices.mqtt (), [&] () { return network.isAvailable (); }), storage (config.storage),
+        control (config.control, devices.blue ()),
+        updater (config.updater, [&] () { return network.isAvailable (); }),
+        alarmsInterface (config.alarmsInterface), alarms (config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
+        diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
         operational (this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
-        components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &network, &nettime, &deliver, &publish, &storage, &updater, &diagnostics, this }) {
+        components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
         DEBUG_PRINTF ("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
 

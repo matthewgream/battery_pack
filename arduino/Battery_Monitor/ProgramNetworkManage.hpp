@@ -27,18 +27,18 @@ private:
             _intervalConnectionCheck.reset (); _connections ++; _connected = true;
             _connectionSignalTracker.update (WiFi.RSSI ());
             DEBUG_PRINTF ("NetworkManager::events: WIFI_CONNECTED, ssid=%s, bssid=%s, channel=%d, authmode=%s, rssi=%d (%s)\n",
-                __wifi_ssid_to_string (info.wifi_sta_connected.ssid, info.wifi_sta_connected.ssid_len).c_str (),
-                __wifi_bssid_to_string (info.wifi_sta_connected.bssid).c_str (), (int) info.wifi_sta_connected.channel,
-                __wifi_authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode).c_str (), _connectionSignalTracker.rssi (), _connectionSignalTracker.toString ().c_str ());
+                _ssid_to_string (info.wifi_sta_connected.ssid, info.wifi_sta_connected.ssid_len).c_str (),
+                _bssid_to_string (info.wifi_sta_connected.bssid).c_str (), (int) info.wifi_sta_connected.channel,
+                _authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode).c_str (), _connectionSignalTracker.rssi (), _connectionSignalTracker.toString ().c_str ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP) {
             _allocations ++; _available = true;
             DEBUG_PRINTF ("NetworkManager::events: WIFI_ALLOCATED, address=%s\n", IPAddress (info.got_ip.ip_info.ip.addr).toString ().c_str ());
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
-            const String reason = __wifi_error_to_string ((wifi_err_reason_t) info.wifi_sta_disconnected.reason);
+            const String reason = _error_to_string ((wifi_err_reason_t) info.wifi_sta_disconnected.reason);
             _intervalConnectionCheck.reset (); _available = false; _connected = false; _disconnections += reason;
             DEBUG_PRINTF ("NetworkManager::events: WIFI_DISCONNECTED, ssid=%s, bssid=%s, reason=%s\n",
-                __wifi_ssid_to_string (info.wifi_sta_disconnected.ssid, info.wifi_sta_disconnected.ssid_len).c_str (),
-                __wifi_bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (), reason.c_str ());
+                _ssid_to_string (info.wifi_sta_disconnected.ssid, info.wifi_sta_disconnected.ssid_len).c_str (),
+                _bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (), reason.c_str ());
         }
     }
     static void __wiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info) {
@@ -48,7 +48,7 @@ private:
 
 public:
     explicit NetwerkManager (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
-    
+
     void begin () override {
         WiFi.persistent (false);
         WiFi.onEvent (__wiFiEventHandler);
@@ -76,12 +76,9 @@ public:
                 _connectionSignalTracker.update (WiFi.RSSI ());
                 DEBUG_PRINTF ("NetworkManager::process: rssi=%d (%s)\n", _connectionSignalTracker.rssi (), _connectionSignalTracker.toString ().c_str ());
             }
-        // } else if (!_connected && _intervalConnectionCheck) {
-        //     WiFi.disconnect (true);
-        //     connect ();
         }
     }
-    inline bool isAvailable () const {
+    bool isAvailable () const {
         return _available;
     }
 
@@ -103,13 +100,13 @@ protected:
     }
 
 private:
-    static String __wifi_ssid_to_string (const uint8_t ssid [], const uint8_t ssid_len) {
+    static String _ssid_to_string (const uint8_t ssid [], const uint8_t ssid_len) {
         return String (reinterpret_cast <const char*> (ssid), ssid_len);
     }
-    static String __wifi_bssid_to_string (const uint8_t bssid []) {
+    static String _bssid_to_string (const uint8_t bssid []) {
         return hexabyte_to_hexastring (bssid);
     }
-    static String __wifi_authmode_to_string (const wifi_auth_mode_t authmode) {
+    static String _authmode_to_string (const wifi_auth_mode_t authmode) {
         switch (authmode) {
             case WIFI_AUTH_OPEN: return "OPEN";
             case WIFI_AUTH_WEP: return "WEP";
@@ -121,7 +118,7 @@ private:
         }
     }
     // note: WiFi.disconnectReasonName
-    static String __wifi_error_to_string (const wifi_err_reason_t reason) {
+    static String _error_to_string (const wifi_err_reason_t reason) {
         switch (reason) {
             case WIFI_REASON_UNSPECIFIED: return "UNSPECIFIED";
             case WIFI_REASON_AUTH_EXPIRE: return "AUTH_EXPIRE";

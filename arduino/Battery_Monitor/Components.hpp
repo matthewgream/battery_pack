@@ -17,12 +17,6 @@ public:
     static constexpr RssiType RSSI_THRESHOLD_GOOD      = RssiType (-60);
     static constexpr RssiType RSSI_THRESHOLD_FAIR      = RssiType (-70);
 
-private:
-    const Callback _callback;
-    RssiType _rssiLast = std::numeric_limits <RssiType>::min ();
-    QualityType _qualityLast = QualityType::UNKNOWN;
-
-public:
     static QualityType signalQuality (const RssiType rssi) {
         if (rssi > RSSI_THRESHOLD_EXCELLENT) return QualityType::EXCELLENT;
         else if (rssi > RSSI_THRESHOLD_GOOD) return QualityType::GOOD;
@@ -39,6 +33,11 @@ public:
           default: return "UNDEFINED";
         }
     }
+
+private:
+    const Callback _callback;
+    RssiType _rssiLast = std::numeric_limits <RssiType>::min ();
+    QualityType _qualityLast = QualityType::UNKNOWN;
 
 public:
     explicit ConnectionSignalTracker (const Callback callback = nullptr): _callback (callback) {}
@@ -157,7 +156,7 @@ public:
 class MQTTPublisher: public JsonSerializable {
 public:
     typedef struct {
-        String client, host, user, pass, topic;
+        String client, host, user, pass;
         uint16_t port;
         uint16_t bufferSize;
     } Config;
@@ -205,7 +204,7 @@ public:
         if ((obj ["connected"] = mqttClient.connected ())) {
             //
         }
-        obj ["state"] = __mqtt_state_to_string (mqttClient.state ());
+        obj ["state"] = _state_to_string (mqttClient.state ());
         if (_bufferExceeded)
             obj ["bufferExceeded"] = _bufferExceeded;
     }
@@ -214,7 +213,7 @@ public:
     }
 
 private:
-    static String __mqtt_state_to_string (const int state) {
+    static String _state_to_string (const int state) {
         switch (state) {
           case MQTT_CONNECTION_TIMEOUT: return "CONNECTION_TIMEOUT";
           case MQTT_CONNECTION_LOST: return "CONNECTION_LOST";
@@ -264,7 +263,7 @@ private:
         }
         _totalBytes = SPIFFS.totalBytes ();
         _usedBytes = SPIFFS.usedBytes ();
-        DEBUG_PRINTF ("SPIFFSFile[%s]::begin: available=%.2f%% (totalBytes=%lu, usedBytes=%lu)\n", _filename.c_str (), (float) ((_totalBytes - _usedBytes) * 100.0) / (float) _totalBytes, _totalBytes, _usedBytes);
+        DEBUG_PRINTF ("SPIFFSFile[%s]::begin: available=%.2f%% (totalBytes=%lu, usedBytes=%lu)\n", _filename.c_str (), static_cast <float> ((_totalBytes - _usedBytes) * 100.0) / static_cast <float> (_totalBytes), _totalBytes, _usedBytes);
         _mode = MODE_CLOSED;
         return true;
     }
@@ -272,17 +271,19 @@ private:
         _file.close ();
         _mode = MODE_CLOSED;
     }
-    void _open (const mode_t mode) {
+    bool _open (const mode_t mode) {
         // MODE_WRITING and MODE_READING only
         _file = SPIFFS.open (_filename, mode == MODE_WRITING ? FILE_APPEND : FILE_READ);
         if (_file) {
             _size = _file.size ();
             _mode = mode;
             DEBUG_PRINTF ("SPIFFSFile[%s]::_open: %s, size=%ld\n", _filename.c_str (), mode == MODE_WRITING ? "WRITING" : "READING", _size);
+            return true;
         } else {
             _size = -1;
             _mode = MODE_ERROR;
             DEBUG_PRINTF ("SPIFFSFile[%s]::_open: %s, failed on SPIFFS.open (), file activity not available\n", _filename.c_str (), mode == MODE_WRITING ? "WRITING" : "READING");
+            return false;
         }
     }
     size_t _append (const char * type, const std::function <size_t ()> impl, const size_t length) {
@@ -292,8 +293,7 @@ private:
             _file.close ();
             SPIFFS.remove (_filename);
             _usedBytes = 0;
-            _open (MODE_WRITING);
-            if (_mode == MODE_ERROR)
+            if (!_open (MODE_WRITING))
                 return 0;
         }
         size_t length_actual = impl ();
@@ -341,12 +341,12 @@ public:
     }
     //
     long size () const {
-        if (_mode == MODE_CLOSED)   const_cast <SPIFFSFile *> (this)->_open (MODE_READING);
+        if (_mode == MODE_CLOSED)   if (const_cast <SPIFFSFile *> (this)->_open (MODE_READING)) const_cast <SPIFFSFile *> (this)->_close ();
         if (_mode == MODE_ERROR)    return -1;
         return _size;
     }
     float remains () const {
-        return round2places ((float) ((_totalBytes - _usedBytes) * 100.0f) / (float) _totalBytes);
+        return round2places (static_cast <float> ((_totalBytes - _usedBytes) * 100.0f) / static_cast <float> (_totalBytes));
     }
     template <typename T>
     size_t append (const T& data) {
@@ -358,7 +358,7 @@ public:
     template <typename T>
     size_t write (const T& data) {
         if (_mode == MODE_READING)  _close ();
-        if (_mode == MODE_CLOSED)   if (_erase ()) _open (MODE_WRITING);
+        if (_mode == MODE_CLOSED)   if (_erase ()) _open (MODE_WRITING); // will set ERROR
         if (_mode == MODE_ERROR)    return 0;
         return _append (data);
     }
@@ -386,14 +386,14 @@ public:
     }
     //
     void serialize (JsonVariant &obj) const override {
-        obj ["mode"] = __file_mode_to_string ((int) _mode);
+        obj ["mode"] = _mode_to_string (static_cast <int> (_mode));
         obj ["size"] = size ();
         obj ["left"] = _totalBytes - _usedBytes;
         obj ["remains"] = remains ();
     }
 
 private:
-    static String __file_mode_to_string (const int mode) {
+    static String _mode_to_string (const int mode) {
         switch (mode) {
           case 0: return "ERROR";
           case 1: return "CLOSED";

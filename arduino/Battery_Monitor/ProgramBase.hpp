@@ -128,14 +128,14 @@ public:
 private:
     const Config &config;
 
-    AlarmInterface_SinglePIN &_interface;
+    AlarmInterface &_interface;
     const Alarmable::List _alarmables;
 
     AlarmSet _alarms;
     std::array <ActivationTracker, _ALARM_COUNT> _activations, _deactivations;
 
 public:
-    AlarmManager (const Config& cfg, AlarmInterface_SinglePIN &interface, const Alarmable::List& alarmables) : config (cfg), _interface (interface), _alarmables (alarmables) {}
+    AlarmManager (const Config& cfg, AlarmInterface &interface, const Alarmable::List& alarmables) : config (cfg), _interface (interface), _alarmables (alarmables) {}
     void process () override {
         AlarmSet alarms;
         for (const auto& alarmable : _alarmables)
@@ -165,69 +165,6 @@ protected:
                     if (_cnt > 0) alarm ["cnt"] = _cnt;
                 }
             }
-    }
-};
-
-// -----------------------------------------------------------------------------------------------
-// -----------------------------------------------------------------------------------------------
-
-#include <functional>
-
-extern String ota_image_check (const String& json, const String& type, const String& vers, const String& addr);
-
-class UpdateManager: public Component, public Alarmable, public Diagnosticable {
-public:
-    typedef struct {
-        interval_t intervalUpdate;
-        time_t intervalCheck;
-        String json, type, vers;
-    } Config;
-
-    using BooleanFunc = std::function <bool ()>;
-
-private:
-    const Config& config;
-    const BooleanFunc _networkIsAvailable;
-
-    PersistentData _persistent_data;
-    PersistentValue <uint32_t> _persistent_data_previous;
-    PersistentValue <String> _persistent_data_version;
-    bool _available;
-
-    Intervalable _interval;
-
-public:
-    UpdateManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
-            AlarmCondition (ALARM_UPDATE_VERS, [this] () { return _available; })
-        }), config (cfg), _networkIsAvailable (networkIsAvailable),
-        _persistent_data ("updates"), _persistent_data_previous (_persistent_data, "previous", 0), _persistent_data_version (_persistent_data, "version", String ("")),
-        _available (!static_cast <String> (_persistent_data_version).isEmpty ()),
-        _interval (config.intervalUpdate) {}
-    void process () override {
-        if (static_cast <bool> (_interval)) {
-            if (_networkIsAvailable ()) {
-                time_t previous = (time_t) static_cast <uint32_t> (_persistent_data_previous), current = time (nullptr);
-                if ((current > 0 && (current - previous) > (config.intervalCheck / 1000)) || (previous > current)) {
-                    String version = ota_image_check (config.json, config.type, config.vers, getMacAddress ());
-                    if (_persistent_data_version != version) {
-                        _persistent_data_version = version;
-                        _available = !version.isEmpty ();
-                    }
-                    _persistent_data_previous = current;
-                }
-            }
-        }
-    }
-
-protected:
-    void collectDiagnostics (JsonVariant &obj) const override {
-        JsonObject sub = obj ["updates"].to <JsonObject> ();
-            sub ["current"] = config.vers;
-            if (_available)
-                sub ["available"] = static_cast <String> (_persistent_data_version);
-            const time_t time = (time_t) static_cast <uint32_t> (_persistent_data_previous);
-            if (time)
-                sub ["checked"] = getTimeString (time);
     }
 };
 

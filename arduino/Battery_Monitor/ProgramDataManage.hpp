@@ -2,31 +2,24 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class DeliverManager : public Component, public Alarmable, public Diagnosticable {
+class DeliverManager: public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
-        BluetoothDevice::Config blue;
         counter_t failureLimit;
     } Config;
 
 private:
     const Config &config;
 
-    BluetoothDevice _blue;
+    BluetoothDevice& _blue;
     ActivationTrackerWithDetail _delivers;
     ActivationTracker _failures;
 
 public:
-    explicit DeliverManager (const Config& cfg): Alarmable ({
+    explicit DeliverManager (const Config& cfg, BluetoothDevice& blue): Alarmable ({
             AlarmCondition (ALARM_DELIVER_FAIL, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.payloadExceeded (); })
-        }), config (cfg), _blue (cfg.blue) {}
-    void begin () override {
-        _blue.begin ();
-    }
-    void process () override {
-        _blue.process ();
-    }
+        }), config (cfg), _blue (blue) {}
     bool deliver (const String& data) {
         if (_blue.connected ()) {
             if (_blue.notify (data)) {
@@ -48,17 +41,16 @@ protected:
                 JsonObject failures = sub ["failures"].as <JsonObject> ();
                 failures ["limit"] = config.failureLimit;
             }
-            sub ["blue"] = _blue;
     }
 };
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class PublishManager : public Component, public Alarmable, public Diagnosticable {
+class PublishManager: public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
-        MQTTPublisher::Config mqtt;
+        String topic;
         counter_t failureLimit;
     } Config;
 
@@ -68,25 +60,18 @@ private:
     const Config &config;
     const BooleanFunc _networkIsAvailable;
 
-    MQTTPublisher _mqtt;
+    MQTTPublisher& _mqtt;
     ActivationTrackerWithDetail _publishes;
     ActivationTracker _failures;
 
 public:
-    explicit PublishManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
+    explicit PublishManager (const Config& cfg, MQTTPublisher& mqtt, const BooleanFunc networkIsAvailable): Alarmable ({
             AlarmCondition (ALARM_PUBLISH_FAIL, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_PUBLISH_SIZE, [this] () { return _mqtt.bufferExceeded (); })
-        }), config (cfg), _networkIsAvailable (networkIsAvailable), _mqtt (cfg.mqtt) {}
-    void begin () override {
-        _mqtt.setup ();
-    }
-    void process () override {
-        if (_networkIsAvailable ())
-            _mqtt.process ();
-    }
+        }), config (cfg), _networkIsAvailable (networkIsAvailable), _mqtt (mqtt) {}
     bool publish (const String& data, const String& subtopic) {
         if (_networkIsAvailable ()) {
-          if (_mqtt.connected () && _mqtt.publish (config.mqtt.topic + "/" + subtopic, data)) { // XXX
+          if (_mqtt.connected () && _mqtt.publish (config.topic + "/" + subtopic, data)) { // XXX
               _publishes += ArithmeticToString (data.length ());
               _failures = 0;
               return true;
@@ -94,7 +79,7 @@ public:
         }
         return false;
     }
-    inline bool connected () { return _networkIsAvailable () && _mqtt.connected (); }
+    bool connected () { return _networkIsAvailable () && _mqtt.connected (); }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
@@ -106,14 +91,13 @@ protected:
                 JsonObject failures = sub ["failures"].as <JsonObject> ();
                 failures ["limit"] = config.failureLimit;
             }
-            sub ["mqtt"] = _mqtt;
     }
 };
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class StorageManager : public Component, public Alarmable, public Diagnosticable {
+class StorageManager: public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
         String filename ;
@@ -137,7 +121,7 @@ public:
     void begin () override {
         if (!_file.begin ()) _failures ++;
     }
-    inline long size () const {
+    long size () const {
         return _file.size ();
     }
     bool append (const String& data) {
@@ -148,7 +132,7 @@ public:
         } else _failures ++;
         return false;
     }
-    inline bool retrieve (LineCallback& callback) { // XXX const
+    bool retrieve (LineCallback& callback) { // XXX const
         return _file.read (callback);
     }
     void erase () {

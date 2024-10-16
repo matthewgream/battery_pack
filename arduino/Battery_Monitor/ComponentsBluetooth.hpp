@@ -12,20 +12,52 @@
 // -----------------------------------------------------------------------------------------------
 
 class BluetoothDevice;
-class BluetoothWriteHandler {
+class BluetoothReadWriteHandler {
 public:
     virtual bool process (BluetoothDevice&, JsonDocument&) = 0;
-    virtual ~BluetoothWriteHandler () {};
-};
-
-class BluetoothWriteHandler_TypeInfo: public BluetoothWriteHandler {
-public:
-    bool process (BluetoothDevice& notifier, JsonDocument& doc) override;
+    virtual ~BluetoothReadWriteHandler () {};
 };
 
 // -----------------------------------------------------------------------------------------------
 
-class BluetoothDevice: private Singleton <BluetoothDevice>, public JsonSerializable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks {
+class BluetoothReadWriteHandler_TypeSpecific: public BluetoothReadWriteHandler {
+protected:
+    const String _type;
+public:
+    BluetoothReadWriteHandler_TypeSpecific (const String& type): _type (type) {}
+    virtual bool process (BluetoothDevice&, const String&, const String&, JsonDocument&) = 0;
+};
+class BluetoothWriteHandler_TypeSpecific: public BluetoothReadWriteHandler_TypeSpecific {
+public:
+    BluetoothWriteHandler_TypeSpecific (const String& type): BluetoothReadWriteHandler_TypeSpecific (type) {}
+    virtual bool process (BluetoothDevice&, const String&, const String&, JsonDocument&) override = 0;
+    bool process (BluetoothDevice& device, JsonDocument& doc) override {
+        const char *type = doc [_type.c_str ()], *time = doc ["time"];
+        return (type != nullptr && time != nullptr) ? process (device, String (time), _type, doc) : false;
+    }
+};
+class BluetoothReadHandler_TypeSpecific: public BluetoothReadWriteHandler_TypeSpecific {
+public:
+    BluetoothReadHandler_TypeSpecific (const String& type): BluetoothReadWriteHandler_TypeSpecific (type) {}
+    virtual bool process (BluetoothDevice&, const String&, const String&, JsonDocument&) override = 0;
+    bool process (BluetoothDevice& device, JsonDocument& doc) override {
+        const String _time = getTimeString ();
+        doc ["type"] = _type, doc ["time"] = _time;
+        return process (device, _time, _type, doc);
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+
+class BluetoothWriteHandler_TypeInfo: public BluetoothWriteHandler_TypeSpecific {
+public:
+    BluetoothWriteHandler_TypeInfo (): BluetoothWriteHandler_TypeSpecific ("info") {};
+    bool process (BluetoothDevice& device, const String& time, const String& info, JsonDocument& doc) override;
+};
+
+// -----------------------------------------------------------------------------------------------
+
+class BluetoothDevice: private Singleton <BluetoothDevice>, protected BLEServerCallbacks, protected BLECharacteristicCallbacks, public JsonSerializable {
 public:
     static inline constexpr uint16_t MIN_MTU = 32, MAX_MTU = 517;
 
@@ -42,15 +74,19 @@ private:
 
     void onConnect (BLEServer * server, esp_ble_gatts_cb_param_t *param) override {
         DEBUG_PRINTF ("BluetoothDevice::events: BLE_CONNECTED, %s (conn_id=%d, role=%s)\n",
-            __ble_address_to_string (param->connect.remote_bda).c_str (), param->connect.conn_id, __ble_linkrole_to_string (param->connect.link_role).c_str ());
+            _address_to_string (param->connect.remote_bda).c_str (), param->connect.conn_id, _linkrole_to_string (param->connect.link_role).c_str ());
         _connected (param->connect.conn_id, param->connect.remote_bda);
     }
     void onMtuChanged (BLEServer *, esp_ble_gatts_cb_param_t *param) override {
         DEBUG_PRINTF ("BluetoothDevice::events: BLE_MTU_CHANGED, (conn_id=%d, mtu=%u)\n", param->mtu.conn_id, param->mtu.mtu);
         _connected_mtuChanged (param->mtu.mtu);
     }
-    void onRead (BLECharacteristic *characteristic, esp_ble_gatts_cb_param_t *) override {
-        DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_READ, (uuid=%s, value=%s)\n", characteristic->getUUID ().toString ().c_str (), characteristic->getValue ().c_str ());
+    void onRead (BLECharacteristic *characteristic, esp_ble_gatts_cb_param_t * param) override {
+        // param->offset, param->is_long
+        DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_READ, (uuid=%s, offset=%d, is_long=%d)\n", characteristic->getUUID ().toString ().c_str (), param->read.offset, param->read.is_long);
+        String str;
+        _connected_readRequested (str);
+        if (!str.isEmpty ()) characteristic->setValue (str.c_str ());
     }
     void onWrite (BLECharacteristic *characteristic, esp_ble_gatts_cb_param_t *) override {
         // param->write.offset, param->write.len, param->write.value
@@ -62,12 +98,12 @@ private:
     }
     void onStatus (BLECharacteristic *characteristic, Status s, uint32_t code) override {
         if (s != BLECharacteristicCallbacks::Status::SUCCESS_NOTIFY)
-            DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_STATUS, (uuid=%s, status=%s. code=%lu)\n", characteristic->getUUID ().toString ().c_str (), __ble_status_to_string (s).c_str (), code);
+            DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_STATUS, (uuid=%s, status=%s. code=%lu)\n", characteristic->getUUID ().toString ().c_str (), _status_to_string (s).c_str (), code);
     }
     void onDisconnect (BLEServer *, esp_ble_gatts_cb_param_t *param) override {
-        const String reason = __ble_disconnect_reason ((esp_gatt_conn_reason_t) param->disconnect.reason);
+        const String reason = _disconnect_reason_to_string ((esp_gatt_conn_reason_t) param->disconnect.reason);
         DEBUG_PRINTF ("BluetoothDevice::events: BLE_DISCONNECTED, %s (conn_id=%d, reason=%s)\n",
-            __ble_address_to_string (param->disconnect.remote_bda).c_str (), param->disconnect.conn_id, reason.c_str ());
+            _address_to_string (param->disconnect.remote_bda).c_str (), param->disconnect.conn_id, reason.c_str ());
         _disconnected (param->disconnect.conn_id, param->disconnect.remote_bda, reason);
     }
     void events (const esp_gap_ble_cb_event_t event, const esp_ble_gap_cb_param_t *param) {
@@ -136,7 +172,7 @@ private:
     class ConnectionWriteManager {
     public:
         using Queue = QueueSimpleConcurrentSafe <String>;
-        using Handlers = std::map <String, std::shared_ptr <BluetoothWriteHandler>>;
+        using Handlers = std::map <String, std::shared_ptr <BluetoothReadWriteHandler>>;
     private:
         BluetoothDevice* const _device;
         Queue _queue;
@@ -161,7 +197,12 @@ private:
         }
     public:
         ActivationTrackerWithDetail _failures;
-        explicit ConnectionWriteManager (BluetoothDevice* device, const Handlers& handlers): _device (device), _handlers (handlers) {}
+        explicit ConnectionWriteManager (BluetoothDevice* device): _device (device) {}
+        ConnectionWriteManager& operator += (const Handlers& handlers) {
+            for (auto const& handler : handlers)
+              _handlers.insert (handler);
+            return *this;
+        }
         void insert (const String& str) {
             _queue.push (str);
         }
@@ -170,12 +211,36 @@ private:
             while (_queue.pull (str)) {
                 DEBUG_PRINTF ("BluetoothDeviceWriteManager::process: content=<<<%s>>>\n", str.c_str ());
                 if (str.startsWith ("{\"type\""))
-                  processJson (str);
+                    processJson (str);
                 else _failures += String ("write failed to identify as Json or have leading 'type'");
             }
         }
         void drain () {
             _queue.drain ();
+        }
+    };
+
+    //
+
+    class ConnectionReadManager {
+    public:
+        using Handlers = std::vector <std::shared_ptr <BluetoothReadWriteHandler>>;
+    private:
+        BluetoothDevice* const _device;
+        Handlers _handlers;
+    public:
+        explicit ConnectionReadManager (BluetoothDevice* device): _device (device) {}
+        ConnectionReadManager& operator += (const Handlers& handlers) {
+            for (auto const& handler : handlers)
+              _handlers.push_back (handler);
+            return *this;
+        }
+        void process (String& str) {
+            JsonDocument doc;
+            for (auto& handler : _handlers)
+                handler->process (*_device, doc);
+            if (doc.size ())
+                serializeJson (doc, str);
         }
     };
 
@@ -212,6 +277,7 @@ private:
     Intervalable _connectionActiveChecker;
     ConnectionSignalTracker _connectionSignalTracker;
     ConnectionWriteManager _connectionWriteManager;
+    ConnectionReadManager _connectionReadManager;
     ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
     bool _connectionActive = false;
     void _connect () {
@@ -244,6 +310,11 @@ private:
     void _connected_writeReceived (const String& str) {
         if (_connectionActive) {
             _connectionWriteManager.insert (str);
+        }
+    }
+    void _connected_readRequested (String& str) {
+        if (_connectionActive) {
+            _connectionReadManager.process (str);
         }
     }
     bool _connected_notify (const String& data) {
@@ -299,10 +370,13 @@ private:
 
 public:
     explicit BluetoothDevice (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr): Singleton <BluetoothDevice> (this), config (cfg),
-         _connectionActiveChecker (config.intervalConnectionCheck), _connectionSignalTracker (connectionSignalCallback), 
-         _connectionWriteManager (this, {
-            { String ("info"), std::make_shared <BluetoothWriteHandler_TypeInfo> () }
-        }) {}
+         _connectionActiveChecker (config.intervalConnectionCheck), _connectionSignalTracker (connectionSignalCallback),
+         _connectionWriteManager (this), _connectionReadManager (this) {
+        insert ({ { String ("info"), std::make_shared <BluetoothWriteHandler_TypeInfo> () } });
+    }
+
+    void insert (const ConnectionWriteManager::Handlers& handlers) { _connectionWriteManager += handlers; }
+    void insert (const ConnectionReadManager::Handlers& handlers) { _connectionReadManager += handlers; }
 
     void begin () {
         _serverInitAndStartService ();
@@ -310,13 +384,13 @@ public:
         _connect ();
     }
     // json only
-    inline bool notify (const String& data) {
+    bool notify (const String& data) {
         return _connected_notify (data);
     }
-    inline bool payloadExceeded () const {
+    bool payloadExceeded () const {
         return _notify_payloadExceeded > 0;
     }
-    inline bool connected () const {
+    bool connected () const {
         return _connectionActive;
     }
     void process () {
@@ -330,7 +404,7 @@ public:
     //
     void serialize (JsonVariant &obj) const override {
         if ((obj ["connected"] = _connectionActive)) {
-            obj ["address"] = __ble_address_to_string (_peerAddress);
+            obj ["address"] = _address_to_string (_peerAddress);
             if (!_peerDetails.isEmpty ())
                 obj ["details"] = _peerDetails;
             obj ["mtu"] = _peerMtu;
@@ -347,7 +421,7 @@ public:
     }
 
 private:
-    static String __ble_disconnect_reason (const esp_gatt_conn_reason_t reason) {
+    static String _disconnect_reason_to_string (const esp_gatt_conn_reason_t reason) {
         switch (reason) {
           case ESP_GATT_CONN_UNKNOWN: return "UNKNOWN";
           case ESP_GATT_CONN_L2C_FAILURE: return "L2C_FAILURE";
@@ -361,13 +435,13 @@ private:
           default: return "UNDEFINED_(" + ArithmeticToString (static_cast <int> (reason)) + ")";
         }
     }
-    static String __ble_address_to_string (const esp_bd_addr_t bleaddr) {
+    static String _address_to_string (const esp_bd_addr_t bleaddr) {
         return hexabyte_to_hexastring (bleaddr);
     }
-    static String __ble_linkrole_to_string (const int linkrole) {
+    static String _linkrole_to_string (const int linkrole) {
         return linkrole == 0 ? "master" : "slave";
     }
-    static String __ble_status_to_string (const BLECharacteristicCallbacks::Status status) {
+    static String _status_to_string (const BLECharacteristicCallbacks::Status status) {
         switch (status) {
           case BLECharacteristicCallbacks::Status::ERROR_NO_CLIENT: return "NO_CLIENT";
           case BLECharacteristicCallbacks::Status::ERROR_NOTIFY_DISABLED: return "NOTIFY_DISABLED";
@@ -383,14 +457,10 @@ private:
 
 // -----------------------------------------------------------------------------------------------
 
-bool BluetoothWriteHandler_TypeInfo::process (BluetoothDevice& device, JsonDocument& doc) {
-    const char *time = doc ["time"], *info = doc ["info"];
-    if (time != nullptr && info != nullptr) {
-        device._peerDetails = info;
-        DEBUG_PRINTF ("BluetoothWriteHandler_TypeInfo:: type=info, time=%s, info='%s'\n", time, info);
-        return true;
-    }
-    return false;
+bool BluetoothWriteHandler_TypeInfo::process (BluetoothDevice& device, const String& time, const String& info, JsonDocument& doc) {
+    device._peerDetails = info;
+    DEBUG_PRINTF ("BluetoothWriteHandler_TypeInfo:: type=info, time=%s, info='%s'\n", time.c_str (), info.c_str ());
+    return true;
 }
 
 // -----------------------------------------------------------------------------------------------

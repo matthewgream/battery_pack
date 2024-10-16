@@ -4,10 +4,11 @@
 
 #include <Arduino.h>
 
-class AlarmInterface_SinglePIN {
+class ActivablePIN {
 public:
     typedef struct {
-        int PIN_ALARM;
+        int PIN;
+        uint8_t ACTIVE;
     } Config;
 
 private:
@@ -16,17 +17,17 @@ private:
     bool _enabled = false;
 
 public:
-    explicit AlarmInterface_SinglePIN (const Config& cfg) : config (cfg) {
-        if (config.PIN_ALARM >= 0) {
-            pinMode (config.PIN_ALARM, OUTPUT);
-            digitalWrite (config.PIN_ALARM, LOW); // Active HIGH
+    explicit ActivablePIN (const Config& cfg) : config (cfg) {
+        if (config.PIN >= 0) {
+            pinMode (config.PIN, OUTPUT);
+            digitalWrite (config.PIN, !config.ACTIVE);
         }
     }
 
     void set (const bool enabled) {
-        if (config.PIN_ALARM >= 0)
+        if (config.PIN >= 0)
             if (enabled != _enabled) {
-                digitalWrite (config.PIN_ALARM, enabled ? HIGH : LOW); // Active HIGH
+                digitalWrite (config.PIN, enabled ? config.ACTIVE : !config.ACTIVE);
                 _enabled = enabled;
             }
     }
@@ -42,12 +43,12 @@ class TemperatureSensor_DS18B20 {
 public:
     typedef struct {
         int PIN_DAT;
+        int INDEX;
     } Config;
 
 private:
     const Config& config;
 
-    static inline constexpr int DS1820_INDEX = 0;
     OneWire oneWire;
     DallasTemperature sensors;
     bool _available;
@@ -57,7 +58,7 @@ public:
     explicit TemperatureSensor_DS18B20 (const Config& cfg): config (cfg), oneWire (config.PIN_DAT), sensors (&oneWire) {
         sensors.begin ();
         DEBUG_PRINTF ("TemperatureSensor_DS18B20::init: (DAT=%d) found %d devices on bus, %d are DS18", config.PIN_DAT, sensors.getDeviceCount (), sensors.getDS18Count ());
-        if ((_available = sensors.getAddress (_address, DS1820_INDEX)))
+        if ((_available = sensors.getAddress (_address, config.INDEX)))
             DEBUG_PRINTF (" [0] = %s", __ds1820_address_to_string (_address).c_str ());
         DEBUG_PRINTF ("\n");
     }
@@ -211,20 +212,20 @@ public:
         DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::init: device %s i2c (address=0x%x, sda=%d, scl=%d, status=%d), pwm (resolution=%d, frequency=%d) \n", (_status == 0 ? "connected" : "unresponsive"), config.I2C_ADDR, config.PIN_I2C_SDA, config.PIN_I2C_SCL, _status, MotorSpeedResolution, config.frequency);
     }
     void setSpeed (const MotorSpeedType speed, const int motorID = MOTOR_ALL) {
-        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setSpeed: %s -> %d\n", __osqmd_motorid_to_string (motorID).c_str (), speed);
+        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setSpeed: %s -> %d\n", _motorid_to_string (motorID).c_str (), speed);
         applySpeed (motorID, speed);
     }
     void setDirection (const MotorDirection direction, const int motorID = MOTOR_ALL) {
-        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setDirection: %s -> %s\n", __osqmd_motorid_to_string (motorID).c_str (), (direction == MOTOR_CLOCKWISE) ? "CLOCKWISE" : "ANTICLOCKWISE");
+        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setDirection: %s -> %s\n", _motorid_to_string (motorID).c_str (), (direction == MOTOR_CLOCKWISE) ? "CLOCKWISE" : "ANTICLOCKWISE");
         applyDirections (motorID, (direction == MOTOR_CLOCKWISE) ? MOTOR_CONTROL_CLOCKWISE : MOTOR_CONTROL_ANTICLOCKWISE);
     }
     void stop (const int motorID = MOTOR_ALL) {
-        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::stop: %s\n", __osqmd_motorid_to_string (motorID).c_str ());
+        DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::stop: %s\n", _motorid_to_string (motorID).c_str ());
         applyDirections (motorID, MOTOR_CONTROL_OFF);
     }
 
 private:
-    static String __osqmd_motorid_to_string (const int motorId) {
+    static String _motorid_to_string (const int motorId) {
         switch (motorId) {
             case -1: return "ABCD";
             case 0: return "A";
