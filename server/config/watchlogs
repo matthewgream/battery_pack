@@ -1,2 +1,2 @@
 #!/usr/bin/bash
-/usr/bin/mosquitto_sub -t BatteryMonitor/logs
+/usr/bin/mosquitto_sub -F '@Y-@m-@dT@H:@M:@S@z: %p' -t BatteryMonitor/logs
