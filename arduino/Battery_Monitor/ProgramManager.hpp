@@ -127,8 +127,7 @@ private:
         if (__debugPrintfBuffer_Offset == (__debugPrintBuffer_Length - 1) || (__debugPrintfBuffer_Offset > 0 && __debugPrintfBuffer_Content [__debugPrintfBuffer_Offset - 1] == '\n')) {
             while (__debugPrintfBuffer_Offset > 0 && __debugPrintfBuffer_Content [__debugPrintfBuffer_Offset - 1] == '\n')
                 __debugPrintfBuffer_Content [-- __debugPrintfBuffer_Offset] = '\0';
-            if (__debugPrintfBuffer_Content [__debugPrintfBuffer_Offset] != '\0')
-                __debugPrintfBuffer_Content [__debugPrintfBuffer_Offset] = '\0';
+            __debugPrintfBuffer_Content [__debugPrintfBuffer_Offset] = '\0';
             __debugPrintfBuffer_Offset = 0;
 
             auto control = Singleton <ControlManager>::instance ();
