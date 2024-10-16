@@ -123,7 +123,7 @@ struct Config {
 
     // program
     ControlManager::Config control = {
-        .debugLoggerSerial = true, .debugLoggerMQTT = true, .debugLoggerMQTTTopic = DEFAULT_NAME
+        .logging = { .debugLoggerSerial = true, .debugLoggerMQTT = true, .debugLoggerMQTTTopic = DEFAULT_NAME }
     };
     UpdateManager::Config updater = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS };
     AlarmManager::Config alarms = { }; ActivablePIN::Config alarmsInterface = { .PIN = -1, .ACTIVE = LOW };

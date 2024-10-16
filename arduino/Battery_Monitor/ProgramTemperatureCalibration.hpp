@@ -322,7 +322,7 @@ public:
                 auto name = factory.first, strategy = factory.second ();
                 const String faults = strategy->calibrate (collection.temperatures, collection.resistances [sensor]);
                 if (faults.isEmpty ()) {
-                    auto stats = strategy->calculateStatsErrors (collection.temperatures, collection.resistances [sensor]);
+                    DEBUG_ONLY (auto stats = strategy->calculateStatsErrors (collection.temperatures, collection.resistances [sensor]));
                     DEBUG_PRINTF ("%s%s (okay, error avg=%.4f,max=%.4f,min=%.4f)", calibrations [sensor].size () > 0 ? ", ": "", name.c_str (), stats.avg (), stats.max (), stats.min ());
                     calibrations [sensor].push_back (strategy);
                 } else {
@@ -444,11 +444,13 @@ private:
 public:
     TemperatureCalibrationRuntime (const StrategyDefault& defaultStrategy, const CalibrationStrategies& calibrationStrategies): defaultStrategy (defaultStrategy), calibrationStrategies (calibrationStrategies) {
         DEBUG_PRINTF ("TemperatureCalibrationRuntime::init: default [%s", defaultStrategy.getDetails ().c_str ());
-        for (int index = 0; index < calibrationStrategies.size (); index ++) {
-            DEBUG_PRINTF ("], %d [", index); int count = 0;
-            for (const auto& strategy : calibrationStrategies [index])
-                DEBUG_PRINTF ("%s%s", count ++ == 0 ? "" : ",", strategy->getName ().c_str ());
-        }
+        DEBUG_ONLY (\
+          for (int index = 0; index < calibrationStrategies.size (); index ++) { \
+            DEBUG_PRINTF ("], %d [", index); int count = 0; \
+            for (const auto& strategy : calibrationStrategies [index]) \
+                DEBUG_PRINTF ("%s%s", count ++ == 0 ? "" : ",", strategy->getName ().c_str ()); \
+          } \
+        );
         DEBUG_PRINTF ("]\n");
     }
 
