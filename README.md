@@ -6,7 +6,7 @@
 <table>
   <tr><td>
     
-![Android](materials/v1_0_0_android.mp4)
+<video src="materials/v1_0_0_android.mp4"></video>
 
   </td><td>
   </td></tr>
