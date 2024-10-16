@@ -2,6 +2,31 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+#include <Arduino.h>
+
+#define DEBUG
+#ifdef DEBUG
+#ifndef DEBUG_OLD
+    typedef void (*__DebugPrintfFunc) (const char*, ...);
+    __DebugPrintfFunc __debugPrintfFunc = NULL;
+    void __debugPrintfDefault (const char* format, ...) { va_list args; va_start (args, format); Serial.vprintf (format, args); va_end (args); }
+    void __debugPrintfSet (__DebugPrintfFunc func = NULL) { __debugPrintfFunc = func; }
+    #define DEBUG_START(...) do { Serial.begin (DEFAULT_SERIAL_BAUD); __debugPrintfFunc = __debugPrintfDefault; } while (0)
+    #define DEBUG_END(...) do { __debugPrintfFunc = NULL; Serial.flush (); Serial.end (); } while (0)
+    #define DEBUG_PRINTF(...) do { if (__debugPrintfFunc) __debugPrintfFunc (__VA_ARGS__); } while (0)
+#else
+    #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD);
+    #define DEBUG_END(...) Serial.flush (); Serial.end ();
+    #define DEBUG_PRINTF Serial.printf
+#endif    
+#else
+    #define DEBUG_START(...)
+    #define DEBUG_END(...)
+    #define DEBUG_PRINTF(...) do {} while (0)
+#endif
+
+// -----------------------------------------------------------------------------------------------
+
 #include "Program.hpp"
 #include "Factory.hpp"
 
@@ -30,6 +55,9 @@ Program *program;
 Watchdog watchdog (DEFAULT_WATCHDOG_SECS);
 
 void setup () {
+
+    delay (DEFAULT_INITIAL_DELAY);
+
     DEBUG_START ();
     const std::pair <String, String> r = getResetDetails ();
     DEBUG_PRINTF ("\n[%s: %s]", r.first.c_str (), r.second.c_str ());

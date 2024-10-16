@@ -52,6 +52,8 @@ public:
 private:
     const Config &config;
 
+    DeviceManager& _devices;
+
     class BluetoothWriteHandler_TypeCtrl: public BluetoothWriteHandler_TypeSpecific {
     public:
         BluetoothWriteHandler_TypeCtrl (): BluetoothWriteHandler_TypeSpecific ("ctrl") {};
@@ -77,10 +79,27 @@ private:
         }
     };
 
+    #ifdef DEBUG
+    static void __debugPrintfMQTT (const char* format, ...) {
+        char buffer [256+1];
+        va_list args;
+        va_start (args, format);
+        vsnprintf (buffer, sizeof (buffer), format, args);
+        va_end (args);
+        Serial.print (buffer);
+        // Send to MQTT
+    }
+    #endif
+
 public:
-    explicit ControlManager (const Config& cfg, BluetoothDevice& blue): config (cfg) {
-        blue.insert ({ { String ("ctrl"), std::make_shared <BluetoothWriteHandler_TypeCtrl> () } });
-        blue.insert ({ { std::make_shared <BluetoothReadHandler_TypeCtrl> () } });
+    explicit ControlManager (const Config& cfg, DeviceManager& devices): config (cfg), _devices (devices) {
+        _devices.blue ().insert ({ { String ("ctrl"), std::make_shared <BluetoothWriteHandler_TypeCtrl> () } });
+        _devices.blue ().insert ({ { std::make_shared <BluetoothReadHandler_TypeCtrl> () } });
+
+        // XXX intercept debug printf and send to mqtt or send to console
+#ifdef DEBUG        
+        __debugPrintfSet (__debugPrintfMQTT);
+#endif
     }
 
 protected:

@@ -332,6 +332,15 @@ private:
         }
         return true;
     }
+    void _ssize () {
+        _file = SPIFFS.open (_filename, FILE_READ);
+        if (_file) {
+            _size = _file.size ();
+            _file.close ();
+        } else
+            _size = 0;
+    }
+
 
 public:
     explicit SPIFFSFile (const String& filename): _filename (filename) {}
@@ -341,7 +350,7 @@ public:
     }
     //
     long size () const {
-        if (_mode == MODE_CLOSED)   if (const_cast <SPIFFSFile *> (this)->_open (MODE_READING)) const_cast <SPIFFSFile *> (this)->_close ();
+        if (_mode == MODE_CLOSED)   if (_size < 0) const_cast <SPIFFSFile *> (this)->_ssize (); // zero if not exists
         if (_mode == MODE_ERROR)    return -1;
         return _size;
     }

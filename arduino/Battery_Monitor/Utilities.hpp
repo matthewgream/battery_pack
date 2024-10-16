@@ -2,21 +2,6 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-#include <Arduino.h>
-
-#define DEBUG
-#ifdef DEBUG
-    #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD); delay (5*1000L);
-    #define DEBUG_END(...) Serial.flush (); Serial.end ();
-    #define DEBUG_PRINTF(...) Serial.printf (__VA_ARGS__)
-#else
-    #define DEBUG_START(...)
-    #define DEBUG_END(...)
-    #define DEBUG_PRINTF(...) do {} while (0)
-#endif
-
-// -----------------------------------------------------------------------------------------------
-
 String hexabyte_to_hexastring (const uint8_t bytes []) {
     char buffer [3*6+1];
     sprintf (buffer, "%02x:%02x:%02x:%02x:%02x:%02x", bytes [0], bytes [1], bytes [2], bytes [3], bytes [4], bytes [5]);
