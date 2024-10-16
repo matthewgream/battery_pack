@@ -15,13 +15,13 @@ process_file() {
         rm "$temp_file"
     fi
 }
-files=$(find . -type f \( -name "*.hpp" -o -name "*.ino" \))
+files=`ls *.ino *.[ch]pp`
 for file in $files; do
     process_file "$file"
 done
 
 jscpd $files
 
-cppcheck --enable=all --suppress=postfixOperator --suppress=syntaxError:Utilities.hpp --suppress=unusedStructMember:ProgramTemperatureCalibration.hpp --suppress=useStlAlgorithm:ProgramBase.hpp --suppress=missingIncludeSystem --std=c++21 $files
+cppcheck --force --enable=all --suppress=postfixOperator --suppress=syntaxError:Utilities.hpp --suppress=unusedStructMember:ProgramTemperatureCalibration.hpp --suppress=useStlAlgorithm:ProgramBase.hpp --suppress=missingIncludeSystem --std=c++21 $files
 
 egrep -n '^[^/].*[^ ] {2,}[^ ]' $files | egrep -v '^\s*\/\/'

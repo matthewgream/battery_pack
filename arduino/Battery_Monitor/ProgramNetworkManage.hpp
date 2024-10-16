@@ -78,7 +78,7 @@ public:
             }
         }
     }
-    bool isAvailable () const {
+    bool available () const {
         return _available;
     }
 
