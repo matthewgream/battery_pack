@@ -122,7 +122,9 @@ struct Config {
     };
 
     // program
-    ControlManager::Config control = { };
+    ControlManager::Config control = {
+        .debugLoggingToSerial = true, .debugLoggingToMQTT = true, .debugLoggingTopic = DEFAULT_NAME
+    };
     UpdateManager::Config updater = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS };
     AlarmManager::Config alarms = { }; ActivablePIN::Config alarmsInterface = { .PIN = -1, .ACTIVE = LOW };
     DiagnosticManager::Config diagnostics = { };

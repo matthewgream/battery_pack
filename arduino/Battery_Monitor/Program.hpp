@@ -2,7 +2,6 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-#define DEFAULT_SERIAL_BAUD 115200
 #define DEFAULT_WATCHDOG_SECS 60
 #define DEFAULT_INITIAL_DELAY 5*1000L
 
@@ -159,7 +158,8 @@ class Program: public Component, public Diagnosticable {
     Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
     void process () override {
         const bool deliverTo = intervalDeliver, captureTo = intervalCapture, diagnoseTo = intervalDiagnose;
-        DEBUG_PRINTF ("\nProgram::process: deliver=%d, capture=%d, diagnose=%d\n", deliverTo, captureTo, diagnoseTo);
+        DEBUG_PRINTF ("\n");
+        DEBUG_PRINTF ("Program::process: deliver=%d, capture=%d, diagnose=%d\n", deliverTo, captureTo, diagnoseTo);
         if (deliverTo || captureTo) {
             const String data = doCollect ("data", [&] (JsonVariant& obj) { operational.collect (obj); });
             if (deliverTo) doDeliver (data);
@@ -189,7 +189,7 @@ public:
         devices (config.devices, [&] () { return network.isAvailable (); }),
         network (config.network), nettime (config.nettime, [&] () { return network.isAvailable (); }),
         deliver (config.deliver, devices.blue ()), publish (config.publish, devices.mqtt (), [&] () { return network.isAvailable (); }), storage (config.storage),
-        control (config.control, devices),
+        control (config.control, devices, [&] () { return network.isAvailable (); }),
         updater (config.updater, [&] () { return network.isAvailable (); }),
         alarmsInterface (config.alarmsInterface), alarms (config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
         diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),

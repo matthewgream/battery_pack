@@ -44,15 +44,25 @@ protected:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class ControlManager: public Component, public Diagnosticable {
+#ifdef DEBUG
+#include <mutex>
+#endif
+
+class ControlManager: private Singleton <ControlManager>, public Component, public Diagnosticable {
 public:
     typedef struct {
+        bool debugLoggingToSerial;
+        bool debugLoggingToMQTT;
+        String debugLoggingTopic;
     } Config;
+
+    using BooleanFunc = std::function <bool ()>;
 
 private:
     const Config &config;
 
     DeviceManager& _devices;
+    const BooleanFunc _networkIsAvailable;
 
     class BluetoothWriteHandler_TypeCtrl: public BluetoothWriteHandler_TypeSpecific {
     public:
@@ -79,33 +89,73 @@ private:
         }
     };
 
-    #ifdef DEBUG
+#ifdef DEBUG
+    char _debugLoggingTopic [64+1];
+    void logger_init () {
+        snprintf (_debugLoggingTopic, sizeof (_debugLoggingTopic) - 1, "%s/logs", config.debugLoggingTopic.c_str ());
+        if (config.debugLoggingToMQTT) {
+            __debugPrintfSet (__debugPrintfMQTT);
+            DEBUG_PRINTF ("ControlManager::init: logging to Serial and MQTT (as topic '%s' when online)\n", _debugLoggingTopic);
+        } else if (config.debugLoggingToSerial) {
+            __debugPrintfSet (__debugPrintfSerial);
+            DEBUG_PRINTF ("ControlManager::init: logging to Serial\n");
+        }
+    }
+    void logger_send (const char *line) {
+        if (config.debugLoggingToSerial)
+            Serial.println (line);
+        if (line [0] != '\0' && config.debugLoggingToMQTT && _networkIsAvailable () && _devices.mqtt ().connected ())
+            _devices.mqtt ().publish_fast (_debugLoggingTopic, line);
+    }
+
+    static std::mutex __debugPrintfBuffer_Mutex;
+    #define __debugPrintBuffer_Length (512+1)
+    static char __debugPrintfBuffer_Content [__debugPrintBuffer_Length];
+    static int __debugPrintfBuffer_Offset;
     static void __debugPrintfMQTT (const char* format, ...) {
-        char buffer [256+1];
+        
+        std::lock_guard <std::mutex> guard (__debugPrintfBuffer_Mutex);
+
         va_list args;
         va_start (args, format);
-        vsnprintf (buffer, sizeof (buffer), format, args);
+        int printed = vsnprintf (__debugPrintfBuffer_Content + __debugPrintfBuffer_Offset, (__debugPrintBuffer_Length - __debugPrintfBuffer_Offset), format, args);
         va_end (args);
-        Serial.print (buffer);
-        // Send to MQTT
+        if (printed < 0)
+            return;
+
+        __debugPrintfBuffer_Offset = (printed >= (__debugPrintBuffer_Length - __debugPrintfBuffer_Offset)) ? (__debugPrintBuffer_Length - 1) : (__debugPrintfBuffer_Offset + printed);
+        if (__debugPrintfBuffer_Offset == (__debugPrintBuffer_Length - 1) || (__debugPrintfBuffer_Offset > 0 && __debugPrintfBuffer_Content [__debugPrintfBuffer_Offset - 1] == '\n')) {
+            while (__debugPrintfBuffer_Offset > 0 && __debugPrintfBuffer_Content [__debugPrintfBuffer_Offset - 1] == '\n')
+                __debugPrintfBuffer_Content [-- __debugPrintfBuffer_Offset] = '\0';
+            if (__debugPrintfBuffer_Content [__debugPrintfBuffer_Offset] != '\0')
+                __debugPrintfBuffer_Content [__debugPrintfBuffer_Offset] = '\0';
+            __debugPrintfBuffer_Offset = 0;
+
+            auto control = Singleton <ControlManager>::instance ();
+            if (control) control->logger_send (__debugPrintfBuffer_Content);  
+        }
     }
-    #endif
+#else
+    void logger_init () {}
+#endif
 
 public:
-    explicit ControlManager (const Config& cfg, DeviceManager& devices): config (cfg), _devices (devices) {
+    explicit ControlManager (const Config& cfg, DeviceManager& devices, const BooleanFunc networkIsAvailable): Singleton <ControlManager> (this), config (cfg), _devices (devices), _networkIsAvailable (networkIsAvailable) {
         _devices.blue ().insert ({ { String ("ctrl"), std::make_shared <BluetoothWriteHandler_TypeCtrl> () } });
         _devices.blue ().insert ({ { std::make_shared <BluetoothReadHandler_TypeCtrl> () } });
-
-        // XXX intercept debug printf and send to mqtt or send to console
-#ifdef DEBUG        
-        __debugPrintfSet (__debugPrintfMQTT);
-#endif
+        logger_init ();
     }
 
 protected:
     void collectDiagnostics (JsonVariant &) const override {
     }
 };
+
+#ifdef DEBUG
+std::mutex ControlManager::__debugPrintfBuffer_Mutex;
+char ControlManager::__debugPrintfBuffer_Content [512+1];
+int ControlManager::__debugPrintfBuffer_Offset = 0;
+#endif
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------

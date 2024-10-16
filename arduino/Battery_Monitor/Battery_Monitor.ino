@@ -5,14 +5,25 @@
 #include <Arduino.h>
 
 #define DEBUG
+#define DEBUG_PRINTF_INITIAL_SERIAL
+#define DEBUG_PRINTF_SERIAL_BAUD 115200
+
 #ifdef DEBUG
 #ifndef DEBUG_OLD
     typedef void (*__DebugPrintfFunc) (const char*, ...);
     __DebugPrintfFunc __debugPrintfFunc = NULL;
-    void __debugPrintfDefault (const char* format, ...) { va_list args; va_start (args, format); Serial.vprintf (format, args); va_end (args); }
-    void __debugPrintfSet (__DebugPrintfFunc func = NULL) { __debugPrintfFunc = func; }
-    #define DEBUG_START(...) do { Serial.begin (DEFAULT_SERIAL_BAUD); __debugPrintfFunc = __debugPrintfDefault; } while (0)
-    #define DEBUG_END(...) do { __debugPrintfFunc = NULL; Serial.flush (); Serial.end (); } while (0)
+    void __debugPrintfSerial (const char* format, ...) { va_list args; va_start (args, format); Serial.vprintf (format, args); va_end (args); }
+    void __debugPrintfSet (__DebugPrintfFunc func = NULL) {
+        if (func == __debugPrintfSerial && __debugPrintfFunc != __debugPrintfSerial) Serial.begin (DEBUG_PRINTF_SERIAL_BAUD);
+        else if (func == NULL && __debugPrintfFunc == __debugPrintfSerial) Serial.flush (), Serial.end ();
+        __debugPrintfFunc = func;
+    }
+#ifdef DEBUG_PRINTF_INITIAL_SERIAL    
+    #define DEBUG_START(...) __debugPrintfSet (__debugPrintfSerial)
+#else
+    #define DEBUG_START(...) do {} while (0)
+#endif
+    #define DEBUG_END(...) __debugPrintfSet ()
     #define DEBUG_PRINTF(...) do { if (__debugPrintfFunc) __debugPrintfFunc (__VA_ARGS__); } while (0)
 #else
     #define DEBUG_START(...) Serial.begin (DEFAULT_SERIAL_BAUD);
