@@ -205,7 +205,7 @@ class Intervalable {
     interval_t _interval, _previous;
 
 public:
-    explicit Intervalable (const interval_t interval = 0) : _interval (interval), _previous (0) {}
+    explicit Intervalable (const interval_t interval = 0, const interval_t previous = 0) : _interval (interval), _previous (previous) {}
     operator bool () {
         const interval_t current = millis ();
         if (current - _previous > _interval) {

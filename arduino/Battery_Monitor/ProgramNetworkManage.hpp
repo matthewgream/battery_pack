@@ -59,7 +59,7 @@ public:
     }
     void connect () {
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
-        DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddress ().c_str (), config.client.c_str ());
+        DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddressWifi ().c_str (), config.client.c_str ());
     }
     void reset () {
         DEBUG_PRINTF ("NetworkManager::reset\n");
@@ -85,7 +85,7 @@ public:
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["network"].to <JsonObject> ();
-            sub ["macaddr"] = getMacAddress ();
+            sub ["macaddr"] = getMacAddressWifi ();
             if ((sub ["connected"] = _connected)) {
                 if ((sub ["available"] = _available))
                     sub ["ipaddr"] = WiFi.localIP ();

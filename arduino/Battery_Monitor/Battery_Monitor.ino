@@ -102,6 +102,7 @@ void setup () {
 }
 
 void loop () {
+    DEBUG_PRINTF ("***\n");
     exception_catcher ([&] () {
         program->loop ();
         program->sleep ();

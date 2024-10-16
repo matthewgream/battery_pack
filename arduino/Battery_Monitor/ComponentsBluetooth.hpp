@@ -155,14 +155,15 @@ private:
         if (!_advertisingActive) {
             _server->getAdvertising ()->start ();
             _advertisingActive = true;
-            DEBUG_PRINTF ("BluetoothDevice::advertising start\n");
+            DEBUG_PRINTF ("BluetoothDevice::advertise: start, name=%s, pin=%d, mac=%s\n", config.name.c_str (), config.pin, getMacAddressBlue ().c_str ());
+
         }
     }
     void _advertisingDisable () {
         if (_advertisingActive) {
             _server->getAdvertising ()->stop ();
             _advertisingActive = false;
-            DEBUG_PRINTF ("BluetoothDevice::advertising stop\n");
+            DEBUG_PRINTF ("BluetoothDevice::advertise: stop\n");
         }
     }
 
@@ -388,8 +389,8 @@ public:
     bool payloadExceeded () const {
         return _notify_payloadExceeded > 0;
     }
-    bool connected () const {
-        return _connectionActive;
+    bool available () const {
+        return _connectionActive && _peerMtu;
     }
     void process () {
         if (!_connectionActive && !_advertisingActive) {
@@ -401,6 +402,7 @@ public:
     }
     //
     void serialize (JsonVariant &obj) const override {
+        obj ["macaddr"] = getMacAddressBlue ();
         if ((obj ["connected"] = _connectionActive)) {
             obj ["address"] = _address_to_string (_peerAddress);
             if (!_peerDetails.isEmpty ())

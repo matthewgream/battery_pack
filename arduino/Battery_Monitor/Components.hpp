@@ -352,6 +352,10 @@ public:
         return _init ();
     }
     //
+    bool available () const {
+        return _mode != MODE_ERROR;
+    }
+    //
     long size () const {
         if (_mode == MODE_CLOSED)   if (_size < 0) const_cast <SPIFFSFile *> (this)->_ssize (); // zero if not exists
         if (_mode == MODE_ERROR)    return -1;

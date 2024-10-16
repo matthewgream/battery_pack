@@ -21,7 +21,7 @@ public:
             AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.payloadExceeded (); })
         }), config (cfg), _blue (blue) {}
     bool deliver (const String& data) {
-        if (_blue.connected ()) {
+        if (_blue.available ()) {
             if (_blue.notify (data)) {
                 _delivers += ArithmeticToString (data.length ());
                 _failures = 0;
@@ -30,6 +30,7 @@ public:
         }
         return false;
     }
+    bool available () { return _blue.available (); }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
@@ -79,7 +80,7 @@ public:
         }
         return false;
     }
-    bool connected () { return _networkIsAvailable () && _mqtt.connected (); }
+    bool available () { return _networkIsAvailable () && _mqtt.connected (); }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
@@ -139,6 +140,7 @@ public:
         _file.erase ();
         _erasures ++;
     }
+    bool available () const { return _file.available (); }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {

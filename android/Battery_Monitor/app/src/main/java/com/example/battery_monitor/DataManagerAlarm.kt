@@ -12,8 +12,11 @@ object DataManagerAlarm {
         "STORE_FAIL" to Alarm("STORE_FAIL", "Store fail", "Storage system has failed"),
         "STORE_SIZE" to Alarm("STORE_SIZE", "Store full", "Storage system is full"),
         "PUBLISH_FAIL" to Alarm("PUBLISH_FAIL", "Publish fail", "Publish to network (MQTT) failed"),
-        "DELIVER_SIZE" to Alarm("DELIVER_SIZE", "Deliver size", "Deliver size (BLE) was exceeded"),
+        "PUBLISH_SIZE" to Alarm("PUBLISH_SIZE", "Publish size", "Publish to network (MQTT) too large"),
+        "DELIVER_FAIL" to Alarm("DELIVER_FAIL", "Deliver fail", "Deliver to device (BLE) failed"),
+        "DELIVER_SIZE" to Alarm("DELIVER_SIZE", "Deliver size", "Deliver to device (BLE) too large"),
         "UPDATE_VERS" to Alarm("UPDATE_VERS", "Device update", "Device update available"),
+        "UPDATE_LONG" to Alarm("UPDATE_LONG", "Device check", "Device update check needed"),
         "SYSTEM_MEMLOW" to Alarm("SYSTEM_MEMLOW", "Device memory", "Device memory low"),
         "SYSTEM_BADRESET" to Alarm("SYSTEM_BADRESET", "Device fault", "Device reset unexpectedly")
     )

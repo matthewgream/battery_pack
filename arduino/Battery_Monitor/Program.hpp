@@ -2,8 +2,12 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-#define DEFAULT_WATCHDOG_SECS 60
-#define DEFAULT_INITIAL_DELAY 5*1000L
+#define DEFAULT_WATCHDOG_SECS (60)
+#define DEFAULT_INITIAL_DELAY (5*1000L)
+#ifdef DEBUG
+#define DEFAULT_DEBUG_LOGGING_BUFFER (2048+1)
+#define DEFAULT_SCRUB_SENSITIVE_CONTENT_FROM_NETWORK_LOGGING
+#endif
 
 #define DEFAULT_NAME "BatteryMonitor"
 #define DEFAULT_VERS "1.1.1"
@@ -103,8 +107,8 @@ class Program: public Component, public Diagnosticable {
     DeliverManager deliver;
     PublishManager publish;
     StorageManager storage;
-    ControlManager control;
 
+    ControlManager control;
     UpdateManager updater;
     AlarmInterface alarmsInterface;
     AlarmManager alarms;
@@ -129,10 +133,7 @@ class Program: public Component, public Diagnosticable {
         func (obj);
         return collector;
     }
-    void doDeliver (const String& data) {
-        deliver.deliver (data);
-    }
-    void doCapture (const String& data) {
+    void dataCapture (const String& data) {
         class StorageLineHandler: public StorageManager::LineCallback {
             PublishManager& _publish;
         public:
@@ -141,7 +142,7 @@ class Program: public Component, public Diagnosticable {
                 return line.isEmpty () ? true : _publish.publish (line, "data");
             }
         };
-        if (publish.connected ()) {
+        if (publish.available ()) {
             if (storage.size () > 0) {
                 DEBUG_PRINTF ("Program::doCapture: publish.connected () && storage.size () > 0\n");
                 // probably needs to be time bound and recall and reuse an offset ... or this will cause infinite watchdog loop one day
@@ -150,31 +151,36 @@ class Program: public Component, public Diagnosticable {
                     storage.erase ();
             }
             if (!publish.publish (data, "data"))
-              storage.append (data);
+                storage.append (data);
         } else
             storage.append (data);
     }
 
     Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
     void process () override {
-        const bool deliverTo = intervalDeliver, captureTo = intervalCapture, diagnoseTo = intervalDiagnose;
-        DEBUG_PRINTF ("\n");
-        DEBUG_PRINTF ("Program::process: deliver=%d, capture=%d, diagnose=%d\n", deliverTo, captureTo, diagnoseTo);
-        if (deliverTo || captureTo) {
+
+        const bool dataShouldDeliver = intervalDeliver, dataToDeliver = dataShouldDeliver && deliver.available ();
+        const bool dataShouldCapture = intervalCapture, captureToPublish = dataShouldCapture && publish.available (), captureToStorage = dataShouldCapture && storage.available (), dataToCapture = captureToPublish || captureToStorage;
+        const bool diagShould = intervalDiagnose && (config.deliverDiagnostics || config.publishDiagnostics), diagToDeliver = diagShould && (config.deliverDiagnostics && deliver.available ()), diagToPublish = diagShould && (config.publishDiagnostics && publish.available ());
+
+        DEBUG_PRINTF ("Program::process: deliver=%d/%d, capture=%d/%d/%d, diagnose=%d/%d/%d\n", dataShouldDeliver, dataToDeliver, dataShouldCapture, captureToPublish, captureToStorage, diagShould, diagToDeliver, diagToPublish);
+
+        if (dataToDeliver || dataToCapture) {
             const String data = doCollect ("data", [&] (JsonVariant& obj) { operational.collect (obj); });
-            if (deliverTo) doDeliver (data);
-            if (captureTo) doCapture (data);
             DEBUG_PRINTF ("Program::process: data, length=%d, content=<<<%s>>>\n", data.length (), data.c_str ());
+            if (dataToDeliver) deliver.deliver (data);
+            if (dataToCapture) dataCapture (data);
         }
-        if (diagnoseTo) {
+
+        if (diagToDeliver || diagToPublish) {
             const String diag = doCollect ("diag", [&] (JsonVariant& obj) { diagnostics.collect (obj); });
-            doDeliver (diag);
             DEBUG_PRINTF ("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
-#ifdef DEBUG
-            if (publish.connected ())
+            if (diagToDeliver)
+                deliver.deliver (diag);
+            if (diagToPublish)
                 publish.publish (diag, "diag");
-#endif
         }
+
         cycles ++;
     }
 

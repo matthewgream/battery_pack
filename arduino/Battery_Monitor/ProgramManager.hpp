@@ -51,80 +51,89 @@ protected:
 class LoggingHandler: private Singleton <LoggingHandler> {
 public:
     typedef struct {
-        bool debugLoggerSerial, debugLoggerMQTT;
-        String debugLoggerMQTTTopic;
+        bool enableSerial, enableMqtt;
+        String mqttTopic;
     } Config;
 
 #ifdef DEBUG
 private:
     const Config& config;
 
-    bool __debugLoggerEnableSerial = false, __debugLoggerEnableMQTT = false;
+    bool _enableSerial = false, _enableMqtt = false;
     __DebugLoggerFunc __debugLoggerPrevious = nullptr;
-    char __debugLoggerMQTTTopic [64+1];
-    MQTTPublisher *__debugLoggerMQTTClient;
+    char _mqttTopic [64+1];
+    MQTTPublisher *_mqttClient;
 
 public:
-    explicit LoggingHandler (const Config& cfg, MQTTPublisher *loggingMQTTClient = nullptr): Singleton <LoggingHandler> (this), config (cfg), __debugLoggerMQTTClient (loggingMQTTClient) { init (); }
+    explicit LoggingHandler (const Config& cfg, MQTTPublisher *mqttClient = nullptr): Singleton <LoggingHandler> (this), config (cfg), _mqttClient (mqttClient) { init (); }
     ~LoggingHandler () { term (); }
 
 protected:
     void init () {
-        if (config.debugLoggerMQTT && __debugLoggerMQTTClient != nullptr) {
-            snprintf (__debugLoggerMQTTTopic, sizeof (__debugLoggerMQTTTopic) - 1, "%s/logs", config.debugLoggerMQTTTopic.c_str ());
+        if (config.enableMqtt && _mqttClient != nullptr) {
+            snprintf (_mqttTopic, sizeof (_mqttTopic) - 1, "%s/logs", config.mqttTopic.c_str ());
             __debugLoggerPrevious = __debugLoggerSet (__debugLoggerMQTT);
-            if (config.debugLoggerSerial) __debugLoggerEnableSerial = true;
-            __debugLoggerEnableMQTT = true;
-            DEBUG_PRINTF ("LoggingHandler::init: logging directed to Serial and MQTT (as topic '%s' when online)\n", __debugLoggerMQTTTopic);
-        } else if (config.debugLoggerSerial) {
+            if (config.enableSerial) _enableSerial = true;
+            _enableMqtt = true;
+            DEBUG_PRINTF ("LoggingHandler::init: logging directed to Serial and MQTT (as topic '%s' when online)\n", _mqttTopic);
+        } else if (config.enableSerial) {
             __debugLoggerPrevious = __debugLoggerSet (__debugLoggerSerial);
-            __debugLoggerEnableSerial = true;
+            _enableSerial = true;
             DEBUG_PRINTF ("LoggingHandler::init: logging directed to Serial\n");
         } else {
             DEBUG_PRINTF ("LoggingHandler::init: logging not directed\n");
         }
     }
     void term () { // not entirely thread safe
-      __debugLoggerSet (__debugLoggerPrevious);
-      __debugLoggerPrevious = nullptr;
-      __debugLoggerEnableSerial = false;
-      __debugLoggerEnableMQTT = false;
-      __debugLoggerMQTTTopic [0] = '\0';
-      __debugLoggerMQTTClient = nullptr;
+      __debugLoggerSet (__debugLoggerPrevious); __debugLoggerPrevious = nullptr;
+      _enableSerial = false;
+      _enableMqtt = false;
+      _mqttTopic [0] = '\0';
+      _mqttClient = nullptr;
       DEBUG_PRINTF ("LoggingHandler::term: logging reverted to previous\n");
     }
     void send (const char *line) {
-        if (__debugLoggerEnableSerial)
+        if (_enableSerial)
             Serial.println (line);
-        if (__debugLoggerEnableMQTT && line [0] != '\0')
-            __debugLoggerMQTTClient->publish__native (__debugLoggerMQTTTopic, line);
+        if (_enableMqtt && line [0] != '\0')
+            _mqttClient->publish__native (_mqttTopic, line);
     }
 
 private:
-    static std::mutex __debugLoggerBuffer_Mutex;
-    #define __debugPrintBuffer_Length (1024+1)
-    static char __debugLoggerBuffer_Content [__debugPrintBuffer_Length];
-    static int __debugLoggerBuffer_Offset;
+    static std::mutex _bufferMutex;
+    static int constexpr _bufferLength = DEFAULT_DEBUG_LOGGING_BUFFER;
+    static char _bufferContent [_bufferLength];
+    static int _bufferOffset;
+
     static void __debugLoggerMQTT (const char* format, ...) {
 
-        std::lock_guard <std::mutex> guard (__debugLoggerBuffer_Mutex);
+        std::lock_guard <std::mutex> guard (_bufferMutex);
 
         va_list args;
         va_start (args, format);
-        int printed = vsnprintf (__debugLoggerBuffer_Content + __debugLoggerBuffer_Offset, (__debugPrintBuffer_Length - __debugLoggerBuffer_Offset), format, args);
+        int printed = vsnprintf (_bufferContent + _bufferOffset, (_bufferLength - _bufferOffset), format, args);
         va_end (args);
         if (printed < 0)
             return;
 
-        __debugLoggerBuffer_Offset = (printed >= (__debugPrintBuffer_Length - __debugLoggerBuffer_Offset)) ? (__debugPrintBuffer_Length - 1) : (__debugLoggerBuffer_Offset + printed);
-        if (__debugLoggerBuffer_Offset == (__debugPrintBuffer_Length - 1) || (__debugLoggerBuffer_Offset > 0 && __debugLoggerBuffer_Content [__debugLoggerBuffer_Offset - 1] == '\n')) {
-            while (__debugLoggerBuffer_Offset > 0 && __debugLoggerBuffer_Content [__debugLoggerBuffer_Offset - 1] == '\n')
-                __debugLoggerBuffer_Content [-- __debugLoggerBuffer_Offset] = '\0';
-            __debugLoggerBuffer_Content [__debugLoggerBuffer_Offset] = '\0';
-            __debugLoggerBuffer_Offset = 0;
+        _bufferOffset = (printed >= (_bufferLength - _bufferOffset)) ? (_bufferLength - 1) : (_bufferOffset + printed);
+        if (_bufferOffset == (_bufferLength - 1) || (_bufferOffset > 0 && _bufferContent [_bufferOffset - 1] == '\n')) {
+            while (_bufferOffset > 0 && _bufferContent [_bufferOffset - 1] == '\n')
+                _bufferContent [-- _bufferOffset] = '\0';
+            _bufferContent [_bufferOffset] = '\0';
+            _bufferOffset = 0;
+
+#ifdef DEFAULT_SCRUB_SENSITIVE_CONTENT_FROM_NETWORK_LOGGING
+                for (char *location = _bufferContent; (location = strstr (location, "pass=")) != NULL; )
+                    for (location += sizeof ("pass=") - 1; *location != '\0' && *location != ',' && *location != ' '; )
+                        *location ++ = '*';
+                for (char *location = _bufferContent; (location = strstr (location, "pin=")) != NULL; )
+                    for (location += sizeof ("pin=") - 1; *location != '\0' && *location != ',' && *location != ' '; )
+                        *location ++ = '*';
+#endif
 
             auto logging = Singleton <LoggingHandler>::instance ();
-            if (logging) logging->send (__debugLoggerBuffer_Content);
+            if (logging) logging->send (_bufferContent);
         }
     }
 #else
@@ -133,9 +142,9 @@ private:
 };
 
 #ifdef DEBUG
-std::mutex LoggingHandler::__debugLoggerBuffer_Mutex;
-char LoggingHandler::__debugLoggerBuffer_Content [__debugPrintBuffer_Length];
-int LoggingHandler::__debugLoggerBuffer_Offset = 0;
+std::mutex LoggingHandler::_bufferMutex;
+char LoggingHandler::_bufferContent [_bufferLength];
+int LoggingHandler::_bufferOffset = 0;
 #endif
 
 // -----------------------------------------------------------------------------------------------
@@ -159,11 +168,14 @@ private:
         bool process (BluetoothDevice& device, const String& time, const String& ctrl, JsonDocument& doc) override {
             DEBUG_PRINTF ("BluetoothWriteHandler_TypeCtrl:: type=ctrl, time=%s, ctrl='%s'\n", time.c_str (), ctrl.c_str ());
             // XXX
-            // turn on/off diag
-            // force reboot
-            // wipe spiffs data file
-            // changw wifi
-            // suppress specific alarms
+            // request controllables
+            // process controllables
+                // force reboot
+                // turn on/off diag/logging
+                // wipe spiffs data file
+                // disable/enable wifi
+                // change wifi user/pass
+                // suppress specific alarms
             return true;
         }
     };
@@ -173,7 +185,7 @@ private:
         bool process (BluetoothDevice& device, const String& time, const String& ctrl, JsonDocument& doc) override {
             DEBUG_PRINTF ("BluetoothReadHandler_TypeCtrl:: type=ctrl\n");
             // XXX
-            // send all of the variables that can be controlled
+            // send controllables
             return false;
         }
     };
@@ -199,9 +211,8 @@ extern String ota_image_check (const String& json, const String& type, const Str
 class UpdateManager: public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
-        interval_t intervalUpdate;
-        time_t intervalCheck;
-        String json, type, vers;
+        interval_t intervalCheck, intervalLong;
+        String json, type, vers, addr;
     } Config;
 
     using BooleanFunc = std::function <bool ()>;
@@ -213,31 +224,28 @@ private:
     PersistentData _persistent_data;
     PersistentValue <uint32_t> _persistent_data_previous;
     PersistentValue <String> _persistent_data_version;
-    bool _available;
-
     Intervalable _interval;
+    bool _available;
 
 public:
     UpdateManager (const Config& cfg, const BooleanFunc networkIsAvailable): Alarmable ({
-            AlarmCondition (ALARM_UPDATE_VERS, [this] () { return _available; })
+            AlarmCondition (ALARM_UPDATE_VERS, [this] () { return _available; }),
+            AlarmCondition (ALARM_UPDATE_LONG, [this] () { return istoolong (); }),
         }), config (cfg), _networkIsAvailable (networkIsAvailable),
-        _persistent_data ("updates"), _persistent_data_previous (_persistent_data, "previous", 0), _persistent_data_version (_persistent_data, "version", String ("")),
-        _available (!static_cast <String> (_persistent_data_version).isEmpty ()),
-        _interval (config.intervalUpdate) {}
+        _persistent_data ("updates"), _persistent_data_previous (_persistent_data, "previous", 0), _persistent_data_version (_persistent_data, "version", String ()),
+        _interval (config.intervalCheck, _persistent_data_previous), _available (!static_cast <String> (_persistent_data_version).isEmpty ()) {}
     void process () override {
-        if (static_cast <bool> (_interval)) {
-            if (_networkIsAvailable ()) {
-                time_t previous = (time_t) static_cast <uint32_t> (_persistent_data_previous), current = time (nullptr);
-                if ((current > 0 && (current - previous) > (config.intervalCheck / 1000)) || (previous > current)) {
-                    String version = ota_image_check (config.json, config.type, config.vers, getMacAddress ());
-                    if (_persistent_data_version != version) {
-                        _persistent_data_version = version;
-                        _available = !version.isEmpty ();
-                    }
-                    _persistent_data_previous = current;
-                }
+        if (_networkIsAvailable () && _interval) {
+            const String version = ota_image_check (config.json, config.type, config.vers, config.addr);
+            if (_persistent_data_version != version) {
+                _persistent_data_version = version;
+                _available = !version.isEmpty ();
             }
+            _persistent_data_previous = millis ();
         }
+    }
+    bool istoolong () const {
+        return _persistent_data_previous && (millis () - _persistent_data_previous) > config.intervalLong;
     }
 
 protected:
@@ -246,9 +254,8 @@ protected:
             sub ["current"] = config.vers;
             if (_available)
                 sub ["available"] = static_cast <String> (_persistent_data_version);
-            const time_t time = (time_t) static_cast <uint32_t> (_persistent_data_previous);
-            if (time)
-                sub ["checked"] = getTimeString (time);
+            if (_persistent_data_previous)
+                sub ["checked"] = getTimeString (static_cast <time_t> (_persistent_data_previous / 1000));
     }
 };
 

@@ -123,11 +123,12 @@ struct Config {
 
     // program
     ControlManager::Config control = {
-        .logging = { .debugLoggerSerial = true, .debugLoggerMQTT = true, .debugLoggerMQTTTopic = DEFAULT_NAME }
+        .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME }
     };
-    UpdateManager::Config updater = { .intervalUpdate = 60*60*1000, .intervalCheck = 12*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS };
+    UpdateManager::Config updater = { .intervalCheck = 1*24*60*60*1000, .intervalLong = 28*24*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase () };
     AlarmManager::Config alarms = { }; ActivablePIN::Config alarmsInterface = { .PIN = -1, .ACTIVE = LOW };
     DiagnosticManager::Config diagnostics = { };
+    bool publishDiagnostics = true, deliverDiagnostics = true;
     interval_t intervalProcess = 5*1000, intervalDeliver = 5*1000, intervalCapture = 15*1000, intervalDiagnose = 60*1000;
 };
 

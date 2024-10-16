@@ -75,9 +75,19 @@ public:
 
 #include <esp_mac.h>
 
-String getMacAddress (void) {
+String getMacAddressBase (void) {
+    uint8_t macaddr [6];
+    esp_read_mac (macaddr, ESP_MAC_BASE);
+    return hexabyte_to_hexastring (macaddr);
+}
+String getMacAddressWifi (void) {
     uint8_t macaddr [6];
     esp_read_mac (macaddr, ESP_MAC_WIFI_STA);
+    return hexabyte_to_hexastring (macaddr);
+}
+String getMacAddressBlue (void) {
+    uint8_t macaddr [6];
+    esp_read_mac (macaddr, ESP_MAC_BT);
     return hexabyte_to_hexastring (macaddr);
 }
 
