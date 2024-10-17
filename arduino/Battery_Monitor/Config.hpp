@@ -125,7 +125,7 @@ struct Config {
     ControlManager::Config control = {
         .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME }
     };
-    UpdateManager::Config updater = { .intervalCheck = 1*24*60*60*1000, .intervalLong = 28*24*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase () };
+    UpdateManager::Config updater = { .intervalCheck = 1*24*60*60*1000, .intervalLong = (interval_t) 28*24*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase () };
     AlarmManager::Config alarms = { }; ActivablePIN::Config alarmsInterface = { .PIN = -1, .ACTIVE = LOW };
     DiagnosticManager::Config diagnostics = { };
     bool publishDiagnostics = true, deliverDiagnostics = true;
