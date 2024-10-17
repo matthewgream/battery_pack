@@ -61,7 +61,7 @@ private:
 
     bool _enableSerial = false, _enableMqtt = false;
     __DebugLoggerFunc __debugLoggerPrevious = nullptr;
-    char _mqttTopic [64+1];
+    char _mqttTopic [64+1]; // arbitrary
     MQTTPublisher *_mqttClient;
 
 public:
@@ -92,12 +92,6 @@ protected:
       _mqttClient = nullptr;
       DEBUG_PRINTF ("LoggingHandler::term: logging reverted to previous\n");
     }
-    void send (const char *line) {
-        if (_enableSerial)
-            Serial.println (line);
-        if (_enableMqtt && line [0] != '\0')
-            _mqttClient->publish__native (_mqttTopic, line);
-    }
 
 private:
     static std::mutex _bufferMutex;
@@ -106,6 +100,10 @@ private:
     static int _bufferOffset;
 
     static void __debugLoggerMQTT (const char* format, ...) {
+
+        auto logging = Singleton <LoggingHandler>::instance ();
+        if (!logging)
+            return;
 
         std::lock_guard <std::mutex> guard (_bufferMutex);
 
@@ -123,6 +121,10 @@ private:
             _bufferContent [_bufferOffset] = '\0';
             _bufferOffset = 0;
 
+            if (logging->_enableSerial)
+                Serial.println (_bufferContent);
+
+            if (logging->_enableMqtt && _bufferContent [0] != '\0') {
 #ifdef DEFAULT_SCRUB_SENSITIVE_CONTENT_FROM_NETWORK_LOGGING
                 for (char *location = _bufferContent; (location = strstr (location, "pass=")) != NULL; )
                     for (location += sizeof ("pass=") - 1; *location != '\0' && *location != ',' && *location != ' '; )
@@ -131,9 +133,8 @@ private:
                     for (location += sizeof ("pin=") - 1; *location != '\0' && *location != ',' && *location != ' '; )
                         *location ++ = '*';
 #endif
-
-            auto logging = Singleton <LoggingHandler>::instance ();
-            if (logging) logging->send (_bufferContent);
+                logging->_mqttClient->publish__native (logging->_mqttTopic, _bufferContent);
+            }
         }
     }
 #else
@@ -204,6 +205,26 @@ protected:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+class IntervalableByPersistentTime {
+    interval_t _interval;
+    PersistentValue <uint32_t>& _previous;
+
+public:
+    explicit IntervalableByPersistentTime (const interval_t interval, PersistentValue <uint32_t>& previous) : _interval (interval), _previous (previous) {}
+    operator bool () {
+        const uint32_t timet = static_cast <uint32_t> (time (NULL));
+        if (timet > 0 && ((timet - _previous) > (_interval / 1000))) {
+            _previous = timet;
+            return true;
+        }
+        return false;
+    }
+    interval_t interval () const {
+        const uint32_t timet = static_cast <uint32_t> (time (NULL));
+        return timet > 0 && _previous > 0 ? (timet - _previous) * 1000 : 0;
+    }
+};
+
 #include <functional>
 
 extern String ota_image_check (const String& json, const String& type, const String& vers, const String& addr);
@@ -224,7 +245,7 @@ private:
     PersistentData _persistent_data;
     PersistentValue <uint32_t> _persistent_data_previous;
     PersistentValue <String> _persistent_data_version;
-    Intervalable _interval;
+    IntervalableByPersistentTime _interval;
     bool _available;
 
 public:
@@ -241,11 +262,10 @@ public:
                 _persistent_data_version = version;
                 _available = !version.isEmpty ();
             }
-            _persistent_data_previous = millis ();
         }
     }
     bool istoolong () const {
-        return _persistent_data_previous && (millis () - _persistent_data_previous) > config.intervalLong;
+        return _interval.interval () > config.intervalLong;
     }
 
 protected:
@@ -255,7 +275,7 @@ protected:
             if (_available)
                 sub ["available"] = static_cast <String> (_persistent_data_version);
             if (_persistent_data_previous)
-                sub ["checked"] = getTimeString (static_cast <time_t> (_persistent_data_previous / 1000));
+                sub ["checked"] = getTimeString (static_cast <time_t> (_persistent_data_previous));
     }
 };
 
