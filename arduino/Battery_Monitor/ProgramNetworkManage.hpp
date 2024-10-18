@@ -20,11 +20,12 @@ public:
 private:
     const Config &config;
 
-    WiFiUDP _udp;
-    MDNS _mdns;
+    std::shared_ptr <WiFiUDP> _udp;
+    std::shared_ptr <MDNS> _mdns;
 
     ConnectionSignalTracker _connectionSignalTracker;
     bool _connected = false, _available = false;
+    IPAddress _address;
     Intervalable _intervalConnectionCheck;
     ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
 
@@ -58,16 +59,43 @@ private:
         _connectionSignalTracker.update (rssi);
     }
     void doAllocated (const IPAddress& address) { // careful, reallocations
-        _allocations ++; _available = true;
-        _mdns.start (address, config.host.c_str ());
+        _allocations ++; _available = true; _address = address;
+        mdnsStart ();
     }
     void doDisconnected (const String& reason) {
-        _mdns.stop ();
+        mdnsStop ();
         _intervalConnectionCheck.reset (); _available = false; _connected = false; _disconnections += reason;
     }
 
+    void mdnsBegin () {
+        if ((_udp = std::make_shared <WiFiUDP> ()))
+            _mdns = std::make_shared <MDNS> (*_udp);
+        if (_mdns) {
+          MDNSStatus_t status = _mdns->begin ();
+          if (status != MDNSSuccess)
+              DEBUG_PRINTF ("NetworkManager::begin: mdns begin error=%d\n", status);
+          extern const String build_info;
+          _mdns->addServiceRecord (MDNSServiceTCP, 80, "webserver._http", { "build=" + build_info }); // XXX move elsewhere, should not be here
+        }     
+    }
+    void mdnsStart () {
+        if (_mdns)
+            _mdns->start (_address, config.host.c_str ());
+    }
+    void mdnsProcess () {
+        if (_mdns) {
+            MDNSStatus_t status = _mdns->process ();
+            if (status != MDNSSuccess)
+                DEBUG_PRINTF ("NetworkManager::process: mdns process error=%d\n", status);
+        }
+    }
+    void mdnsStop () {
+        if (_mdns)
+            _mdns->stop ();
+    }
+
 public:
-    explicit NetwerkManager (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg), _mdns (_udp), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+    explicit NetwerkManager (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
 
     void begin () override {
         WiFi.persistent (false);
@@ -77,12 +105,8 @@ public:
         WiFi.mode (WIFI_STA);
         connect ();
 
-        MDNSStatus_t status = _mdns.begin ();
-        if (status != MDNSSuccess)
-            DEBUG_PRINTF ("NetworkManager::begin: mdns begin error=%d\n", status);
-
-        extern const String build_info;
-        _mdns.addServiceRecord (MDNSServiceTCP, 80, "webserver._http", { "build=" + build_info }); // XXX move elsewhere, should not be here
+        if (config.multicastDNS)
+            mdnsBegin ();
     }
     void connect () {
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
@@ -104,9 +128,7 @@ public:
                 DEBUG_PRINTF ("NetworkManager::process: rssi=%d (%s)\n", _connectionSignalTracker.rssi (), _connectionSignalTracker.toString ().c_str ());
             }
         }
-        MDNSStatus_t status = _mdns.process ();
-        if (status != MDNSSuccess)
-            DEBUG_PRINTF ("NetworkManager::process: mdns process error=%d\n", status);
+        mdnsProcess ();
     }
     bool available () const {
         return _available;
