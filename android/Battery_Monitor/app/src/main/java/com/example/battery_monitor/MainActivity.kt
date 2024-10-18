@@ -21,6 +21,7 @@ class MainActivity : PermissionsAwareActivity () {
     private lateinit var notificationsManager: NotificationsManager
     private lateinit var dataProcessor: DataProcessor
     private lateinit var bluetoothManager: BluetoothManager
+    private lateinit var networkManager: NetworkManager
 
     //
 
@@ -31,7 +32,11 @@ class MainActivity : PermissionsAwareActivity () {
         dataProcessor = DataProcessor (this, notificationsManager)
         bluetoothManager = BluetoothManager (this,
             dataCallback = { data -> dataProcessor.processDataReceived (JSONObject (data)) },
-            statusCallback = { processDataConnection (bluetoothManager.isAvailable (), bluetoothManager.isPermitted (), bluetoothManager.isConnected ()) })
+            statusCallback = { updateConnectionStatus () })
+        networkManager = NetworkManager(this,
+            dataCallback = { data -> dataProcessor.processDataReceived (JSONObject (data)) },
+            statusCallback = { updateConnectionStatus () }
+        )
         setupConnectionStatusDoubleTap ()
         setupPowerSave ()
     }
@@ -40,20 +45,24 @@ class MainActivity : PermissionsAwareActivity () {
         Log.d ("Main", "onDestroy")
         super.onDestroy ()
         bluetoothManager.onDestroy ()
+        networkManager.onDestroy()
     }
     override fun onPause () {
         Log.d ("Main", "onPause")
         super.onPause ()
         bluetoothManager.onPause ()
+        networkManager.onPause ()
     }
     override fun onResume () {
         Log.d ("Main", "onResume")
         super.onResume ()
         bluetoothManager.onResume ()
+        networkManager.onResume ()
     }
-    private fun onPowerSave (enabled: Boolean) {
+    private fun onPowerSave() {
         Log.d ("Main", "onPowerSave")
-        bluetoothManager.onPowerSave (enabled)
+        bluetoothManager.onPowerSave()
+        networkManager.onPowerSave()
     }
 
     //
@@ -67,12 +76,12 @@ class MainActivity : PermissionsAwareActivity () {
                 PowerManager.THERMAL_STATUS_CRITICAL ->
                     if (!powerSaveState) {
                         powerSaveState = true
-                        onPowerSave (true)
+                        onPowerSave()
                     }
                 else ->
                     if (powerSaveState) {
                         powerSaveState = false
-                        onPowerSave (false)
+                        onPowerSave()
                 }
             }
         }
@@ -83,6 +92,7 @@ class MainActivity : PermissionsAwareActivity () {
         val detector = GestureDetector (this, object : GestureDetector.SimpleOnGestureListener () {
             override fun onDoubleTap (e: MotionEvent): Boolean {
                 bluetoothManager.onDoubleTap ()
+                networkManager.onDoubleTap ()
                 return true
             }
         })
@@ -92,17 +102,21 @@ class MainActivity : PermissionsAwareActivity () {
         }
     }
 
-    private fun processDataConnection (available: Boolean, permitted: Boolean, connected: Boolean) {
+    private fun updateConnectionStatus() {
+        val bluetoothConnected = bluetoothManager.isConnected ()
+        val networkConnected = networkManager.isConnected ()
         val text = when {
-            !available -> "Bluetooth not available"
-            !permitted -> "Bluetooth not permitted"
-            !connected -> "Bluetooth not connected"
-            else -> "Bluetooth connected"
+            bluetoothConnected && networkConnected -> "Bluetooth and Wi-Fi connected"
+            bluetoothConnected -> "Bluetooth connected"
+            networkConnected -> "Wi-Fi connected"
+            !bluetoothManager.isAvailable() && !networkManager.isAvailable() -> "No connectivity available"
+            !bluetoothManager.isPermitted() || !networkManager.isPermitted() -> "Permissions not granted"
+            else -> "Not connected"
         }
-        val color = getColor (if (connected) R.color.connected_color else R.color.disconnected_color)
+        val color = getColor(if (bluetoothConnected || networkConnected) R.color.connected_color else R.color.disconnected_color)
         runOnUiThread {
             connectionStatusTextView.text = text
-            connectionStatusTextView.setTextColor (color)
+            connectionStatusTextView.setTextColor(color)
         }
     }
 }

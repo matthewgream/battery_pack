@@ -4,7 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 
-abstract class BluetoothComponent (private val tag: String) {
+abstract class ConnectivityComponent (protected open val tag: String) {
 
     protected val handler = Handler (Looper.getMainLooper ())
     private var active: Boolean = false

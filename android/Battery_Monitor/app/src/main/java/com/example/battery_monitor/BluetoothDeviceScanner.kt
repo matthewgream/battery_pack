@@ -129,7 +129,7 @@ class BluetoothDeviceScanner (
     private val scanner: BluetoothLeScanner,
     private val config: BluetoothDeviceScannerConfig,
     private val onFound: (BluetoothDevice) -> Unit
-) : BluetoothComponent ("BluetoothDeviceScanner") {
+) : ConnectivityComponent ("BluetoothDeviceScanner") {
 
     private val retryRunnable = Runnable {
         start ()
@@ -139,17 +139,17 @@ class BluetoothDeviceScanner (
         override fun onScanResult (callbackType: Int, result: ScanResult) {
             if (result.scanRecord?.deviceName == config.name) {
                 stop ()
-                Log.d ("Bluetooth", "Device scan located, device ${result.scanRecord?.deviceName} / ${result.device.address} [txPower=${result.scanRecord?.txPowerLevel}, rssi=${result.rssi}]")
+                Log.d (tag, "Device scan located, device ${result.scanRecord?.deviceName} / ${result.device.address} [txPower=${result.scanRecord?.txPowerLevel}, rssi=${result.rssi}]")
                 onFound (result.device)
             }
         }
         override fun onScanFailed (errorCode: Int) {
             when (errorCode) {
-                SCAN_FAILED_ALREADY_STARTED -> Log.e ("Bluetooth", "Device scan failed: already started")
+                SCAN_FAILED_ALREADY_STARTED -> Log.e (tag, "Device scan failed: already started")
                 SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> Log.e ("Bluetooth", "Device scan failed: application registration failed")
-                SCAN_FAILED_FEATURE_UNSUPPORTED -> Log.e ("Bluetooth", "Device scan failed: feature unsupported")
-                SCAN_FAILED_INTERNAL_ERROR -> Log.e ("Bluetooth", "Device scan failed: internal error")
-                else -> Log.e ("Bluetooth", "Device scan failed: error $errorCode")
+                SCAN_FAILED_FEATURE_UNSUPPORTED -> Log.e (tag, "Device scan failed: feature unsupported")
+                SCAN_FAILED_INTERNAL_ERROR -> Log.e (tag, "Device scan failed: internal error")
+                else -> Log.e (tag, "Device scan failed: error $errorCode")
             }
             restartAfterDelay ()
         }

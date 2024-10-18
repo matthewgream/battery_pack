@@ -11,7 +11,7 @@ class BluetoothStateReceiver (
     private val context: Context,
     private val onDisabled: () -> Unit,
     private val onEnabled: () -> Unit
-) : BluetoothComponent ("BluetoothStateReceiver") {
+) : ConnectivityComponent ("BluetoothStateReceiver") {
 
     private val receiver: BroadcastReceiver = object : BroadcastReceiver () {
         override fun onReceive (context: Context?, intent: Intent?) {
@@ -19,11 +19,11 @@ class BluetoothStateReceiver (
                 BluetoothAdapter.ACTION_STATE_CHANGED -> {
                     when (intent.getIntExtra (BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
                         BluetoothAdapter.STATE_OFF -> {
-                            Log.d ("Bluetooth", "Adapter disabled")
+                            Log.d (tag, "Adapter disabled")
                             onDisabled ()
                         }
                         BluetoothAdapter.STATE_ON -> {
-                            Log.d ("Bluetooth", "Adapter enabled")
+                            Log.d (tag, "Adapter enabled")
                             onEnabled ()
                         }
                     }
@@ -32,9 +32,6 @@ class BluetoothStateReceiver (
         }
     }
 
-    init {
-        start ()
-    }
     override fun onStart () {
         context.registerReceiver (receiver, IntentFilter (BluetoothAdapter.ACTION_STATE_CHANGED))
     }

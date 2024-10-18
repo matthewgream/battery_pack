@@ -28,16 +28,18 @@ class BluetoothManager (private val activity: Activity, dataCallback: (String) -
         val bluetoothManager = activity.getSystemService (Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothManager.adapter
     }
+    private val device: BluetoothDeviceManager = BluetoothDeviceManager (activity,
+        adapter,
+        BluetoothDeviceManagerConfig (),
+        dataCallback,
+        statusCallback,
+        isPermitted = { permissions.allowed },
+        isEnabled = { adapter.isEnabled () }
+    )
     private val checker: BluetoothStateReceiver = BluetoothStateReceiver (
         context = activity,
         onDisabled = { device.disconnect () },
         onEnabled = { device.locate () }
-    )
-    private val device: BluetoothDeviceManager = BluetoothDeviceManager (activity, adapter,
-        BluetoothDeviceManagerConfig (),
-        dataCallback,
-        statusCallback,
-        isPermitted = { permissions.allowed }
     )
 
     init {
@@ -47,6 +49,7 @@ class BluetoothManager (private val activity: Activity, dataCallback: (String) -
                     device.permissionsAllowed ()
                 }, 50)
         })
+        checker.start ()
     }
 
     fun onDestroy () {
@@ -66,7 +69,7 @@ class BluetoothManager (private val activity: Activity, dataCallback: (String) -
     fun onDoubleTap () {
         device.reconnect ()
     }
-    fun onPowerSave (enabled: Boolean) {
+    fun onPowerSave() {
         // ??? reduce the scanning
         // ??? reduce the data reception period
         // ??? reduce the diagnostics rendering

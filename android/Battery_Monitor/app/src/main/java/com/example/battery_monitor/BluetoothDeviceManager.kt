@@ -38,7 +38,8 @@ class BluetoothDeviceManager (
     private val config: BluetoothDeviceManagerConfig,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
-    private val isPermitted: () -> Boolean
+    private val isPermitted: () -> Boolean,
+    private val isEnabled: () -> Boolean
 ) {
     private val handler = Handler (Looper.getMainLooper ())
 
@@ -65,8 +66,12 @@ class BluetoothDeviceManager (
         BluetoothDeviceScannerConfig (config.DEVICE_NAME, config.SERVICE_UUID),
         onFound = { device -> connect (device) }
     )
-    private val checker: BluetoothDeviceChecker = BluetoothDeviceChecker (
-        BluetoothDeviceCheckerConfig (),
+    private val checker: ConnectivityChecker = ConnectivityChecker (
+        "Bluetooth",
+        ConnectivityCheckerConfig (
+            CONNECTION_TIMEOUT = 60000L, // 60 seconds
+            CONNECTION_CHECK = 10000L // 10 seconds
+        ),
         isConnected = { isConnected () },
         onTimeout = { reconnect () }
     )
@@ -115,7 +120,6 @@ class BluetoothDeviceManager (
         }
     }
 
-
     @SuppressLint("MissingPermission")
     fun transmitTypeInfo () {
         val characteristic = bluetoothGatt?.getService (config.SERVICE_UUID)?.getCharacteristic (config.CHARACTERISTIC_UUID)
@@ -147,7 +151,7 @@ class BluetoothDeviceManager (
         Log.d ("Bluetooth", "Device locate initiated")
         statusCallback ()
         when {
-            !adapter.isEnabled -> Log.e ("Bluetooth", "Bluetooth is not enabled")
+            !isEnabled () -> Log.e ("Bluetooth", "Bluetooth is not enabled")
             !isPermitted () -> Log.e ("Bluetooth", "Bluetooth is not permitted")
             isConnected -> Log.d ("Bluetooth", "Device is already connected, will not locate")
             else -> scanner.start ()
