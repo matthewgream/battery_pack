@@ -7,6 +7,7 @@ public:
     typedef struct {
         BluetoothDevice::Config blue;
         MQTTPublisher::Config mqtt;
+        WebServer::Config webserver;
     } Config;
 
     using BooleanFunc = std::function <bool ()>;
@@ -17,27 +18,33 @@ private:
 
     BluetoothDevice _blue;
     MQTTPublisher _mqtt;
+    WebServer _webserver;
 
 public:
-    explicit DeviceManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (networkIsAvailable), _blue (config.blue), _mqtt (config.mqtt) {}
+    explicit DeviceManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (networkIsAvailable), _blue (config.blue), _mqtt (config.mqtt), _webserver (config.webserver) {}
     void begin () override {
         _blue.begin ();
-        _mqtt.setup ();
+        _mqtt.begin ();
+        _webserver.begin ();
     }
     void process () override {
         _blue.process ();
-        if (_networkIsAvailable ())
+        if (_networkIsAvailable ()) {
             _mqtt.process ();
+            _webserver.process ();
+        }
     }
 
     BluetoothDevice& blue () { return _blue; }
     MQTTPublisher& mqtt () { return _mqtt; }
+    WebServer& webserver () { return _webserver; }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["devices"].to <JsonObject> ();
             sub ["blue"] = _blue;
             sub ["mqtt"] = _mqtt;
+            sub ["webserver"] = _webserver;
     }
 };
 
@@ -221,7 +228,7 @@ public:
     }
     interval_t interval () const {
         const uint32_t timet = static_cast <uint32_t> (time (NULL));
-        return timet > 0 && _previous > 0 ? (timet - _previous) * 1000 : 0;
+        return timet > 0 && _previous > static_cast <uint32_t> (0) ? (timet - _previous) * 1000 : 0;
     }
 };
 

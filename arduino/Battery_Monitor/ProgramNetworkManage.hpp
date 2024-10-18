@@ -3,18 +3,25 @@
 // -----------------------------------------------------------------------------------------------
 
 #include <WiFi.h>
+#include <WiFiUdp.h>
+// announce+response, not lookup, see https://gist.github.com/matthewgream/1c535fa86fd006ae794f4f245216b1a0
+#include <ArduinoLightMDNS.h>
 
 // -----------------------------------------------------------------------------------------------
 
 class NetwerkManager: private Singleton <NetwerkManager>, public Component, public Diagnosticable { // Netwerk due to conflict w/ system class
 public:
     typedef struct {
-        String client, ssid, pass;
+        String host, ssid, pass;
         interval_t intervalConnectionCheck;
+        bool multicastDNS;
     } Config;
 
 private:
     const Config &config;
+
+    WiFiUDP _udp;
+    MDNS _mdns;
 
     ConnectionSignalTracker _connectionSignalTracker;
     bool _connected = false, _available = false;
@@ -23,22 +30,21 @@ private:
 
     void events (const WiFiEvent_t event, const WiFiEventInfo_t info) {
         if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED) {
-            _connectionSignalTracker.reset ();
-            _intervalConnectionCheck.reset (); _connections ++; _connected = true;
-            _connectionSignalTracker.update (WiFi.RSSI ());
+            const int8_t rssi = WiFi.RSSI ();
             DEBUG_PRINTF ("NetworkManager::events: WIFI_CONNECTED, ssid=%s, bssid=%s, channel=%d, authmode=%s, rssi=%d (%s)\n",
                 _ssid_to_string (info.wifi_sta_connected.ssid, info.wifi_sta_connected.ssid_len).c_str (),
                 _bssid_to_string (info.wifi_sta_connected.bssid).c_str (), (int) info.wifi_sta_connected.channel,
-                _authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode).c_str (), _connectionSignalTracker.rssi (), _connectionSignalTracker.toString ().c_str ());
+                _authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode).c_str (), rssi, ConnectionSignalTracker::toString (ConnectionSignalTracker::signalQuality (rssi)).c_str ());
+            doConnected (rssi);
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP) {
-            _allocations ++; _available = true;
             DEBUG_PRINTF ("NetworkManager::events: WIFI_ALLOCATED, address=%s\n", IPAddress (info.got_ip.ip_info.ip.addr).toString ().c_str ());
+            doAllocated (IPAddress (info.got_ip.ip_info.ip.addr));
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
             const String reason = _error_to_string ((wifi_err_reason_t) info.wifi_sta_disconnected.reason);
-            _intervalConnectionCheck.reset (); _available = false; _connected = false; _disconnections += reason;
             DEBUG_PRINTF ("NetworkManager::events: WIFI_DISCONNECTED, ssid=%s, bssid=%s, reason=%s\n",
                 _ssid_to_string (info.wifi_sta_disconnected.ssid, info.wifi_sta_disconnected.ssid_len).c_str (),
                 _bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (), reason.c_str ());
+            doDisconnected (reason);
         }
     }
     static void __wiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info) {
@@ -46,20 +52,41 @@ private:
         if (manager != nullptr) manager->events (event, info);
     }
 
+    void doConnected (const int8_t rssi) {
+        _connectionSignalTracker.reset ();
+        _intervalConnectionCheck.reset (); _connections ++; _connected = true;
+        _connectionSignalTracker.update (rssi);
+    }
+    void doAllocated (const IPAddress& address) { // careful, reallocations
+        _allocations ++; _available = true;
+        _mdns.start (address, config.host.c_str ());
+    }
+    void doDisconnected (const String& reason) {
+        _mdns.stop ();
+        _intervalConnectionCheck.reset (); _available = false; _connected = false; _disconnections += reason;
+    }
+
 public:
-    explicit NetwerkManager (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+    explicit NetwerkManager (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg), _mdns (_udp), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
 
     void begin () override {
         WiFi.persistent (false);
         WiFi.onEvent (__wiFiEventHandler);
-        WiFi.setHostname (config.client.c_str ());
+        WiFi.setHostname (config.host.c_str ());
         WiFi.setAutoReconnect (true);
         WiFi.mode (WIFI_STA);
         connect ();
+
+        MDNSStatus_t status = _mdns.begin ();
+        if (status != MDNSSuccess)
+            DEBUG_PRINTF ("NetworkManager::begin: mdns begin error=%d\n", status);
+
+        extern const String build_info;
+        _mdns.addServiceRecord (MDNSServiceTCP, 80, "webserver._http", { "build=" + build_info }); // XXX move elsewhere, should not be here
     }
     void connect () {
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
-        DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddressWifi ().c_str (), config.client.c_str ());
+        DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddressWifi ().c_str (), config.host.c_str ());
     }
     void reset () {
         DEBUG_PRINTF ("NetworkManager::reset\n");
@@ -77,6 +104,9 @@ public:
                 DEBUG_PRINTF ("NetworkManager::process: rssi=%d (%s)\n", _connectionSignalTracker.rssi (), _connectionSignalTracker.toString ().c_str ());
             }
         }
+        MDNSStatus_t status = _mdns.process ();
+        if (status != MDNSSuccess)
+            DEBUG_PRINTF ("NetworkManager::process: mdns process error=%d\n", status);
     }
     bool available () const {
         return _available;

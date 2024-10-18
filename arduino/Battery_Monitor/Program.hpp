@@ -5,12 +5,12 @@
 #define DEFAULT_WATCHDOG_SECS (60)
 #define DEFAULT_INITIAL_DELAY (5*1000L)
 #ifdef DEBUG
-#define DEFAULT_DEBUG_LOGGING_BUFFER (2048+1)
+#define DEFAULT_DEBUG_LOGGING_BUFFER (2*1024)
 #define DEFAULT_SCRUB_SENSITIVE_CONTENT_FROM_NETWORK_LOGGING
 #endif
 
 #define DEFAULT_NAME "BatteryMonitor"
-#define DEFAULT_VERS "1.1.1"
+#define DEFAULT_VERS "1.2.0"
 #define DEFAULT_TYPE "batterymonitor-custom-esp32c3"
 #define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 
@@ -104,15 +104,20 @@ class Program: public Component, public Diagnosticable {
 
     NetwerkManager network;
     NettimeManager nettime;
-    DeliverManager deliver;
-    PublishManager publish;
-    StorageManager storage;
+    DeliverManager deliver; //
+    PublishManager publish; //
+    StorageManager storage; //
 
     ControlManager control;
     UpdateManager updater;
     AlarmInterface alarmsInterface;
     AlarmManager alarms;
     PlatformArduino platform;
+
+    Uptime uptime;
+    ActivationTracker cycles;
+
+    //
 
     DiagnosticManager diagnostics;
     class OperationalManager {
@@ -121,19 +126,14 @@ class Program: public Component, public Diagnosticable {
         explicit OperationalManager (const Program* program) : _program (program) {};
         void collect (JsonVariant &) const;
     } operational;
-
-    Uptime uptime;
-    ActivationTracker cycles;
-
-    //
-
-    String doCollect (const String& name, const std::function <void (JsonVariant &)> func) const {
+    Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
+    String dataCollect (const String& name, const std::function <void (JsonVariant &)> func) const {
         JsonCollector collector (name, getTimeString ());
         JsonVariant obj = collector.document ().as <JsonVariant> ();
         func (obj);
         return collector;
     }
-    void dataCapture (const String& data) {
+    void dataCapture (const String& data, const bool publishData, const bool storageData) {
         class StorageLineHandler: public StorageManager::LineCallback {
             PublishManager& _publish;
         public:
@@ -142,8 +142,8 @@ class Program: public Component, public Diagnosticable {
                 return line.isEmpty () ? true : _publish.publish (line, "data");
             }
         };
-        if (publish.available ()) {
-            if (storage.size () > 0) {
+        if (publishData) {
+            if (storage.available () && storage.size () > 0) { // even if !storageData, still drain it
                 DEBUG_PRINTF ("Program::doCapture: publish.connected () && storage.size () > 0\n");
                 // probably needs to be time bound and recall and reuse an offset ... or this will cause infinite watchdog loop one day
                 StorageLineHandler handler (publish);
@@ -151,36 +151,40 @@ class Program: public Component, public Diagnosticable {
                     storage.erase ();
             }
             if (!publish.publish (data, "data"))
-                storage.append (data);
-        } else
+                if (storageData)
+                    storage.append (data);
+        } else if (storageData)
             storage.append (data);
     }
-
-    Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
-    void process () override {
+    void dataProcess () {
 
         const bool dataShouldDeliver = intervalDeliver, dataToDeliver = dataShouldDeliver && deliver.available ();
-        const bool dataShouldCapture = intervalCapture, captureToPublish = dataShouldCapture && publish.available (), captureToStorage = dataShouldCapture && storage.available (), dataToCapture = captureToPublish || captureToStorage;
-        const bool diagShould = intervalDiagnose && (config.deliverDiagnostics || config.publishDiagnostics), diagToDeliver = diagShould && (config.deliverDiagnostics && deliver.available ()), diagToPublish = diagShould && (config.publishDiagnostics && publish.available ());
+        const bool dataShouldCapture = intervalCapture, dataToCaptureToPublish = dataShouldCapture && (config.publishData && publish.available ()), dataToCaptureToStorage = dataShouldCapture && (config.storageData && storage.available ());
+        const bool diagShould = intervalDiagnose && (config.deliverDiag || config.publishDiag), diagToDeliver = diagShould && (config.deliverDiag && deliver.available ()), diagToPublish = diagShould && (config.publishDiag && publish.available ());
 
-        DEBUG_PRINTF ("Program::process: deliver=%d/%d, capture=%d/%d/%d, diagnose=%d/%d/%d\n", dataShouldDeliver, dataToDeliver, dataShouldCapture, captureToPublish, captureToStorage, diagShould, diagToDeliver, diagToPublish);
+        DEBUG_PRINTF ("Program::process: deliver=%d/%d, capture=%d/%d/%d, diagnose=%d/%d/%d\n", dataShouldDeliver, dataToDeliver, dataShouldCapture, dataToCaptureToPublish, dataToCaptureToStorage, diagShould, diagToDeliver, diagToPublish);
 
-        if (dataToDeliver || dataToCapture) {
-            const String data = doCollect ("data", [&] (JsonVariant& obj) { operational.collect (obj); });
+        if (dataToDeliver || (dataToCaptureToPublish || dataToCaptureToStorage)) {
+            const String data = dataCollect ("data", [&] (JsonVariant& obj) { operational.collect (obj); });
             DEBUG_PRINTF ("Program::process: data, length=%d, content=<<<%s>>>\n", data.length (), data.c_str ());
             if (dataToDeliver) deliver.deliver (data);
-            if (dataToCapture) dataCapture (data);
+            if (dataToCaptureToPublish || dataToCaptureToStorage) dataCapture (data, dataToCaptureToPublish, dataToCaptureToStorage);
         }
 
         if (diagToDeliver || diagToPublish) {
-            const String diag = doCollect ("diag", [&] (JsonVariant& obj) { diagnostics.collect (obj); });
+            const String diag = dataCollect ("diag", [&] (JsonVariant& obj) { diagnostics.collect (obj); });
             DEBUG_PRINTF ("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
             if (diagToDeliver)
                 deliver.deliver (diag);
             if (diagToPublish)
                 publish.publish (diag, "diag");
         }
+    }
 
+    //
+
+    void process () override {
+        dataProcess ();
         cycles ++;
     }
 

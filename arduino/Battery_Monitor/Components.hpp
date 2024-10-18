@@ -2,6 +2,60 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+
+class WebServer: public JsonSerializable  {
+public:
+    typedef struct {
+        bool enabled;
+        uint16_t port;
+        String url_version;
+    } Config;
+
+    static inline constexpr const char *STRING_404_NOT_FOUND = "Not Found";
+
+private:
+    const Config &config;
+
+    std::shared_ptr <AsyncWebServer> _server;
+    bool _started = false;
+
+    void start () {
+        _started = true; // if it fails, don't try again
+        _server = std::make_shared <AsyncWebServer> (config.port);
+        if (!_server) {
+            DEBUG_PRINTF ("WebServer::start: failed, insufficient memory\n");
+            return;
+        }
+        _server->on (config.url_version.c_str (), HTTP_GET, [] (AsyncWebServerRequest *request) {
+            extern const String build_info;
+            request->send (200, "text/plain", build_info);
+        });
+        _server->onNotFound ([] (AsyncWebServerRequest *request) {
+            request->send (404, "text/plain", STRING_404_NOT_FOUND);
+        });
+        _server->begin ();
+        DEBUG_PRINTF ("WebServer::start: active, port=%u, url_version=%s\n", config.port, config.url_version.c_str ());
+    }
+
+public:
+    explicit WebServer (const Config& cfg): config (cfg) {}
+    void begin () {
+    }
+    void process () {
+        // only when connected or panic()
+        if (config.enabled && !_started)
+            start ();
+    }
+    //
+    void serialize (JsonVariant &obj) const override {
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
 class ConnectionSignalTracker: public JsonSerializable {
 public:
     using RssiType = int8_t;
@@ -176,7 +230,7 @@ private:
 
 public:
     explicit MQTTPublisher (const Config& cfg) : config (cfg), _mqttClient (_wifiClient) {}
-    void setup () {
+    void begin () {
         _mqttClient.setServer (config.host.c_str (), config.port)
             .setBufferSize (config.bufferSize);
     }
