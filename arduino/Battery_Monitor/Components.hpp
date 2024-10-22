@@ -23,11 +23,12 @@ private:
 
     void start () {
         _started = true; // if it fails, don't try again
-        _server = std::make_shared <AsyncWebServer> (config.port);
-        if (!_server) {
+        AsyncWebServer* server = new (std::nothrow) AsyncWebServer (config.port);
+        if (!server) {
             DEBUG_PRINTF ("WebServer::start: failed, insufficient memory\n");
             return;
         }
+        _server.reset (server);
         _server->on (config.url_version.c_str (), HTTP_GET, [] (AsyncWebServerRequest *request) {
             extern const String build_info;
             request->send (200, "text/plain", build_info);

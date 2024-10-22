@@ -16,7 +16,7 @@ public:
 #ifdef DEBUG
 private:
     const Config& config;
-    
+
     bool _enableSerial = false, _enableMqtt = false;
     __DebugLoggerFunc __debugLoggerPrevious = nullptr;
     MQTTPublisher *_mqttClient;

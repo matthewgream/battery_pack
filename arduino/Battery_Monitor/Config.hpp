@@ -96,7 +96,7 @@ struct Config {
         .blue = { .name = DEFAULT_NAME, .serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", .characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", .pin = DEFAULT_BLUE_PIN, .intervalConnectionCheck = 1*60*1000 },
         .mqtt = { .client = DEFAULT_NAME, .host = "mqtt.local", .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .port = 1883, .bufferSize = 3*1024 },
         .webs = { .enabled  = true, .port = 80, .url_version = "/version" },
-        .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME } 
+        .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME }
     };
 
     // network managers
