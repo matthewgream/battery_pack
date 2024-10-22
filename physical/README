@@ -6,6 +6,10 @@ battery layout spreadsheet + script (battery_layout.gs)
 https://docs.google.com/spreadsheets/d/1nIypuU6Yo7al4vPYv5pmPqtEnIxG7LupgtRaQy6-S0I/view 
 https://script.google.com/u/0/home/projects/1WdgNSFODsvGVUW9D3aOnENeT_1vaDqy4YU4pCIYA1KY3frv_aO5ZXVyZ/edit
 
+notes: further optimisations: (1) ensure no stranded cells that are not reachable by an adjacent node so that there are no cases of singular 
+connectivity to the same group. for example, in the current solution, look up at the seventh row from the bottom and there are two groups
+where one has a single connection and the other has two single connections; (2) optimise or produce details for welding strip lengths.
+
 ***
 
 gfmc@lo-virtual:~/battery_pack/optimiser$ python3 battery_solution_check.py battery_solution_initial.json
