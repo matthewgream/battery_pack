@@ -13,6 +13,8 @@ import java.util.UUID
 class CloudDeviceManagerConfig (
     val host: String,
     val port: Int = 1883,
+    val user: String? = null,
+    val pass: String? = null,
     val client: String = UUID.randomUUID ().toString ()
 )
 
@@ -61,11 +63,18 @@ class CloudDeviceManager (
                 .build ()
                 .toAsync ()
 
-            mqttClient?.connectWith ()
+            val connect = mqttClient?.connectWith ()
                 ?.cleanStart (true)
                 ?.sessionExpiryInterval (30L)
                 ?.keepAlive (30)
-                ?.send ()
+
+            if (config.user != null && config.pass != null)
+                connect?.simpleAuth ()
+                    ?.username(config.user)
+                    ?.password(config.pass.toByteArray ())
+                    ?.applySimpleAuth ()
+
+            connect?.send ()
                 ?.whenComplete { connAck: Mqtt5ConnAck, throwable ->
                     if (throwable != null) {
                         Log.e("Cloud", "MQTT broker connection failure: ", throwable)
@@ -168,8 +177,8 @@ class CloudDeviceManager (
     }
 
     fun reconnect () {
-        disconnect ()
-        connect ()
+//        disconnect ()
+//        connect ()
     }
 
     fun isConnected (): Boolean = isConnected

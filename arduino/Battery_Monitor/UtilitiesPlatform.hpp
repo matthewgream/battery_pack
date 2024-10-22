@@ -75,20 +75,20 @@ public:
 
 #include <esp_mac.h>
 
-String getMacAddressBase (void) {
+String getMacAddressBase (const char* separator = ":") {
     uint8_t macaddr [6];
     esp_read_mac (macaddr, ESP_MAC_BASE);
-    return hexabyte_to_hexastring (macaddr);
+    return BytesToHexString <6> (macaddr, separator);
 }
-String getMacAddressWifi (void) {
+String getMacAddressWifi (const char* separator = ":") {
     uint8_t macaddr [6];
     esp_read_mac (macaddr, ESP_MAC_WIFI_STA);
-    return hexabyte_to_hexastring (macaddr);
+    return BytesToHexString <6> (macaddr, separator);
 }
-String getMacAddressBlue (void) {
+String getMacAddressBlue (const char* separator = ":") {
     uint8_t macaddr [6];
     esp_read_mac (macaddr, ESP_MAC_BT);
-    return hexabyte_to_hexastring (macaddr);
+    return BytesToHexString <6> (macaddr, separator);
 }
 
 // -----------------------------------------------------------------------------------------------

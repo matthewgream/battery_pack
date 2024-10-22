@@ -2,6 +2,7 @@ third_party
 build
 secrets.txt
 Secrets.hpp
+Secrets.kt
 android/Battery_Monitor/gradle
 android/Battery_Monitor/.idea
 arduino/Battery_Monitor/.theia

@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.ImageView
 import android.os.Handler
 import android.os.Looper
+import android.widget.TextView
 
 class DataViewConnectivityStatus @JvmOverloads constructor(
     context: Context,
@@ -21,7 +22,6 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
     private lateinit var doubleTapListener: () -> Unit
     private lateinit var gestureDetector: GestureDetector
 
-    private val connectivityIcon: ImageView
     private val bluetoothIcon: ImageView
     private val networkIcon: ImageView
     private val cloudIcon: ImageView
@@ -37,7 +37,6 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
         orientation = VERTICAL
         LayoutInflater.from(context).inflate(R.layout.view_connectivity_status, this, true)
 
-        connectivityIcon = findViewById(R.id.connectivityIcon)
         bluetoothIcon = findViewById(R.id.bluetoothIcon)
         networkIcon = findViewById(R.id.networkIcon)
         cloudIcon = findViewById(R.id.cloudIcon)
@@ -84,18 +83,6 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
                 else -> IconState.CONNECTED
             }
             updateIconState(cloudIcon, cloudState)
-
-            val anyConnected = bluetoothConnected || networkConnected || cloudConnected
-            val anyAvailable = bluetoothAvailable || networkAvailable || cloudAvailable
-            val allPermitted = bluetoothPermitted && networkPermitted && cloudPermitted
-
-            val mainState = when {
-                !allPermitted -> IconState.DISABLED
-                !anyAvailable -> IconState.DISABLED
-                !anyConnected -> IconState.DISCONNECTED
-                else -> IconState.CONNECTED
-            }
-            updateIconState(connectivityIcon, mainState)
         }
     }
 

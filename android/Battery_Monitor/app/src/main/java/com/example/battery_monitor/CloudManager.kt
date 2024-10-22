@@ -38,7 +38,8 @@ class CloudManager (
         activity,
         adapter,
         CloudDeviceManagerConfig (
-            host = "tcp://mqtt.local"
+            host = SECRET_MQTT_HOST, port = SECRET_MQTT_PORT,
+            user = SECRET_MQTT_USER, pass = SECRET_MQTT_PASS
         ),
         dataCallback,
         statusCallback,

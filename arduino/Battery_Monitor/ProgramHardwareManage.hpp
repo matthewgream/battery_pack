@@ -118,7 +118,6 @@ protected:
 class FanManager : public Component, public Diagnosticable {
 public:
     typedef struct {
-        FanInterface::FanSpeedType NO_SPEED, MIN_SPEED, MAX_SPEED;
     } Config;
 
     using TargetSet = std::pair <float, float>;
@@ -132,27 +131,26 @@ private:
     AlphaSmoothing <double> &_smootherAlgorithm; // XXX should be an abstract interface
 
     const TargetSetFunc _targetValues;
-    FanInterface::FanSpeedType _value = FanInterface::FanSpeedType (0);
-    Stats <FanInterface::FanSpeedType> _statsValue;
+    float _value = 0.0f;
+    Stats <float> _statsValue;
 
 public:
     FanManager (const Config& cfg, FanInterface& fan, PidController <double>& controller, AlphaSmoothing <double>& smoother, const TargetSetFunc targetValues): config (cfg), _fan (fan), _controllerAlgorithm (controller), _smootherAlgorithm (smoother), _targetValues (targetValues) {
-        assert (config.NO_SPEED <= config.MIN_SPEED && config.MIN_SPEED < config.MAX_SPEED && "Bad configuration values");
     }
     void process () override {
         const TargetSet targets (_targetValues ());
         const float &setpoint = targets.first, &current = targets.second;
         if (current < setpoint) {
-            _fan.setSpeed (config.NO_SPEED);
             DEBUG_PRINTF ("FanManager::process: setpoint=%.2f, current=%.2f\n", setpoint, current);
+            _fan.setSpeed (0.0f);
         } else {
             const double speedCalculated = _controllerAlgorithm.apply (setpoint, current);
-            const double speedConstrained = std::clamp (map <double> (speedCalculated, -100.0, 100.0, static_cast <double> (config.MIN_SPEED), static_cast <double> (config.MAX_SPEED)), static_cast <double> (config.MIN_SPEED), static_cast <double> (config.MAX_SPEED));
+            const double speedConstrained = std::clamp (map <double> (speedCalculated, -100.0, 100.0, 0.0, 100.0), 0.0, 100.0); // XXX is this correct?
             const double speedSmoothed = _smootherAlgorithm.apply (speedConstrained);
-            _value = static_cast <FanInterface::FanSpeedType> (speedSmoothed);
-            _fan.setSpeed (_value);
-            _statsValue += _value;
             DEBUG_PRINTF ("FanManager::process: setpoint=%.2f, current=%.2f --> calculated=%.2e, constrained=%.2e, smoothed=%.2e\n", setpoint, current, speedCalculated, speedConstrained, speedSmoothed);
+            _value = static_cast <float> (speedSmoothed);
+            _fan.setSpeed (_value); // percentage: 0% -> 100%
+            _statsValue += _value;
         }
     }
 

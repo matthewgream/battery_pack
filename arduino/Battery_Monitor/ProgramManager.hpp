@@ -2,55 +2,6 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class DeviceManager: public Component, public Diagnosticable {
-public:
-    typedef struct {
-        BluetoothDevice::Config blue;
-        MQTTPublisher::Config mqtt;
-        WebServer::Config webserver;
-    } Config;
-
-    using BooleanFunc = std::function <bool ()>;
-
-private:
-    const Config &config;
-    const BooleanFunc _networkIsAvailable;
-
-    BluetoothDevice _blue;
-    MQTTPublisher _mqtt;
-    WebServer _webserver;
-
-public:
-    explicit DeviceManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (networkIsAvailable), _blue (config.blue), _mqtt (config.mqtt), _webserver (config.webserver) {}
-    void begin () override {
-        _blue.begin ();
-        _mqtt.begin ();
-        _webserver.begin ();
-    }
-    void process () override {
-        _blue.process ();
-        if (_networkIsAvailable ()) {
-            _mqtt.process ();
-            _webserver.process ();
-        }
-    }
-
-    BluetoothDevice& blue () { return _blue; }
-    MQTTPublisher& mqtt () { return _mqtt; }
-    WebServer& webserver () { return _webserver; }
-
-protected:
-    void collectDiagnostics (JsonVariant &obj) const override {
-        JsonObject sub = obj ["devices"].to <JsonObject> ();
-            sub ["blue"] = _blue;
-            sub ["mqtt"] = _mqtt;
-            sub ["webserver"] = _webserver;
-    }
-};
-
-// -----------------------------------------------------------------------------------------------
-// -----------------------------------------------------------------------------------------------
-
 #ifdef DEBUG
 #include <mutex>
 #endif
@@ -65,24 +16,23 @@ public:
 #ifdef DEBUG
 private:
     const Config& config;
-
+    
     bool _enableSerial = false, _enableMqtt = false;
     __DebugLoggerFunc __debugLoggerPrevious = nullptr;
-    char _mqttTopic [64+1]; // arbitrary
     MQTTPublisher *_mqttClient;
+    const String _mqttTopic;
 
 public:
-    explicit LoggingHandler (const Config& cfg, MQTTPublisher *mqttClient = nullptr): Singleton <LoggingHandler> (this), config (cfg), _mqttClient (mqttClient) { init (); }
+    explicit LoggingHandler (const Config& cfg, const String& id, MQTTPublisher *mqttClient = nullptr): Singleton <LoggingHandler> (this), config (cfg), _mqttClient (mqttClient), _mqttTopic (config.mqttTopic + "/" + id + "/logs") { init (); }
     ~LoggingHandler () { term (); }
 
 protected:
     void init () {
         if (config.enableMqtt && _mqttClient != nullptr) {
-            snprintf (_mqttTopic, sizeof (_mqttTopic) - 1, "%s/logs", config.mqttTopic.c_str ());
             __debugLoggerPrevious = __debugLoggerSet (__debugLoggerMQTT);
             if (config.enableSerial) _enableSerial = true;
             _enableMqtt = true;
-            DEBUG_PRINTF ("LoggingHandler::init: logging directed to Serial and MQTT (as topic '%s' when online)\n", _mqttTopic);
+            DEBUG_PRINTF ("LoggingHandler::init: logging directed to Serial and MQTT (as topic '%s' when online)\n", _mqttTopic.c_str ());
         } else if (config.enableSerial) {
             __debugLoggerPrevious = __debugLoggerSet (__debugLoggerSerial);
             _enableSerial = true;
@@ -95,7 +45,6 @@ protected:
       __debugLoggerSet (__debugLoggerPrevious); __debugLoggerPrevious = nullptr;
       _enableSerial = false;
       _enableMqtt = false;
-      _mqttTopic [0] = '\0';
       _mqttClient = nullptr;
       DEBUG_PRINTF ("LoggingHandler::term: logging reverted to previous\n");
     }
@@ -140,7 +89,7 @@ private:
                     for (location += sizeof ("pin=") - 1; *location != '\0' && *location != ',' && *location != ' '; )
                         *location ++ = '*';
 #endif
-                logging->_mqttClient->publish__native (logging->_mqttTopic, _bufferContent);
+                logging->_mqttClient->publish__native (logging->_mqttTopic.c_str (), _bufferContent);
             }
         }
     }
@@ -158,54 +107,51 @@ int LoggingHandler::_bufferOffset = 0;
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class ControlManager: public Component, public Diagnosticable {
+class DeviceManager: public Component, public Diagnosticable {
 public:
     typedef struct {
+        BluetoothDevice::Config blue;
+        MQTTPublisher::Config mqtt;
+        WebServer::Config webs;
         LoggingHandler::Config logging;
     } Config;
 
+    using BooleanFunc = std::function <bool ()>;
+
 private:
     const Config &config;
+    const BooleanFunc _networkIsAvailable;
 
-    DeviceManager& _devices;
+    BluetoothDevice _blue;
+    MQTTPublisher _mqtt;
+    WebServer _webs;
     LoggingHandler _logging;
 
-    class BluetoothWriteHandler_TypeCtrl: public BluetoothWriteHandler_TypeSpecific {
-    public:
-        BluetoothWriteHandler_TypeCtrl (): BluetoothWriteHandler_TypeSpecific ("ctrl") {};
-        bool process (BluetoothDevice& device, const String& time, const String& ctrl, JsonDocument& doc) override {
-            DEBUG_PRINTF ("BluetoothWriteHandler_TypeCtrl:: type=ctrl, time=%s, ctrl='%s'\n", time.c_str (), ctrl.c_str ());
-            // XXX
-            // request controllables
-            // process controllables
-                // force reboot
-                // turn on/off diag/logging
-                // wipe spiffs data file
-                // disable/enable wifi
-                // change wifi user/pass
-                // suppress specific alarms
-            return true;
-        }
-    };
-    class BluetoothReadHandler_TypeCtrl: public BluetoothReadHandler_TypeSpecific {
-    public:
-        BluetoothReadHandler_TypeCtrl (): BluetoothReadHandler_TypeSpecific ("ctrl") {};
-        bool process (BluetoothDevice& device, const String& time, const String& ctrl, JsonDocument& doc) override {
-            DEBUG_PRINTF ("BluetoothReadHandler_TypeCtrl:: type=ctrl\n");
-            // XXX
-            // send controllables
-            return false;
-        }
-    };
-
 public:
-    explicit ControlManager (const Config& cfg, DeviceManager& devices): config (cfg), _devices (devices), _logging (config.logging, &_devices.mqtt ()) {
-        _devices.blue ().insert ({ { String ("ctrl"), std::make_shared <BluetoothWriteHandler_TypeCtrl> () } });
-        _devices.blue ().insert ({ { std::make_shared <BluetoothReadHandler_TypeCtrl> () } });
+    explicit DeviceManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (networkIsAvailable), _blue (config.blue), _mqtt (config.mqtt), _webs (config.webs), _logging (config.logging, getMacAddressBase (""), &_mqtt) {}
+    void begin () override {
+        _blue.begin ();
+        _mqtt.begin ();
+        _webs.begin ();
+    }
+    void process () override {
+        _blue.process ();
+        if (_networkIsAvailable ()) {
+            _mqtt.process ();
+            _webs.process ();
+        }
     }
 
+    BluetoothDevice& blue () { return _blue; }
+    MQTTPublisher& mqtt () { return _mqtt; }
+    WebServer& webs () { return _webs; }
+
 protected:
-    void collectDiagnostics (JsonVariant &) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
+        JsonObject sub = obj ["devices"].to <JsonObject> ();
+            sub ["blue"] = _blue;
+            sub ["mqtt"] = _mqtt;
+            sub ["webs"] = _webs;
     }
 };
 

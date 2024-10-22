@@ -8,6 +8,7 @@ import kotlin.math.floor
 
 class DataProcessorStatus (private val activity: Activity) {
 
+    private val addrTextView: TextView = activity.findViewById (R.id.addrTextView)
     private val timeTextView: TextView = activity.findViewById (R.id.timeTextView)
     private val envTempTextView: TextView = activity.findViewById (R.id.envTempTextView)
     private val batTempTextView: TextView = activity.findViewById (R.id.batTempTextView)
@@ -18,6 +19,8 @@ class DataProcessorStatus (private val activity: Activity) {
     @SuppressLint("SetTextI18n")
     fun render (json: JSONObject) {
         activity.runOnUiThread {
+            val addr = json.getString ("addr")
+            addrTextView.text = if (addr == SECRET_DEVICE_ADDR) { "$SECRET_DEVICE_NAME ($addr)" } else { addr }
             timeTextView.text = json.getString ("time")
 
             val env = json.getJSONObject ("tmp").getDouble ("env")

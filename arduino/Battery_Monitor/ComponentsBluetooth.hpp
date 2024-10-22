@@ -253,7 +253,7 @@ private:
             _characteristic->notify ();
             DEBUG_PRINTF ("BluetoothDevice::notify: length=%u\n", data.length ());
         } else {
-            JsonSplitter splitter (maxPayloadSize, { "type", "time" });
+            JsonSplitter splitter (maxPayloadSize, { "type", "time", "addr" });
             splitter.splitJson (data, [&] (const String& part, const int elements) {
                 const size_t length = part.length ();
                 _characteristic->setValue (part.c_str ());
@@ -436,7 +436,7 @@ private:
         }
     }
     static String _address_to_string (const esp_bd_addr_t bleaddr) {
-        return hexabyte_to_hexastring (bleaddr);
+        return BytesToHexString <6> (bleaddr);
     }
     static String _linkrole_to_string (const int linkrole) {
         return linkrole == 0 ? "master" : "slave";

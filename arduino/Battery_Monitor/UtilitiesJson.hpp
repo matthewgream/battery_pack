@@ -11,9 +11,10 @@ class JsonCollector {
     JsonDocument doc;
 
 public:
-    explicit JsonCollector (const String &type, const String &time) {
+    explicit JsonCollector (const String &type, const String &time, const String &addr) {
         doc ["type"] = type;
         doc ["time"] = time;
+        doc ["addr"] = addr;
     }
     inline JsonDocument& document () { return doc; }
     operator String () const {

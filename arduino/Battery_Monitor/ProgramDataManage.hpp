@@ -2,6 +2,64 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+class ControlManager: public Component, public Diagnosticable {
+public:
+    typedef struct {
+    } Config;
+
+private:
+    const Config &config;
+
+    const String _id;
+    DeviceManager& _devices;
+
+    class BluetoothWriteHandler_TypeCtrl: public BluetoothWriteHandler_TypeSpecific {
+    public:
+        BluetoothWriteHandler_TypeCtrl (): BluetoothWriteHandler_TypeSpecific ("ctrl") {};
+        bool process (BluetoothDevice& device, const String& time, const String& ctrl, JsonDocument& doc) override {
+            DEBUG_PRINTF ("BluetoothWriteHandler_TypeCtrl:: type=ctrl, time=%s, ctrl='%s'\n", time.c_str (), ctrl.c_str ());
+            // XXX
+            // request controllables
+            // process controllables
+                // force reboot
+                // turn on/off diag/logging
+                // wipe spiffs data file
+                // disable/enable wifi
+                // change wifi user/pass
+                // suppress specific alarms
+            return true;
+        }
+    };
+    class BluetoothReadHandler_TypeCtrl: public BluetoothReadHandler_TypeSpecific {
+    public:
+        BluetoothReadHandler_TypeCtrl (): BluetoothReadHandler_TypeSpecific ("ctrl") {};
+        bool process (BluetoothDevice& device, const String& time, const String& ctrl, JsonDocument& doc) override {
+            DEBUG_PRINTF ("BluetoothReadHandler_TypeCtrl:: type=ctrl\n");
+            // XXX
+            // send controllables
+            return false;
+        }
+    };
+
+public:
+    explicit ControlManager (const Config& cfg, const String& id, DeviceManager& devices): config (cfg), _id (id), _devices (devices) {
+        _devices.blue ().insert ({ { String ("ctrl"), std::make_shared <BluetoothWriteHandler_TypeCtrl> () } });
+        _devices.blue ().insert ({ { std::make_shared <BluetoothReadHandler_TypeCtrl> () } });
+    }
+
+protected:
+    void collectDiagnostics (JsonVariant &) const override {
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
+// XXX wifi, mqtt, blue
+// connect to delivery peer
+// listen for request, switch/use that peer
+// alternate if peer disconnected
+// xxx should make it an interface: DeliverChannel
 class DeliverManager: public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
@@ -11,15 +69,19 @@ public:
 private:
     const Config &config;
 
+    const String _id;
     BluetoothDevice& _blue;
+    MQTTPublisher& _mqtt;
+    WebServer& _webs;
+
     ActivationTrackerWithDetail _delivers;
     ActivationTracker _failures;
 
 public:
-    explicit DeliverManager (const Config& cfg, BluetoothDevice& blue): Alarmable ({
+    explicit DeliverManager (const Config& cfg, const String& id, BluetoothDevice& blue, MQTTPublisher& mqtt, WebServer& webs): Alarmable ({
             AlarmCondition (ALARM_DELIVER_FAIL, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.payloadExceeded (); })
-        }), config (cfg), _blue (blue) {}
+        }), config (cfg), _id (id), _blue (blue), _mqtt (mqtt), _webs (webs) {}
     bool deliver (const String& data) {
         if (_blue.available ()) {
             if (_blue.notify (data)) {
@@ -61,18 +123,19 @@ private:
     const Config &config;
     const BooleanFunc _networkIsAvailable;
 
+    const String _id;
     MQTTPublisher& _mqtt;
     ActivationTrackerWithDetail _publishes;
     ActivationTracker _failures;
 
 public:
-    explicit PublishManager (const Config& cfg, MQTTPublisher& mqtt, const BooleanFunc networkIsAvailable): Alarmable ({
+    explicit PublishManager (const Config& cfg, const String& id, MQTTPublisher& mqtt, const BooleanFunc networkIsAvailable): Alarmable ({
             AlarmCondition (ALARM_PUBLISH_FAIL, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_PUBLISH_SIZE, [this] () { return _mqtt.bufferExceeded (); })
-        }), config (cfg), _networkIsAvailable (networkIsAvailable), _mqtt (mqtt) {}
+        }), config (cfg), _networkIsAvailable (networkIsAvailable), _id (id), _mqtt (mqtt) {}
     bool publish (const String& data, const String& subtopic) {
         if (_networkIsAvailable ()) {
-          if (_mqtt.connected () && _mqtt.publish (config.topic + "/" + subtopic, data)) { // XXX
+          if (_mqtt.connected () && _mqtt.publish (config.topic + "/" + subtopic, data)) { // XXX address
               _publishes += ArithmeticToString (data.length ());
               _failures = 0;
               return true;

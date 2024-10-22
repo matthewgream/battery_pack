@@ -75,9 +75,8 @@ private:
           if (status != MDNSSuccess)
               DEBUG_PRINTF ("NetworkManager::begin: mdns begin error=%d\n", status);
           extern const String build_info;
-          String id = getMacAddressBase (); id.replace (":", "");
           _mdns->addServiceRecord (MDNSServiceTCP, 80, "webserver._http", { "build=" + build_info }); // XXX move elsewhere, should not be here
-          _mdns->addServiceRecord (MDNSServiceTCP, 81, "battery_monitor._ws", { "id=" + id }); // XXX move elsewhere, should not be here
+          _mdns->addServiceRecord (MDNSServiceTCP, 81, "battery_monitor._ws", { "id=" + getMacAddressBase ("") }); // XXX move elsewhere, should not be here
         }     
     }
     void mdnsStart () {
@@ -111,8 +110,9 @@ public:
             mdnsBegin ();
     }
     void connect () {
-        WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
         DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddressWifi ().c_str (), config.host.c_str ());
+        WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
+        WiFi.setTxPower(WIFI_POWER_8_5dBm); // XXX ?!? for AUTH_EXPIRE ... flash access problem ...  https://github.com/espressif/arduino-esp32/issues/2144
     }
     void reset () {
         DEBUG_PRINTF ("NetworkManager::reset\n");
@@ -158,7 +158,7 @@ private:
         return String (reinterpret_cast <const char*> (ssid), ssid_len);
     }
     static String _bssid_to_string (const uint8_t bssid []) {
-        return hexabyte_to_hexastring (bssid);
+        return BytesToHexString <6> (bssid);
     }
     static String _authmode_to_string (const wifi_auth_mode_t authmode) {
         switch (authmode) {

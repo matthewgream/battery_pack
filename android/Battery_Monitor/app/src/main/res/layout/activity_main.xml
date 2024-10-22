@@ -31,12 +31,20 @@
                 tools:ignore="UselessParent">
 
                 <TextView
-                    android:id="@+id/timeTextView"
+                    android:id="@+id/addrTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textStyle="bold"
                     android:textSize="16sp"
                     android:layout_marginTop="8dp" />
+
+                <TextView
+                    android:id="@+id/timeTextView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textStyle="bold"
+                    android:textSize="16sp"
+                    android:layout_marginTop="2dp" />
 
                 <TextView
                     android:id="@+id/envTempTextView"

@@ -4,36 +4,43 @@ import android.content.Context
 import android.os.Bundle
 import android.os.PowerManager
 import android.util.Log
+import com.google.android.material.appbar.MaterialToolbar
 import org.json.JSONObject
 
 class MainActivity : PermissionsAwareActivity() {
 
-    private lateinit var connectivityStatusView: DataViewConnectivityStatus
+
     private var powerSaveState: Boolean = false
 
-    private lateinit var notificationsManager: NotificationsManager
+    private val connectivityStatusView: DataViewConnectivityStatus by lazy {
+        findViewById(R.id.connectivityStatusView)
+    }
+    private val bluetoothManager: BluetoothManager by lazy {
+        BluetoothManager(this,
+            dataCallback = { data -> dataProcessor.processDataReceived (JSONObject (data)) },
+            statusCallback = { updateConnectionStatus() })
+    }
+    private val networkManager: NetworkManager by lazy {
+        NetworkManager(this,
+            dataCallback = { data -> dataProcessor.processDataReceived (JSONObject (data)) },
+            statusCallback = { updateConnectionStatus() })
+    }
+    private val cloudManager: CloudManager by lazy {
+        CloudManager(this,
+            dataCallback = { data -> dataProcessor.processDataReceived (JSONObject (data)) },
+            statusCallback = { updateConnectionStatus() })
+    }
+    private val notificationsManager: NotificationsManager by lazy {
+        NotificationsManager(this)
+    }
     private lateinit var dataProcessor: DataProcessor
-    private lateinit var bluetoothManager: BluetoothManager
-    private lateinit var networkManager: NetworkManager
-    private lateinit var cloudManager: CloudManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        connectivityStatusView = findViewById(R.id.connectivityStatusView)
-
-        notificationsManager = NotificationsManager(this)
-        dataProcessor = DataProcessor(this, notificationsManager)
-        bluetoothManager = BluetoothManager(this,
-            dataCallback = { data -> dataProcessor.processDataReceived(JSONObject(data)) },
-            statusCallback = { updateConnectionStatus() })
-        networkManager = NetworkManager(this,
-            dataCallback = { data -> dataProcessor.processDataReceived(JSONObject(data)) },
-            statusCallback = { updateConnectionStatus() })
-        cloudManager = CloudManager(this,
-            dataCallback = { data -> dataProcessor.processDataReceived(JSONObject(data)) },
-            statusCallback = { updateConnectionStatus() })
+        dataProcessor = DataProcessor(this,
+            notificationsManager = notificationsManager)
 
         setupConnectionStatusDoubleTap()
         setupPowerSave()
@@ -102,7 +109,7 @@ class MainActivity : PermissionsAwareActivity() {
         }
     }
     private fun updateConnectionStatus() {
-        connectivityStatusView.updateStatus(
+        connectivityStatusView.updateStatus (
             bluetoothPermitted = bluetoothManager.isPermitted(), bluetoothAvailable = bluetoothManager.isAvailable(), bluetoothConnected = bluetoothManager.isConnected(),
             networkPermitted = networkManager.isPermitted(), networkAvailable = networkManager.isAvailable(), networkConnected = networkManager.isConnected(),
             cloudPermitted = cloudManager.isPermitted() , cloudAvailable = cloudManager.isAvailable(), cloudConnected = cloudManager.isConnected(),

@@ -138,7 +138,8 @@ public:
         client.begin (_server);
         const char *headerList [] = { "Date" };
         client.collectHeaders (headerList, sizeof (headerList) / sizeof (headerList [0]));
-        if (client.sendRequest ("HEAD") > 0) {
+        int code = client.sendRequest ("HEAD");
+        if (code > 0) {
             header = client.header ("Date");
             if (!header.isEmpty ()) {
                 struct tm timeinfo;
@@ -147,7 +148,7 @@ public:
             }
         }
         client.end ();
-        DEBUG_PRINTF ("NetworkTimeFetcher::fetch: server=%s, header=[%s], time=%lu\n", _server.c_str (), header.c_str (), (unsigned long) time);
+        DEBUG_PRINTF ("NetworkTimeFetcher::fetch: server=%s, code=%d, header=[%s], time=%lu\n", _server.c_str (), code, header.c_str (), (unsigned long) time);
         return time;
     }
 };
@@ -331,9 +332,10 @@ private:
     }
     bool _open (const mode_t mode) {
         // MODE_WRITING and MODE_READING only
+        const bool exists = SPIFFS.exists (_filename);
         _file = SPIFFS.open (_filename, mode == MODE_WRITING ? FILE_APPEND : FILE_READ);
         if (_file) {
-            _size = _file.size ();
+            _size = exists ? _file.size () : 0;
             _mode = mode;
             DEBUG_PRINTF ("SPIFFSFile[%s]::_open: %s, size=%ld\n", _filename.c_str (), mode == MODE_WRITING ? "WRITING" : "READING", _size);
             return true;

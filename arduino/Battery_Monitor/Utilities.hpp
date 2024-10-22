@@ -2,16 +2,28 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-String hexabyte_to_hexastring (const uint8_t bytes []) {
-    char buffer [3*6+1];
-    sprintf (buffer, "%02x:%02x:%02x:%02x:%02x:%02x", bytes [0], bytes [1], bytes [2], bytes [3], bytes [4], bytes [5]);
-    return String (buffer);
-}
+typedef unsigned long interval_t;
+typedef unsigned long counter_t;
 
 // -----------------------------------------------------------------------------------------------
 
-typedef unsigned long interval_t;
-typedef unsigned long counter_t;
+template <size_t N>
+String BytesToHexString (const uint8_t bytes [], const char* separator = ":") {
+    constexpr size_t separator_max = 1; // change if needed
+    if (strlen (separator) > separator_max)
+        return String ("");
+    char buffer [(N * 2) + ((N - 1) * separator_max) + 1] = { '\0' }, *buffer_ptr = buffer;
+    for (size_t i = 0; i < N; i ++) {
+        if (i > 0 && separator [0] != '\0')
+            for (const char *separator_ptr = separator; *separator_ptr != '\0'; )
+            *buffer_ptr ++ = *separator_ptr ++;
+        static const char hex_chars [] = "0123456789abcdef";
+        *buffer_ptr ++ = hex_chars [(bytes [i] >> 4) & 0x0F];
+        *buffer_ptr ++ = hex_chars [bytes [i] & 0x0F];
+    }
+    *buffer_ptr = '\0';
+    return String (buffer);
+}
 
 // -----------------------------------------------------------------------------------------------
 

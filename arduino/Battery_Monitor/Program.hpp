@@ -32,11 +32,11 @@
 using AlarmInterface = ActivablePIN;
 
 #include "ProgramBase.hpp"
+#include "ProgramManager.hpp"
 #include "ProgramHardwareInterface.hpp"
 #include "ProgramHardwareManage.hpp"
 #include "ProgramNetworkManage.hpp"
 #include "ProgramDataManage.hpp"
-#include "ProgramManager.hpp"
 #include "ProgramTemperatureCalibration.hpp"
 #include "UtilitiesOTA.hpp" // breaks if included earlier due to SPIFFS headers
 
@@ -88,6 +88,7 @@ protected:
 class Program: public Component, public Diagnosticable {
 
     const Config config;
+    const String address;
 
     FanInterfaceStrategy_motorMapWithRotation fanInterfaceSetrategy;
     PidController <double> fanControllingAlgorithm;
@@ -104,11 +105,11 @@ class Program: public Component, public Diagnosticable {
 
     NetwerkManager network;
     NettimeManager nettime;
+    ControlManager control; //
     DeliverManager deliver; //
     PublishManager publish; //
     StorageManager storage; //
 
-    ControlManager control;
     UpdateManager updater;
     AlarmInterface alarmsInterface;
     AlarmManager alarms;
@@ -128,7 +129,7 @@ class Program: public Component, public Diagnosticable {
     } operational;
     Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
     String dataCollect (const String& name, const std::function <void (JsonVariant &)> func) const {
-        JsonCollector collector (name, getTimeString ());
+        JsonCollector collector (name, getTimeString (), address);
         JsonVariant obj = collector.document ().as <JsonVariant> ();
         func (obj);
         return collector;
@@ -190,6 +191,7 @@ class Program: public Component, public Diagnosticable {
 
 public:
     Program () :
+        address (getMacAddressBase ("")),
         fanControllingAlgorithm (config.FAN_CONTROL_P, config.FAN_CONTROL_I, config.FAN_CONTROL_D), fanSmoothingAlgorithm (config.FAN_SMOOTH_A),
         temperatureCalibrator (config.temperatureCalibrator),
         temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) { return temperatureCalibrator.calculateTemperature (channel, resistance); }),
@@ -198,8 +200,7 @@ public:
             [&] () { return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ()); }),
         devices (config.devices, [&] () { return network.available (); }),
         network (config.network), nettime (config.nettime, [&] () { return network.available (); }),
-        deliver (config.deliver, devices.blue ()), publish (config.publish, devices.mqtt (), [&] () { return network.available (); }), storage (config.storage),
-        control (config.control, devices),
+        control (config.control, address, devices), deliver (config.deliver, address, devices.blue (), devices.mqtt (), devices.webs ()), publish (config.publish, address, devices.mqtt (), [&] () { return network.available (); }), storage (config.storage),
         updater (config.updater, [&] () { return network.available (); }),
         alarmsInterface (config.alarmsInterface), alarms (config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
         diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),

@@ -59,7 +59,7 @@ public:
         sensors.begin ();
         DEBUG_PRINTF ("TemperatureSensor_DS18B20::init: (DAT=%d) found %d devices on bus, %d are DS18", config.PIN_DAT, sensors.getDeviceCount (), sensors.getDS18Count ());
         if ((_available = sensors.getAddress (_address, config.INDEX)))
-            DEBUG_PRINTF (" [0] = %s", __ds1820_address_to_string (_address).c_str ());
+            DEBUG_PRINTF (" [0] = %s", BytesToHexString <8> (_address, "").c_str ());
         DEBUG_PRINTF ("\n");
     }
     float getTemperature () {
@@ -74,13 +74,6 @@ public:
         OneWire onewire (pin);
         DeviceAddress address;
         return onewire.reset () && onewire.search (address) && (address [0] == DS18B20_ADDRESS) && (OneWire::crc8 (address, sizeof (address) - 1) == address [sizeof (address) - 1]);
-    }
-
-private:
-    static String __ds1820_address_to_string (const DeviceAddress& addr) {
-        char buffer [2*8+1];
-        sprintf (buffer, "%02x%02x%02x%02x%02x%02x%02x%02x", addr [0], addr [1], addr [2], addr [3], addr [4], addr [5], addr [6], addr [7]);
-        return String (buffer);
     }
 };
 
@@ -149,6 +142,7 @@ public:
         int PIN_I2C_SDA, PIN_I2C_SCL;
         MotorSpeedPins PIN_PWMS;
         int frequency;
+        bool invertedPWM;
     } Config;
 
     enum MotorID {
@@ -164,7 +158,7 @@ public:
     };
 
     static inline constexpr int MotorSpeedResolution = 8;
-    typedef uint8_t MotorSpeedType;
+    typedef uint8_t MotorSpeed;
 
 private:
     const Config &config;
@@ -191,10 +185,10 @@ private:
         Wire.write (_directions);
         Wire.endTransmission ();
     }
-    void applySpeed (const int motorID, const MotorSpeedType value) {
+    void applySpeed (const int motorID, const MotorSpeed value) {
         for (int id = 0; id < MotorCount; id ++)
             if (motorID == MOTOR_ALL || motorID == id)
-                analogWrite (config.PIN_PWMS [id], value);
+                analogWrite (config.PIN_PWMS [id], config.invertedPWM ? (255 - value) : value);
     }
 
 public:
@@ -207,11 +201,11 @@ public:
             analogWriteResolution (pin, MotorSpeedResolution);
             analogWriteFrequency (pin, config.frequency);
             pinMode (pin, OUTPUT);
-            analogWrite (pin, 0);
+            analogWrite (pin, config.invertedPWM ? 255 : 0);
         }
         DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::init: device %s i2c (address=0x%x, sda=%d, scl=%d, status=%d), pwm (resolution=%d, frequency=%d) \n", (_status == 0 ? "connected" : "unresponsive"), config.I2C_ADDR, config.PIN_I2C_SDA, config.PIN_I2C_SCL, _status, MotorSpeedResolution, config.frequency);
     }
-    void setSpeed (const MotorSpeedType speed, const int motorID = MOTOR_ALL) {
+    void setSpeed (const MotorSpeed speed, const int motorID = MOTOR_ALL) {
         DEBUG_PRINTF ("OpenSmart_QuadMotorDriver::setSpeed: %s -> %d\n", _motorid_to_string (motorID).c_str (), speed);
         applySpeed (motorID, speed);
     }

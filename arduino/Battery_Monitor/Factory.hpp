@@ -33,27 +33,28 @@ class Tester_HardwareInterfaces {
 
 public:
     void allInterface (const int repetitions = 16) {
-        static constexpr int SPEED_MIN = 0, SPEED_MAX = 255, SPEED_STEP = 16;
+        static constexpr float SPEED_MIN = 0.0f, SPEED_MAX = 100.0f, SPEED_STEP = 5.0f;
         static constexpr int DELAY = 5*1000;
 
         DEBUG_PRINTF ("*** Tester_HardwareInterfaces:: all (%d repetitions)\n", repetitions);
-        FanInterfaceStrategy_motorMap strategyMap;
-        // FanInterfaceStrategy_motorAll strategyAll;
-        FanInterface fanInterface (config.fanInterface, strategyMap);
-        TemperatureSensor_DS18B20 ds18b20 (config.ds18b20);
+        // FanInterfaceStrategy_motorMap strategyMap;
+        FanInterfaceStrategy_motorAll strategyAll;
+        FanInterface fanInterface (config.fanInterface, strategyAll);
+        //TemperatureSensor_DS18B20 ds18b20 (config.ds18b20);
         TemperatureInterface temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) { return steinharthart_calculator (static_cast <float> (resistance), 4095.0f, 10000.0f, 10000.0f, 25.0f); });
         fanInterface.begin ();
         temperatureInterface.begin ();
 
-        int speed = SPEED_MIN;
+        float speed = SPEED_MIN;
         RepetitionRunner (repetitions, DELAY).run ([&] () {
 
-            DEBUG_PRINTF ("+++ FAN: speed=%d\n", speed);
-            fanInterface.setSpeed (static_cast <FanInterface::FanSpeedType> (speed));
-            speed = (speed + SPEED_STEP) > SPEED_MAX ? SPEED_MIN : speed + SPEED_STEP;
+            DEBUG_PRINTF ("+++ FAN: speed=%.2f\n", speed);
+            fanInterface.setSpeed (speed);
+            speed += SPEED_STEP;
+            if (speed > SPEED_MAX) speed = SPEED_MIN;
 
             DEBUG_PRINTF ("+++ TEMPERATURE: channels=%d\n", TemperatureInterface::CHANNELS);
-            DEBUG_PRINTF ("ds18b20[ref]: %.2f\n", ds18b20.getTemperature ());
+            //DEBUG_PRINTF ("ds18b20[ref]: %.2f\n", ds18b20.getTemperature ());
             for (int channel = 0; channel < TemperatureInterface::CHANNELS; channel ++)
                 DEBUG_PRINTF ("channel [%2d]: %.2f\n", channel, temperatureInterface.getTemperature (channel));
             DEBUG_PRINTF ("\n");

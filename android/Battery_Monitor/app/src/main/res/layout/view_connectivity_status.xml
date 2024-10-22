@@ -9,26 +9,13 @@
         android:gravity="center"
         android:padding="4dp">
 
-        <!-- Base connectivity indicator -->
-        <LinearLayout
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <ImageView
-                android:id="@+id/connectivityIcon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_baseline_cable_24"
-                app:tint="@color/gray_medium"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Connections"
-                android:textSize="12sp"/>
-        </LinearLayout>
+            android:text="Battery Monitor"
+            android:textStyle="bold"
+            android:textSize="16sp"/>
 
         <!-- Spacer -->
         <Space
@@ -47,12 +34,6 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@drawable/ic_baseline_bluetooth_24"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="BLE"
-                android:textSize="12sp"/>
         </LinearLayout>
 
         <!-- Network status -->
@@ -68,12 +49,6 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@drawable/ic_baseline_wifi_24"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="NET"
-                android:textSize="12sp"/>
         </LinearLayout>
 
         <!-- Cloud status -->
@@ -89,12 +64,6 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@drawable/ic_baseline_cloud_24"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="CLD"
-                android:textSize="12sp"/>
         </LinearLayout>
 
     </LinearLayout>

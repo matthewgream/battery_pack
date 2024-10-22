@@ -73,8 +73,8 @@ struct Config {
         .strategyDefault = { .A = -0.012400427786, .B = 0.006860769298, .C = -0.001057743719, .D = 0.000056166727 } // XXX populate from calibration data
     };
     FanInterface::Config fanInterface = {
-        .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 2, .PIN_PWMS = { 3, 4, 5, 6 }, .frequency = 5000 },
-        .MIN_SPEED = 192, .MAX_SPEED = 255, // duplicated, not ideal
+        .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 2, .PIN_PWMS = { 3, 4, 5, 6 }, .frequency = 5000, .invertedPWM = true },
+        .DIRECTION = OpenSmart_QuadMotorDriver::MOTOR_CLOCKWISE, .MIN_SPEED = 96, .MAX_SPEED = 255, // duplicated, not ideal
         .MOTOR_ORDER = { 0, 1, 2, 3 }, .MOTOR_ROTATE = 5*60*1000
     };
     // hardware managers
@@ -89,14 +89,14 @@ struct Config {
     };
     double FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
     FanManager::Config fanManager = {
-        .NO_SPEED = 0, .MIN_SPEED = 85, .MAX_SPEED = 255
     };
 
     // devices
     DeviceManager::Config devices = {
         .blue = { .name = DEFAULT_NAME, .serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", .characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", .pin = DEFAULT_BLUE_PIN, .intervalConnectionCheck = 1*60*1000 },
         .mqtt = { .client = DEFAULT_NAME, .host = "mqtt.local", .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .port = 1883, .bufferSize = 3*1024 },
-        .webserver = { .enabled  = true, .port = 80, .url_version = "/version" }
+        .webs = { .enabled  = true, .port = 80, .url_version = "/version" },
+        .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME } 
     };
 
     // network managers
@@ -104,7 +104,7 @@ struct Config {
         .host = DEFAULT_NAME, .ssid = DEFAULT_WIFI_SSID, .pass = DEFAULT_WIFI_PASS, .intervalConnectionCheck = 1*60*1000, .multicastDNS = true
     };
     NettimeManager::Config nettime = {
-        .useragent = String (DEFAULT_NAME) + String ("/1.0"), .server = "https://www.google.com",
+        .useragent = String (DEFAULT_NAME) + String ("/1.0"), .server = "http://matthewgream.net",
         .intervalUpdate = 60*60*1000, .intervalAdjust = 60*1000,
         .failureLimit = 3
     };
@@ -123,7 +123,7 @@ struct Config {
     };
 
     // program
-    ControlManager::Config control = { .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME } };
+    ControlManager::Config control = { };
     UpdateManager::Config updater = { .intervalCheck = 1*24*60*60*1000, .intervalLong = (interval_t) 28*24*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase () };
     AlarmManager::Config alarms = { }; ActivablePIN::Config alarmsInterface = { .PIN = -1, .ACTIVE = LOW };
     DiagnosticManager::Config diagnostics = { };
