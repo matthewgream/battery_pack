@@ -23,9 +23,10 @@ __RECORD=$(curl --silent --request GET --url https://api.cloudflare.com/client/v
 if [ -z "$__RECORD" ]; then
 	echo "CANNOT FIND CDNS RECORD ID TO UPDATE"
 else
+	__CURRENT=$(date --iso-8601=seconds)
 	curl --silent --request PUT --url https://api.cloudflare.com/client/v4/zones/$SERVICE_CDNS_ZONE/dns_records/$__RECORD \
 		--header "Content-Type: application/json" --header "Authorization: Bearer $SERVICE_CDNS_TOKEN" \
-		--data "{ \"name\": \"$SERVICE_NAME_EXT\", \"proxied\": false, \"ttl\": 600, \"content\": \"$SERVICE_ADDR_EXT\", \"type\": \"A\" }" | jq
+		--data "{ \"name\": \"$SERVICE_NAME_EXT\", \"proxied\": false, \"ttl\": 600, \"content\": \"$SERVICE_ADDR_EXT\", \"type\": \"A\", \"comment\": \"$SERVICE_NAME $__CURRENT\" }" | jq
 fi
 
 #############
