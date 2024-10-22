@@ -1,4 +1,4 @@
-![Battery Cells](optimiser/battery_cells_image.jpg)
+![Battery Cells](physical/battery_cells_image_2.jpg)
 
 
 <h1>V1.0.0</h1>
