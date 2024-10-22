@@ -18,8 +18,8 @@ fi
 SERVICE_NAME_EXT="$SERVICE_NAME-service"
 SERVICE_ADDR_EXT=$(curl --silent https://api.ipify.org/)
 #
-__RECORD=$(curl --silent --request GET --url https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records?comment.contains=$SERVICE_NAME \
-	--header "Authorization: Bearer $CF_TOKEN" | jq ".result[0].id" | tr -d '"')
+__RECORD=$(curl --silent --request GET --url https://api.cloudflare.com/client/v4/zones/$SERVICE_CDNS_ZONE/dns_records?comment.contains=$SERVICE_NAME \
+	--header "Authorization: Bearer $SERVICE_CDNS_TOKEN" | jq ".result[0].id" | tr -d '"')
 if [ -z "$__RECORD" ]; then
 	echo "CANNOT FIND CDNS RECORD ID TO UPDATE"
 else
