@@ -40,7 +40,7 @@ class BluetoothDeviceManager (
     private val statusCallback: () -> Unit,
     private val isPermitted: () -> Boolean,
     private val isEnabled: () -> Boolean
-) {
+){
     private val handler = Handler (Looper.getMainLooper ())
 
     private var bluetoothGatt: BluetoothGatt? = null
@@ -151,9 +151,9 @@ class BluetoothDeviceManager (
         Log.d ("Bluetooth", "Device locate initiated")
         statusCallback ()
         when {
-            !isEnabled () -> Log.e ("Bluetooth", "Bluetooth is not enabled")
-            !isPermitted () -> Log.e ("Bluetooth", "Bluetooth is not permitted")
-            isConnected -> Log.d ("Bluetooth", "Device is already connected, will not locate")
+            !isEnabled () -> Log.e ("Bluetooth", "Bluetooth not enabled or available")
+            !isPermitted () -> Log.e ("Bluetooth", "Bluetooth access not permitted")
+            isConnected -> Log.d ("Bluetooth", "Bluetooth connection already active, will not locate")
             else -> scanner.start ()
         }
     }

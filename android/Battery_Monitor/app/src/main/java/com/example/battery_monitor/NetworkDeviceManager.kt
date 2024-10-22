@@ -60,9 +60,9 @@ class NetworkDeviceManager(
         Log.d("Network", "Device locate initiated")
         statusCallback()
         when {
-            !isEnabled() -> Log.e("Network", "Network is not enabled or connected")
-            !isPermitted() -> Log.e("Network", "Network is not permitted")
-            isConnected -> Log.d("Network", "Device is already connected, will not locate")
+            !isEnabled() -> Log.e("Network", "Network not enabled or available")
+            !isPermitted() -> Log.e("Network", "Network access not permitted")
+            isConnected -> Log.d("Network", "Network connection already active, will not locate")
             else -> scanner.start()
         }
     }

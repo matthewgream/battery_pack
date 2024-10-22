@@ -52,27 +52,18 @@ class BluetoothManager (private val activity: Activity, dataCallback: (String) -
         checker.start ()
     }
 
+    //
+
     fun onDestroy () {
         checker.stop ()
         device.disconnect ()
     }
-    fun onPause () {
-//        checker.stop ()
-//        if (permissions.permissionsAllowed)
-//            device.disconnect ()
+    fun onSuspend (enabled: Boolean) {
     }
-    fun onResume() {
-//        checker.start ()
-//        if (permissions.permissionsAllowed)
-//            device.locate ()
+    fun onPowerSave (enabled: Boolean) {
     }
     fun onDoubleTap () {
         device.reconnect ()
-    }
-    fun onPowerSave() {
-        // ??? reduce the scanning
-        // ??? reduce the data reception period
-        // ??? reduce the diagnostics rendering
     }
 
     //
@@ -80,5 +71,4 @@ class BluetoothManager (private val activity: Activity, dataCallback: (String) -
     fun isAvailable (): Boolean = adapter.isEnabled
     fun isPermitted (): Boolean = permissions.allowed
     fun isConnected (): Boolean = device.isConnected ()
-
 }

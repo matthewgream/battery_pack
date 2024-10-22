@@ -7,7 +7,9 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-
+    <color name="gray_light">#BDBDBD</color>        <!-- gray_400 - Even lighter option -->
+    <color name="gray_medium">#9E9E9E</color>       <!-- gray_500 - Current choice -->
+    <color name="gray_dark">#757575</color>         <!-- gray_600 - Darker option -->
     <color name="background_color">#F5F5F5</color>
     <color name="text_color">#333333</color>
     <color name="status_color">#4CAF50</color>
@@ -25,4 +27,9 @@
     <color name="threshold_warn">#FFA500</color> <!-- Orange for 35°C -->
     <color name="threshold_max">#8B0000</color> <!-- Dark Red for 45°C -->
     <color name="ic_launcher_background">#FFFFFF</color>
+
+    <color name="icon_disabled">#757575</color>
+    <color name="icon_disconnected">#E53935</color>
+    <color name="icon_connected">#43A047</color>
+    <color name="icon_standby">#FB8C00</color>
 </resources>

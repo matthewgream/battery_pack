@@ -7,18 +7,18 @@ import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.Looper
 
-class NetworkAdapter (context: Context) {
+class CloudAdapter (context: Context) {
     private val connectivityManager: ConnectivityManager =
         context.getSystemService (Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     fun isEnabled (): Boolean {
         val network = connectivityManager.activeNetwork
         val capabilities = connectivityManager.getNetworkCapabilities (network)
-        return capabilities?.hasTransport (NetworkCapabilities.TRANSPORT_WIFI) == true
+        return capabilities?.hasCapability (NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
 }
 
-class NetworkManager (
+class CloudManager (
     activity: Activity,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
@@ -26,17 +26,20 @@ class NetworkManager (
     private val handler = Handler (Looper.getMainLooper ())
 
     private val permissions: PermissionsManager = PermissionsManagerFactory (activity).create (
-        tag = "Network",
+        tag = "Cloud",
         permissions = arrayOf (
             android.Manifest.permission.INTERNET,
             android.Manifest.permission.ACCESS_NETWORK_STATE
         )
     )
 
-    private val adapter: NetworkAdapter = NetworkAdapter (activity)
-    private val device: NetworkDeviceManager = NetworkDeviceManager (activity,
+    private val adapter: CloudAdapter = CloudAdapter (activity)
+    private val device: CloudDeviceManager = CloudDeviceManager (
+        activity,
         adapter,
-        NetworkDeviceManagerConfig (),
+        CloudDeviceManagerConfig (
+            host = "tcp://mqtt.local"
+        ),
         dataCallback,
         statusCallback,
         isPermitted = { permissions.allowed },
@@ -45,7 +48,7 @@ class NetworkManager (
     private val checker: NetworkStateReceiver = NetworkStateReceiver (
         context = activity,
         onDisabled = { device.disconnect () },
-        onEnabled = { device.locate () }
+        onEnabled = { device.connect () }
     )
 
     init {
@@ -78,4 +81,13 @@ class NetworkManager (
     fun isAvailable (): Boolean = adapter.isEnabled ()
     fun isPermitted (): Boolean = permissions.allowed
     fun isConnected (): Boolean = device.isConnected ()
+
+    //
+
+    fun publish (topic: String, message: String) {
+        device.publish (topic, message)
+    }
+    fun subscribe (topic: String) {
+        device.subscribe (topic)
+    }
 }

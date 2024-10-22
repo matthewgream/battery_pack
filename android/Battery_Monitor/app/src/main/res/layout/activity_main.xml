@@ -7,18 +7,12 @@
     android:padding="4dp">
 
         <!-- Connection Status -->
-        <TextView
-            android:id="@+id/connectionStatusTextView"
+        <com.example.battery_monitor.DataViewConnectivityStatus
+            android:id="@+id/connectivityStatusView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:padding="4dp"
             android:layout_marginTop="4dp"
             android:layout_marginBottom="8dp"
-            android:clickable="true"
-            android:focusable="true"
             android:elevation="4dp"/>
 
         <!-- Operational Data Frame -->
