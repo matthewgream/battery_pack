@@ -1,0 +1,5 @@
+#!/bin/bash
+
+. /opt/battery_pack/server/config/service_mqtt/secrets.txt
+/opt/battery_pack/server/scripts/service_connector &
+

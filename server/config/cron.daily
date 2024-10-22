@@ -1,0 +1,7 @@
+#!/bin/sh
+
+if [ -f /opt/battery_pack/server/scripts/daily ]; then
+        /bin/sh /opt/battery_pack/server/scripts/daily &
+fi
+
+exit 0
