@@ -3,14 +3,14 @@
 #############
 
 SERVICE_NAME_INT="$SERVICE_NAME-service-upnp"
-SERVICE_ADDR_INT=$(ip address | grep 192 | awk '{ print $2; }')
+SERVICE_ADDR_INT=$(ip address | grep 192 | awk '{ print $2; }' | sed s,/.*$,,)
 #
-__CHECK=$(/usr/bin/upnpc -L | grep $SERVICE_NAME_INT)
+__CHECK=$(/usr/bin/upnpc -l | grep $SERVICE_NAME_INT)
 if [ -z "$__CHECK" ]; then
-        /usr/bin/upnpc -e $SERVICE_NAME_INT -r $SERVICE_PORT_INT $SERVICE_PORT_EXT $SERVICE_TYPE > /dev/null
+        /usr/bin/upnpc -e $SERVICE_NAME_INT -r $SERVICE_PORT_INT $SERVICE_PORT_EXT $SERVICE_TYPE
 elif [[ "$__CHECK" != *"$SERVICE_ADDR_INT"* ]] || [[ "$__CHECK" != *"$SERVICE_PORT_EXT"* ]] || [[ "$__CHECK" != *"$SERVICE_PORT_INT"* ]]; then
-        /usr/bin/upnpc -d $SERVICE_PORT_EXT $SERVICE_PROTOCOL > /dev/null > /dev/null
-        /usr/bin/upnpc -e $SERVICE_NAME_INT -r $SERVICE_PORT_INT $SERVICE_PORT_EXT $SERVICE_TYPE > /dev/null
+        /usr/bin/upnpc -d $SERVICE_PORT_EXT $SERVICE_PROTOCOL
+        /usr/bin/upnpc -e $SERVICE_NAME_INT -r $SERVICE_PORT_INT $SERVICE_PORT_EXT $SERVICE_TYPE
 fi
 
 #############
@@ -25,7 +25,7 @@ if [ -z "$__RECORD" ]; then
 else
 	curl --silent --request PUT --url https://api.cloudflare.com/client/v4/zones/$SERVICE_CDNS_ZONE/dns_records/$__RECORD \
 		--header "Content-Type: application/json" --header "Authorization: Bearer $SERVICE_CDNS_TOKEN" \
-		--data "{ \"name\": \"$SERVICE_NAME_EXT\", \"proxied\": false, \"ttl\": 600, \"content\": \"$SERVICE_ADDR_EXT\", \"type\": \"A\" }"  > /dev/null
+		--data "{ \"name\": \"$SERVICE_NAME_EXT\", \"proxied\": false, \"ttl\": 600, \"content\": \"$SERVICE_ADDR_EXT\", \"type\": \"A\" }" | jq
 fi
 
 #############
