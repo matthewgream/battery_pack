@@ -20,8 +20,8 @@ public:
 private:
     const Config &config;
 
-    std::shared_ptr <WiFiUDP> _udp;
-    std::shared_ptr <MDNS> _mdns;
+    WiFiUDP _udp;
+    MDNS _mdns;
 
     ConnectionSignalTracker _connectionSignalTracker;
     bool _connected = false, _available = false;
@@ -68,35 +68,33 @@ private:
     }
 
     void mdnsBegin () {
-        if ((_udp = std::make_shared <WiFiUDP> ()))
-            _mdns = std::make_shared <MDNS> (*_udp);
-        if (_mdns) {
-          MDNSStatus_t status = _mdns->begin ();
-          if (status != MDNSSuccess)
-              DEBUG_PRINTF ("NetworkManager::begin: mdns begin error=%d\n", status);
-          extern const String build_info;
-          _mdns->addServiceRecord (MDNSServiceTCP, 80, "webserver._http", { "build=" + build_info }); // XXX move elsewhere, should not be here
-          _mdns->addServiceRecord (MDNSServiceTCP, 81, "battery_monitor._ws", { "id=" + getMacAddressBase ("") }); // XXX move elsewhere, should not be here
+        if (config.multicastDNS) {
+            MDNSStatus_t status = _mdns.begin ();
+            if (status != MDNSSuccess)
+                DEBUG_PRINTF ("NetworkManager::begin: mdns begin error=%d\n", status);
+            extern const String build_info;
+            _mdns.addServiceRecord (MDNSServiceTCP, 80, "webserver._http", { "build=" + build_info }); // XXX move elsewhere, should not be here
+            _mdns.addServiceRecord (MDNSServiceTCP, 81, "battery_monitor._ws", { "id=" + getMacAddressBase ("") }); // XXX move elsewhere, should not be here
         }
     }
     void mdnsStart () {
-        if (_mdns)
-            _mdns->start (_address, config.host.c_str ());
+        if (config.multicastDNS)
+            _mdns.start (_address, config.host.c_str ());
     }
     void mdnsProcess () {
-        if (_mdns) {
-            MDNSStatus_t status = _mdns->process ();
+        if (config.multicastDNS) {
+            MDNSStatus_t status = _mdns.process ();
             if (status != MDNSSuccess)
                 DEBUG_PRINTF ("NetworkManager::process: mdns process error=%d\n", status);
         }
     }
     void mdnsStop () {
-        if (_mdns)
-            _mdns->stop ();
+        if (config.multicastDNS)
+            _mdns.stop ();
     }
 
 public:
-    explicit NetwerkManager (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+    explicit NetwerkManager (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg), _mdns (_udp), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
 
     void begin () override {
         WiFi.persistent (false);
@@ -105,9 +103,7 @@ public:
         WiFi.setAutoReconnect (true);
         WiFi.mode (WIFI_STA);
         connect ();
-
-        if (config.multicastDNS)
-            mdnsBegin ();
+        mdnsBegin ();
     }
     void connect () {
         DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddressWifi ().c_str (), config.host.c_str ());

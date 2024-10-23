@@ -23,7 +23,7 @@ private:
 
     void start () {
         _started = true; // if it fails, don't try again
-        AsyncWebServer* server = new (std::nothrow) AsyncWebServer (config.port);
+        auto* server = new (std::nothrow) AsyncWebServer (config.port);
         if (!server) {
             DEBUG_PRINTF ("WebServer::start: failed, insufficient memory\n");
             return;
