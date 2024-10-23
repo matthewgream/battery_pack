@@ -7,5 +7,5 @@ while [ true ]; do
 	FILENAME=session-`date -Iseconds|sed 's/[-:+/T]//g'`.json
 	FILEPATH=/mnt/database/BatteryMonitor/$FILENAME
 	echo Capturing to $FILEPATH
-	/usr/bin/mosquitto_sub -t BatteryMonitor/data -t BatteryMonitor/diag | tee $FILEPATH
+	/usr/bin/mosquitto_sub -t BatteryMonitor/+/data -t BatteryMonitor/+/diag | tee $FILEPATH
 done
