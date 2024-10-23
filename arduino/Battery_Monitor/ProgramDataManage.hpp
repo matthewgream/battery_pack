@@ -135,7 +135,7 @@ public:
         }), config (cfg), _networkIsAvailable (networkIsAvailable), _id (id), _mqtt (mqtt) {}
     bool publish (const String& data, const String& subtopic) {
         if (_networkIsAvailable ()) {
-          if (_mqtt.connected () && _mqtt.publish (config.topic + "/" + subtopic, data)) { // XXX address
+          if (_mqtt.connected () && _mqtt.publish (config.topic + "/" + _id + "/" + subtopic, data)) {
               _publishes += ArithmeticToString (data.length ());
               _failures = 0;
               return true;

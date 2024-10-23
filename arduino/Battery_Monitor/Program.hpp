@@ -32,7 +32,7 @@
 using AlarmInterface = ActivablePIN;
 
 #include "ProgramBase.hpp"
-#include "ProgramManager.hpp"
+#include "ProgramManage.hpp"
 #include "ProgramHardwareInterface.hpp"
 #include "ProgramHardwareManage.hpp"
 #include "ProgramNetworkManage.hpp"
