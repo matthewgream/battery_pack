@@ -74,7 +74,7 @@ private:
                 DEBUG_PRINTF ("NetworkManager::begin: mdns begin error=%d\n", status);
             extern const String build_info;
             _mdns.addServiceRecord (MDNSServiceTCP, 80, "webserver._http", { "build=" + build_info }); // XXX move elsewhere, should not be here
-            _mdns.addServiceRecord (MDNSServiceTCP, 81, "battery_monitor._ws", { "id=" + getMacAddressBase ("") }); // XXX move elsewhere, should not be here
+            _mdns.addServiceRecord (MDNSServiceTCP, 81, "battery_monitor._ws", { "addr=" + getMacAddressBase ("") }); // XXX move elsewhere, should not be here
         }
     }
     void mdnsStart () {

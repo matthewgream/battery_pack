@@ -17,6 +17,7 @@ class NetworkDeviceScannerConfig(
 class NetworkDeviceScanner(
     private val nsdManager: NsdManager,
     private val config: NetworkDeviceScannerConfig,
+    private val connectionInfo: ConnectionInfo,
     private val onFound: (NsdServiceInfo) -> Unit
 ) : ConnectivityComponent("NetworkDeviceScanner") {
 
@@ -69,9 +70,24 @@ class NetworkDeviceScanner(
                 }
 
                 override fun onServiceUpdated(updatedServiceInfo: NsdServiceInfo) {
-                    Log.d(tag, "Service resolved: ${updatedServiceInfo.serviceName}")
-                    stop()
-                    onFound(updatedServiceInfo)
+                    val txtRecords = updatedServiceInfo.attributes.map { "${it.key}=${String(it.value)}" }
+                    val serviceAddr = txtRecords.firstOrNull { it.startsWith("addr=") }?.split("=")?.getOrNull(1)
+
+                    if (connectionInfo.deviceAddress.isEmpty()) {
+                        // If we don't have a target address yet, log all devices we see
+                        Log.d(tag, "Service resolved but no target address set. Found address: $serviceAddr")
+                    } else if (serviceAddr == connectionInfo.deviceAddress) {
+                        // Found matching service
+                        Log.d(tag, "Service resolved with matching address: $serviceAddr")
+                        stop()
+                        onFound(updatedServiceInfo)
+                    } else {
+                        // Found non-matching service
+                        Log.d(tag, "Service resolved but address mismatch. Expected: ${connectionInfo.deviceAddress}, Found: $serviceAddr")
+                    }
+
+                    // Log all TXT records for debugging
+                    Log.d(tag, "Service TXT records: $txtRecords")
                 }
 
                 override fun onServiceLost() {

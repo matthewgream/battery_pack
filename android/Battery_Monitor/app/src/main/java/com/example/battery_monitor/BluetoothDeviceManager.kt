@@ -9,15 +9,10 @@ import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import org.json.JSONObject
 import java.nio.charset.StandardCharsets
-import java.time.Instant
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 
@@ -36,6 +31,7 @@ class BluetoothDeviceManager (
     private val activity: Activity,
     private val adapter: BluetoothAdapter,
     private val config: BluetoothDeviceManagerConfig,
+    private val connectionInfo: ConnectionInfo,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
     private val isPermitted: () -> Boolean,
@@ -124,22 +120,7 @@ class BluetoothDeviceManager (
     fun transmitTypeInfo () {
         val characteristic = bluetoothGatt?.getService (config.SERVICE_UUID)?.getCharacteristic (config.CHARACTERISTIC_UUID)
         if (characteristic != null) {
-            val appName = "batterymonitor"
-            val appVersion = try {
-                activity.packageManager.getPackageInfo (activity.packageName, PackageManager.PackageInfoFlags.of (0)).versionName
-            } catch (e: PackageManager.NameNotFoundException) {
-                "?.?.?"
-            }
-            val appPlatform = "android${Build.VERSION.SDK_INT}"
-            val appDevice = "${Build.MANUFACTURER} ${Build.MODEL}"
-
-            val jsonString = JSONObject ().apply {
-                put ("type", "info")
-                put ("time", DateTimeFormatter.ISO_INSTANT.format (Instant.now ()))
-                put ("info", "$appName-custom-$appPlatform-v$appVersion ($appDevice)")
-            }.toString ()
-
-            bluetoothGatt?.writeCharacteristic (characteristic, jsonString.toByteArray (StandardCharsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+            bluetoothGatt?.writeCharacteristic (characteristic, connectionInfo.toJsonString().toByteArray(StandardCharsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
         }
     }
     fun permissionsAllowed () {

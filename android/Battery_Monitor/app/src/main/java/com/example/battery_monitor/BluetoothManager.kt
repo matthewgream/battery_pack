@@ -9,7 +9,12 @@ import android.os.Handler
 import android.os.Looper
 
 @SuppressLint("MissingPermission")
-class BluetoothManager (private val activity: Activity, dataCallback: (String) -> Unit, statusCallback: () -> Unit) {
+class BluetoothManager (
+    private val activity: Activity,
+    private val connectionInfo: ConnectionInfo,
+    dataCallback: (String) -> Unit,
+    statusCallback: () -> Unit
+) {
 
     private val handler = Handler (Looper.getMainLooper ())
 
@@ -31,6 +36,7 @@ class BluetoothManager (private val activity: Activity, dataCallback: (String) -
     private val device: BluetoothDeviceManager = BluetoothDeviceManager (activity,
         adapter,
         BluetoothDeviceManagerConfig (),
+        connectionInfo,
         dataCallback,
         statusCallback,
         isPermitted = { permissions.allowed },

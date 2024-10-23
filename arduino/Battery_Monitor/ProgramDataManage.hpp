@@ -72,16 +72,19 @@ private:
     const String _id;
     BluetoothDevice& _blue;
     MQTTPublisher& _mqtt;
-    WebServer& _webs;
+    WebSocket& _webs;
 
     ActivationTrackerWithDetail _delivers;
     ActivationTracker _failures;
 
 public:
-    explicit DeliverManager (const Config& cfg, const String& id, BluetoothDevice& blue, MQTTPublisher& mqtt, WebServer& webs): Alarmable ({
+    explicit DeliverManager (const Config& cfg, const String& id, BluetoothDevice& blue, MQTTPublisher& mqtt, WebSocket& webs): Alarmable ({
             AlarmCondition (ALARM_DELIVER_FAIL, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.payloadExceeded (); })
         }), config (cfg), _id (id), _blue (blue), _mqtt (mqtt), _webs (webs) {}
+
+    void begin () override {
+    }
     bool deliver (const String& data) {
         if (_blue.available ()) {
             if (_blue.notify (data)) {

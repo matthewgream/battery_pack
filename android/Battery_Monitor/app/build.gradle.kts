@@ -45,4 +45,5 @@ dependencies {
     implementation(libs.androidx.cardview)
     implementation(libs.org.eclipse.paho.client.mqttv3)
     implementation(libs.hivemq.mqtt.client)
+    implementation(libs.java.websocket)
 }

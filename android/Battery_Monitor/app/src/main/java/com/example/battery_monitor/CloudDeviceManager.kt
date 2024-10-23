@@ -22,6 +22,7 @@ class CloudDeviceManager (
     private val activity: Activity,
     private val adapter: CloudAdapter,
     private val config: CloudDeviceManagerConfig,
+    private val connectionInfo: ConnectionInfo,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
     private val isEnabled: () -> Boolean,

@@ -18,30 +18,125 @@ public:
 private:
     const Config &config;
 
-    std::shared_ptr <AsyncWebServer> _server;
+    AsyncWebServer _server;
     bool _started = false;
 
     void start () {
-        _started = true; // if it fails, don't try again
-        auto* server = new (std::nothrow) AsyncWebServer (config.port);
-        if (!server) {
-            DEBUG_PRINTF ("WebServer::start: failed, insufficient memory\n");
-            return;
-        }
-        _server.reset (server);
-        _server->on (config.url_version.c_str (), HTTP_GET, [] (AsyncWebServerRequest *request) {
+        _started = true;
+        _server.on (config.url_version.c_str (), HTTP_GET, [] (AsyncWebServerRequest *request) {
             extern const String build_info;
             request->send (200, "text/plain", build_info);
         });
-        _server->onNotFound ([] (AsyncWebServerRequest *request) {
+        _server.onNotFound ([] (AsyncWebServerRequest *request) {
             request->send (404, "text/plain", STRING_404_NOT_FOUND);
         });
-        _server->begin ();
+        _server.begin ();
         DEBUG_PRINTF ("WebServer::start: active, port=%u, url_version=%s\n", config.port, config.url_version.c_str ());
     }
 
 public:
-    explicit WebServer (const Config& cfg): config (cfg) {}
+    explicit WebServer (const Config& cfg): config (cfg), _server (config.port) {}
+    void begin () {
+    }
+    void process () {
+        // only when connected or panic()
+        if (config.enabled && !_started)
+            start ();
+    }
+    //
+    void serialize (JsonVariant &obj) const override {
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
+class WebSocket: public JsonSerializable  {
+public:
+    typedef struct {
+        bool enabled;
+        uint16_t port;
+        String root;
+    } Config;
+
+private:
+    const Config &config;
+
+    AsyncWebServer _server;
+    AsyncWebSocket _socket;
+    bool _started = false;
+
+    static void webSocket_onEvent (AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len) {
+        if (type == WS_EVT_CONNECT){
+            DEBUG_PRINTF ("ws[%s][%u] connect\n", server->url (), client->id ());
+            //client->printf("Hello Client %u :)", client->id());
+            client->ping();
+
+          } else if(type == WS_EVT_DISCONNECT){
+            DEBUG_PRINTF ("ws[%s][%u] disconnect\n", server->url(), client->id());
+
+          } else if(type == WS_EVT_ERROR){
+            DEBUG_PRINTF ("ws[%s][%u] error(%u): %s\n", server->url(), client->id(), *((uint16_t*)arg), (char*)data);
+
+          } else if(type == WS_EVT_PONG){
+            DEBUG_PRINTF ("ws[%s][%u] pong[%u]: %s\n", server->url(), client->id(), len, (len)?(char*)data:"");
+
+          } else if(type == WS_EVT_DATA){
+            AwsFrameInfo * info = (AwsFrameInfo*)arg;
+            if(info->final && info->index == 0 && info->len == len){
+              DEBUG_PRINTF ("ws[%s][%u] %s-message[%llu]: ", server->url(), client->id(), (info->opcode == WS_TEXT)?"text":"binary", info->len);
+              if(info->opcode == WS_TEXT){
+                data[len] = 0;
+                DEBUG_PRINTF ("%s\n", (char*)data);
+              } else {
+                for(size_t i=0; i < info->len; i++)
+                  DEBUG_PRINTF ("%02x ", data[i]);
+                DEBUG_PRINTF ("\n");
+              }
+              // if(info->opcode == WS_TEXT)
+              //   client->text ("I got your text message");
+              // else
+              //   client->binary ("I got your binary message");
+            } else {
+              if (info->index == 0){
+                if (info->num == 0)
+                  DEBUG_PRINTF ("ws[%s][%u] %s-message start\n", server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
+                DEBUG_PRINTF ("ws[%s][%u] frame[%u] start[%llu]\n", server->url(), client->id(), info->num, info->len);
+              }
+              DEBUG_PRINTF ("ws[%s][%u] frame[%u] %s[%llu - %llu]: ", server->url(), client->id(), info->num, (info->message_opcode == WS_TEXT)?"text":"binary", info->index, info->index + len);
+              if(info->message_opcode == WS_TEXT){
+                data[len] = 0;
+                DEBUG_PRINTF ("%s\n", (char*)data);
+              } else {
+                for(size_t i=0; i < len; i++)
+                  DEBUG_PRINTF ("%02x ", data[i]);
+                DEBUG_PRINTF ("\n");
+              }
+
+              if((info->index + len) == info->len){
+                DEBUG_PRINTF ("ws[%s][%u] frame[%u] end[%llu]\n", server->url(), client->id(), info->num, info->len);
+                if(info->final){
+                  DEBUG_PRINTF ("ws[%s][%u] %s-message end\n", server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
+                  // if(info->message_opcode == WS_TEXT)
+                  //   client->text("I got your text message");
+                  // else
+                  //   client->binary("I got your binary message");
+                }
+              }
+            }
+          }      
+    }
+
+    void start () {
+        _started = true;
+        _socket.onEvent (webSocket_onEvent);
+        _server.addHandler (&_socket);
+        _server.begin ();
+        DEBUG_PRINTF ("WebSocket::start: active, port=%u, root=%s\n", config.port, config.root.c_str ());
+    }
+
+public:
+    explicit WebSocket (const Config& cfg): config (cfg), _server (config.port), _socket (config.root) {}
     void begin () {
     }
     void process () {

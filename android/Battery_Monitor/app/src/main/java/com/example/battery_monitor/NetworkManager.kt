@@ -20,6 +20,7 @@ class NetworkAdapter (context: Context) {
 
 class NetworkManager (
     activity: Activity,
+    private val connectionInfo: ConnectionInfo,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
 ) {
@@ -37,10 +38,11 @@ class NetworkManager (
     private val device: NetworkDeviceManager = NetworkDeviceManager (activity,
         adapter,
         NetworkDeviceManagerConfig (),
+        connectionInfo,
         dataCallback,
         statusCallback,
         isPermitted = { permissions.allowed },
-        isEnabled = { adapter.isEnabled () }
+        isEnabled = { adapter.isEnabled () && connectionInfo.deviceAddress.isNotEmpty() }
     )
     private val checker: NetworkStateReceiver = NetworkStateReceiver (
         context = activity,

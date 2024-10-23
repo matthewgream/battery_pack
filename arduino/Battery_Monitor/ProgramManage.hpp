@@ -112,7 +112,8 @@ public:
     typedef struct {
         BluetoothDevice::Config blue;
         MQTTPublisher::Config mqtt;
-        WebServer::Config webs;
+        WebServer::Config webserver;
+        WebSocket::Config websocket;
         LoggingHandler::Config logging;
     } Config;
 
@@ -124,34 +125,39 @@ private:
 
     BluetoothDevice _blue;
     MQTTPublisher _mqtt;
-    WebServer _webs;
+    WebServer _webserver;
+    WebSocket _websocket;
     LoggingHandler _logging;
 
 public:
-    explicit DeviceManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (networkIsAvailable), _blue (config.blue), _mqtt (config.mqtt), _webs (config.webs), _logging (config.logging, getMacAddressBase (""), &_mqtt) {}
+    explicit DeviceManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (networkIsAvailable), _blue (config.blue), _mqtt (config.mqtt), _webserver (config.webserver), _websocket (config.websocket), _logging (config.logging, getMacAddressBase (""), &_mqtt) {}
     void begin () override {
         _blue.begin ();
         _mqtt.begin ();
-        _webs.begin ();
+        _webserver.begin ();
+        _websocket.begin ();
     }
     void process () override {
         _blue.process ();
         if (_networkIsAvailable ()) {
             _mqtt.process ();
-            _webs.process ();
+            _webserver.process ();
+            _websocket.process ();
         }
     }
 
     BluetoothDevice& blue () { return _blue; }
     MQTTPublisher& mqtt () { return _mqtt; }
-    WebServer& webs () { return _webs; }
+    WebServer& webserver () { return _webserver; }
+    WebSocket& websocket () { return _websocket; }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["devices"].to <JsonObject> ();
             sub ["blue"] = _blue;
             sub ["mqtt"] = _mqtt;
-            sub ["webs"] = _webs;
+            sub ["webserver"] = _webserver;
+            sub ["websocket"] = _websocket;
     }
 };
 

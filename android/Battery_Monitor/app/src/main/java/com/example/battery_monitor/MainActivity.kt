@@ -1,32 +1,74 @@
 package com.example.battery_monitor
 
+import android.app.Activity
 import android.content.Context
+import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.util.Log
-import com.google.android.material.appbar.MaterialToolbar
 import org.json.JSONObject
+import java.time.Instant
+import java.time.format.DateTimeFormatter
+
+class ConnectionInfo(private val activity: Activity) {
+    private val prefs: SharedPreferences = activity.getSharedPreferences("ConnectionInfo", Context.MODE_PRIVATE)
+
+    private val appName = "batterymonitor"
+    private val appVersion = try {
+        activity.packageManager.getPackageInfo(activity.packageName, PackageManager.PackageInfoFlags.of(0)).versionName
+    } catch (e: PackageManager.NameNotFoundException) {
+        "?.?.?"
+    }
+    private val appPlatform = "android${Build.VERSION.SDK_INT}"
+    private val appDevice = "${Build.MANUFACTURER} ${Build.MODEL}"
+
+    var deviceAddress: String = ""
+        private set
+
+    init {
+        // Load saved device address on creation
+        deviceAddress = prefs.getString("device_address", "") ?: ""
+    }
+
+    fun updateDeviceAddress(newAddress: String) {
+        deviceAddress = newAddress
+        prefs.edit().putString("device_address", newAddress).apply()
+    }
+
+    fun toJsonString(): String {
+        return JSONObject().apply {
+            put("type", "info")
+            put("time", DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
+            put("info", "$appName-custom-$appPlatform-v$appVersion ($appDevice)")
+        }.toString()
+    }
+}
 
 class MainActivity : PermissionsAwareActivity() {
 
-
+    private val connectionInfo by lazy { ConnectionInfo (this) }
     private var powerSaveState: Boolean = false
 
     private val connectivityStatusView: DataViewConnectivityStatus by lazy {
         findViewById(R.id.connectivityStatusView)
     }
     private val bluetoothManager: BluetoothManager by lazy {
-        BluetoothManager(this,
-            dataCallback = { data -> dataProcessor.processDataReceived (JSONObject (data)) },
+        BluetoothManager(this, connectionInfo,
+            dataCallback = { data ->
+                processBluetoothAddr(data)
+                dataProcessor.processDataReceived(JSONObject(data))
+            },
             statusCallback = { updateConnectionStatus() })
     }
     private val networkManager: NetworkManager by lazy {
-        NetworkManager(this,
+        NetworkManager(this, connectionInfo,
             dataCallback = { data -> dataProcessor.processDataReceived (JSONObject (data)) },
             statusCallback = { updateConnectionStatus() })
     }
     private val cloudManager: CloudManager by lazy {
-        CloudManager(this,
+        CloudManager(this, connectionInfo,
             dataCallback = { data -> dataProcessor.processDataReceived (JSONObject (data)) },
             statusCallback = { updateConnectionStatus() })
     }
@@ -101,6 +143,22 @@ class MainActivity : PermissionsAwareActivity() {
                         onPowerSave(false)
                     }
             }
+        }
+    }
+    private fun processBluetoothAddr(data: String) {
+        try {
+            val json = JSONObject(data)
+            if (json.getString("type") == "data" && json.has("addr")) {
+                val newAddr = json.getString("addr")
+                if (newAddr != connectionInfo.deviceAddress) {
+                    connectionInfo.updateDeviceAddress(newAddr)
+                    Log.d("MainActivity", "Device address changed, triggering network and cloud connection attempts")
+                    networkManager.onDoubleTap()
+                    cloudManager.onDoubleTap()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error processing bluetooth address", e)
         }
     }
     private fun setupConnectionStatusDoubleTap() {

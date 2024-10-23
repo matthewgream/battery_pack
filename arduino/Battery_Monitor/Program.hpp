@@ -200,7 +200,7 @@ public:
             [&] () { return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ()); }),
         devices (config.devices, [&] () { return network.available (); }),
         network (config.network), nettime (config.nettime, [&] () { return network.available (); }),
-        control (config.control, address, devices), deliver (config.deliver, address, devices.blue (), devices.mqtt (), devices.webs ()), publish (config.publish, address, devices.mqtt (), [&] () { return network.available (); }), storage (config.storage),
+        control (config.control, address, devices), deliver (config.deliver, address, devices.blue (), devices.mqtt (), devices.websocket ()), publish (config.publish, address, devices.mqtt (), [&] () { return network.available (); }), storage (config.storage),
         updater (config.updater, [&] () { return network.available (); }),
         alarmsInterface (config.alarmsInterface), alarms (config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
         diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
