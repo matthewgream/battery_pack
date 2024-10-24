@@ -17,7 +17,7 @@ class NetworkDeviceScannerConfig(
 class NetworkDeviceScanner(
     private val nsdManager: NsdManager,
     private val config: NetworkDeviceScannerConfig,
-    private val connectionInfo: ConnectionInfo,
+    private val connectionInfo: ConnectivityInfo,
     private val onFound: (NsdServiceInfo) -> Unit
 ) : ConnectivityComponent("NetworkDeviceScanner") {
 
@@ -33,28 +33,23 @@ class NetworkDeviceScanner(
             Log.d(tag, "Service discovery started")
             isDiscoveryActive = true
         }
-
         override fun onServiceFound(serviceInfo: NsdServiceInfo) {
             Log.d(tag, "Service found: ${serviceInfo.serviceName}")
             if (serviceInfo.serviceName == config.SERVICE_NAME)
                 resolveService(serviceInfo)
         }
-
         override fun onServiceLost(serviceInfo: NsdServiceInfo) {
             Log.d(tag, "Service lost: ${serviceInfo.serviceName}")
         }
-
         override fun onDiscoveryStopped(serviceType: String) {
             Log.d(tag, "Discovery stopped: $serviceType")
             isDiscoveryActive = false
         }
-
         override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
             Log.e(tag, "Discovery failed to start: Error code: $errorCode")
             isDiscoveryActive = false
             restartAfterDelay()
         }
-
         override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
             Log.e(tag, "Discovery failed to stop: Error code: $errorCode")
         }

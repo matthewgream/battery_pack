@@ -22,7 +22,7 @@ class CloudDeviceManager (
     private val activity: Activity,
     private val adapter: CloudAdapter,
     private val config: CloudDeviceManagerConfig,
-    private val connectionInfo: ConnectionInfo,
+    private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
     private val isEnabled: () -> Boolean,
@@ -47,11 +47,11 @@ class CloudDeviceManager (
             !isPermitted () -> Log.e("Cloud", "Cloud access not permitted")
             isConnected -> Log.d("Cloud", "Cloud connection already active, will not connect")
             isConnecting -> Log.d("Cloud", "Cloud connection already in progress")
-            else -> initiateMqttConnection ()
+            else -> connectMqtt ()
         }
     }
 
-    private fun initiateMqttConnection () {
+    private fun connectMqtt () {
         try {
             isConnecting = true
 

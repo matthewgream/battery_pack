@@ -20,7 +20,7 @@ class CloudAdapter (context: Context) {
 
 class CloudManager (
     activity: Activity,
-    private val connectionInfo: ConnectionInfo,
+    private val connectivityInfo: ConnectivityInfo,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
 ) {
@@ -42,11 +42,11 @@ class CloudManager (
             host = SECRET_MQTT_HOST, port = SECRET_MQTT_PORT,
             user = SECRET_MQTT_USER, pass = SECRET_MQTT_PASS
         ),
-        connectionInfo,
+        connectivityInfo,
         dataCallback,
         statusCallback,
         isPermitted = { permissions.allowed },
-        isEnabled = { adapter.isEnabled () && connectionInfo.deviceAddress.isNotEmpty() }
+        isEnabled = { adapter.isEnabled () && connectivityInfo.deviceAddress.isNotEmpty() }
     )
     private val checker: NetworkStateReceiver = NetworkStateReceiver (
         context = activity,

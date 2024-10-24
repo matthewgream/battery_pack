@@ -10,7 +10,6 @@ import android.widget.LinearLayout
 import android.widget.ImageView
 import android.os.Handler
 import android.os.Looper
-import android.widget.TextView
 
 class DataViewConnectivityStatus @JvmOverloads constructor(
     context: Context,

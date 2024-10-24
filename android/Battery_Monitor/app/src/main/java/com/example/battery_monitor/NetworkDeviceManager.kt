@@ -11,7 +11,6 @@ import java.net.URI
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.framing.Framedata
 import org.java_websocket.handshake.ServerHandshake
-import java.nio.ByteBuffer
 
 @Suppress("PropertyName")
 class NetworkDeviceManagerConfig {
@@ -22,10 +21,10 @@ class NetworkDeviceManagerConfig {
 }
 
 class NetworkDeviceManager(
-    private val activity: Activity,
+    activity: Activity,
     private val adapter: NetworkAdapter,
-    private val config: NetworkDeviceManagerConfig,
-    private val connectionInfo: ConnectionInfo,
+    config: NetworkDeviceManagerConfig,
+    private val connectionInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
     private val isPermitted: () -> Boolean,
@@ -43,7 +42,7 @@ class NetworkDeviceManager(
             SERVICE_NAME = config.SERVICE_NAME
         ),
         connectionInfo,
-        onFound = { serviceInfo -> handleFoundService(serviceInfo) }
+        onFound = { serviceInfo -> located(serviceInfo) }
     )
 
     private val checker: ConnectivityChecker = ConnectivityChecker(
@@ -68,7 +67,7 @@ class NetworkDeviceManager(
                             pingHandler.postDelayed(this, 10000) // Send ping every 10 seconds
                         } catch (e: Exception) {
                             Log.e("Network", "Failed to send ping", e)
-                            handleDisconnect()
+                            disconnected()
                         }
                     }
                 }
@@ -79,25 +78,22 @@ class NetworkDeviceManager(
                 isConnected = true
                 isConnecting = false
                 statusCallback()
-                checker.start()  // Start monitoring connection
-                transmitTypeInfo()
+                checker.start()
+                identify()
                 pingHandler.post(pingRunnable)
             }
-
             override fun onMessage(message: String) {
                 Log.d("Network", "WebSocket message received: $message")
                 checker.ping()
                 dataCallback(message)
             }
-
             override fun onClose(code: Int, reason: String, remote: Boolean) {
                 Log.d("Network", "WebSocket closing: $code / $reason")
-                handleDisconnect()
+                disconnected()
             }
-
             override fun onError(ex: Exception?) {
                 Log.e("Network", "WebSocket failure: ${ex?.message}")
-                handleDisconnect()
+                disconnected()
             }
             override fun onWebsocketPong(conn: WebSocket?, f: Framedata?) {
                 Log.d("Network", "WebSocket pong received")
@@ -106,22 +102,20 @@ class NetworkDeviceManager(
         }
     }
 
-    private fun transmitTypeInfo() {
+    private fun identify() {
         webSocketClient?.send(connectionInfo.toJsonString())
     }
 
-    private fun handleFoundService(serviceInfo: NsdServiceInfo) {
-        val host = serviceInfo.host
+    @Suppress("DEPRECATION")
+    private fun located(serviceInfo: NsdServiceInfo) {
+        val name = serviceInfo.serviceName
+        val host = serviceInfo.host.hostAddress
         val port = serviceInfo.port
-
-        Log.d("Network", "Device scan located, ${serviceInfo.serviceName} / ${host.hostAddress}:$port")
-
-        // Construct WebSocket URL using discovered host and port
-        val wsUrl = "ws://${host.hostAddress}:81/"
-        connectWebSocket(wsUrl)
+        Log.d("Network", "Device scan located, $name / $host:$port")
+        connect("ws://$host:$port/")
     }
 
-    private fun connectWebSocket(url: String) {
+    private fun connect(url: String) {
         if (isConnecting || isConnected) {
             Log.d("Network", "WebSocket connection already in progress or established")
             return
@@ -131,17 +125,16 @@ class NetworkDeviceManager(
         statusCallback()
 
         try {
-            val uri = URI(url)
-            webSocketClient = createWebSocketClient(uri)
+            webSocketClient = createWebSocketClient(URI(url))
             webSocketClient?.connect()
         } catch (e: Exception) {
             Log.e("Network", "WebSocket connection failed", e)
-            handleDisconnect()
+            disconnected()
         }
     }
 
-    private fun handleDisconnect() {
-        checker.stop()  // Stop monitoring connection
+    private fun disconnected() {
+        checker.stop()
         webSocketClient?.close()
         webSocketClient = null
         isConnected = false
@@ -168,7 +161,7 @@ class NetworkDeviceManager(
 
     fun disconnect() {
         scanner.stop()
-        handleDisconnect()
+        disconnected()
     }
 
     fun reconnect() {

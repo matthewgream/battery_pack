@@ -15,7 +15,6 @@ import android.util.Log
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
-
 @Suppress("PropertyName")
 class BluetoothDeviceManagerConfig {
     val DEVICE_NAME = "BatteryMonitor"
@@ -29,9 +28,9 @@ class BluetoothDeviceManagerConfig {
 @SuppressLint("MissingPermission")
 class BluetoothDeviceManager (
     private val activity: Activity,
-    private val adapter: BluetoothAdapter,
+    adapter: BluetoothAdapter,
     private val config: BluetoothDeviceManagerConfig,
-    private val connectionInfo: ConnectionInfo,
+    private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
     private val isPermitted: () -> Boolean,
@@ -120,7 +119,7 @@ class BluetoothDeviceManager (
     fun transmitTypeInfo () {
         val characteristic = bluetoothGatt?.getService (config.SERVICE_UUID)?.getCharacteristic (config.CHARACTERISTIC_UUID)
         if (characteristic != null) {
-            bluetoothGatt?.writeCharacteristic (characteristic, connectionInfo.toJsonString().toByteArray(StandardCharsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+            bluetoothGatt?.writeCharacteristic (characteristic, connectivityInfo.toJsonString().toByteArray(StandardCharsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
         }
     }
     fun permissionsAllowed () {

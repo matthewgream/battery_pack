@@ -23,4 +23,3 @@ org-eclipse-paho-client-mqttv3 = { module = "org.eclipse.paho:org.eclipse.paho.c
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-
