@@ -333,23 +333,10 @@ public:
          _connectionActiveChecker (config.intervalConnectionCheck), _connectionSignalTracker (connectionSignalCallback),
          _connectionWriteManager (this), _connectionReadManager (this) {}
 
-    void insert (const ConnectionWriteManager::Handlers& handlers) { _connectionWriteManager += handlers; }
-    void insert (const ConnectionReadManager::Handlers& handlers) { _connectionReadManager += handlers; }
-
     void begin () {
         _serverInitAndStartService ();
         _connection_init ();
         _connect ();
-    }
-    // json only
-    bool notify (const String& data) {
-        return _connected_notify (data);
-    }
-    bool payloadExceeded () const {
-        return _notify_payloadExceeded > 0;
-    }
-    bool available () const {
-        return _connectionActive && _peerMtu;
     }
     void process () {
         if (!_connectionActive && !_advertisingActive) {
@@ -359,6 +346,19 @@ public:
         }
         _connection_process ();
     }
+    bool available () const {
+        return _connectionActive && _peerMtu;
+    }
+    //
+    // json only
+    bool notify (const String& data) {
+        return _connected_notify (data);
+    }
+    bool payloadExceeded () const {
+        return _notify_payloadExceeded > 0;
+    }
+    void insert (const ConnectionWriteManager::Handlers& handlers) { _connectionWriteManager += handlers; }
+    void insert (const ConnectionReadManager::Handlers& handlers) { _connectionReadManager += handlers; }
     //
     void serialize (JsonVariant &obj) const override {
         obj ["macaddr"] = getMacAddressBlue ();

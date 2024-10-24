@@ -72,17 +72,6 @@ public:
         WiFi.mode (WIFI_STA);
         connect ();
     }
-    void connect () {
-        DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddressWifi ().c_str (), config.host.c_str ());
-        WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
-        //WiFi.setTxPower(WIFI_POWER_8_5dBm); // XXX ?!? for AUTH_EXPIRE ... flash access problem ...  https://github.com/espressif/arduino-esp32/issues/2144
-    }
-    void reset () {
-        DEBUG_PRINTF ("NetworkManager::reset\n");
-        const String reason = "LOCAL_TIMEOUT";
-        _available = false; _connected = false; _disconnections += reason;
-        WiFi.disconnect (true);
-    }
     void process () override {
         if (_connected && _intervalConnectionCheck) {
             if (!_available) {
@@ -96,6 +85,18 @@ public:
     }
     bool available () const {
         return _available;
+    }
+    //
+    void connect () {
+        DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddressWifi ().c_str (), config.host.c_str ());
+        WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
+        WiFi.setTxPower(WIFI_POWER_8_5dBm); // XXX ?!? for AUTH_EXPIRE ... flash access problem ...  https://github.com/espressif/arduino-esp32/issues/2144
+    }
+    void reset () {
+        DEBUG_PRINTF ("NetworkManager::reset\n");
+        const String reason = "LOCAL_TIMEOUT";
+        _available = false; _connected = false; _disconnections += reason;
+        WiFi.disconnect (true);
     }
 
 protected:
@@ -212,6 +213,7 @@ public:
         }
         DEBUG_PRINTF ("NettimeManager::constructor: persistentTime=%lu, persistentDrift=%ld, time=%s\n", (unsigned long) _persistentTime, (long) _persistentDrift, getTimeString ().c_str ());
     }
+
     void process () override {
         interval_t interval;
 

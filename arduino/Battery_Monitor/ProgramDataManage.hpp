@@ -93,6 +93,7 @@ public:
         _devices.blue ().insert ({ { std::make_shared <BluetoothReadHandler_TypeCtrl> () } });
         _devices.blue ().insert ({ { String ("info"), std::make_shared <BluetoothWriteHandler_TypeInfo> () } });
     }
+    //
 
 protected:
     void collectDiagnostics (JsonVariant &) const override {
@@ -129,8 +130,10 @@ public:
             AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.payloadExceeded (); })
         }), config (cfg), _id (id), _blue (blue), _mqtt (mqtt), _webs (webs) {}
 
-    void begin () override {
+    bool available () { 
+        return _blue.available ();
     }
+    //
     bool deliver (const String& data) {
         if (_blue.notify (data)) {
             _delivers += ArithmeticToString (data.length ());
@@ -139,7 +142,6 @@ public:
         } else _failures ++;
         return false;
     }
-    bool available () { return _blue.available (); }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
@@ -179,6 +181,11 @@ public:
             AlarmCondition (ALARM_PUBLISH_FAIL, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_PUBLISH_SIZE, [this] () { return _mqtt.bufferExceeded (); })
         }), config (cfg), _id (id), _mqtt (mqtt) {}
+
+    bool available () {
+        return _mqtt.connected ();
+    }
+    //
     bool publish (const String& data, const String& subtopic) {
         if (_mqtt.publish (config.topic + "/" + _id + "/" + subtopic, data)) {
             _publishes += ArithmeticToString (data.length ());
@@ -187,7 +194,6 @@ public:
         } else _failures ++;
         return false;
     }
-    bool available () { return _mqtt.connected (); }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
@@ -226,9 +232,14 @@ public:
             AlarmCondition (ALARM_STORAGE_FAIL, [this] () { return _failures > config.failureLimit; }),
             AlarmCondition (ALARM_STORAGE_SIZE, [this] () { return _file.remains () < config.remainLimit; })
         }), config (cfg), _file (config.filename) {}
+
     void begin () override {
         if (!_file.begin ()) _failures ++;
     }
+    bool available () const {
+        return _file.available ();
+    }
+    //
     long size () const {
         return _file.size ();
     }
@@ -247,7 +258,6 @@ public:
         _file.erase ();
         _erasures ++;
     }
-    bool available () const { return _file.available (); }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {

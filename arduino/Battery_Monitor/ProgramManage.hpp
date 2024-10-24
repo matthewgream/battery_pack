@@ -132,8 +132,9 @@ private:
     LoggingHandler _logging;
 
 public:
-    explicit DeviceManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (networkIsAvailable), 
-      _blue (config.blue), _mdns (config.mdns), _mqtt (config.mqtt), _webserver (config.webserver), _websocket (config.websocket), _logging (config.logging, getMacAddressBase (""), &_mqtt) {}
+    explicit DeviceManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (networkIsAvailable),
+        _blue (config.blue), _mdns (config.mdns), _mqtt (config.mqtt), _webserver (config.webserver), _websocket (config.websocket), _logging (config.logging, getMacAddressBase (""), &_mqtt) {}
+
     void begin () override {
         _blue.begin ();
         _mdns.begin ();
@@ -150,7 +151,7 @@ public:
             _websocket.process ();
         }
     }
-
+    //
     MulticastDNS& mdns () { return _mdns; }
     BluetoothDevice& blue () { return _blue; }
     MQTTPublisher& mqtt () { return _mqtt; }
@@ -201,6 +202,7 @@ public:
         }), config (cfg), _networkIsAvailable (networkIsAvailable),
         _persistent_data ("updates"), _persistent_data_previous (_persistent_data, "previous", 0), _persistent_data_version (_persistent_data, "version", String ()),
         _interval (config.intervalCheck, _persistent_data_previous), _available (!static_cast <String> (_persistent_data_version).isEmpty ()) {}
+
     void process () override {
         if (_networkIsAvailable () && _interval) {
             const String version = ota_image_check (config.json, config.type, config.vers, config.addr);
@@ -210,6 +212,7 @@ public:
             }
         }
     }
+    //
     bool istoolong () const {
         return _interval.interval () > config.intervalLong;
     }
