@@ -63,7 +63,7 @@ static inline constexpr const char __build_time [] = {
 };
 static inline String __build_plat () { String platform = ESP.getChipModel (); platform.toLowerCase (); platform.replace ("-", ""); return platform; }
 
-const String build_info (String (__build_name) + " V" + String (__build_vers) + "-" + String (__build_time) + " (" + __build_plat () + ")");
+const String build (String (__build_name) + " V" + String (__build_vers) + "-" + String (__build_time) + " (" + __build_plat () + ")");
 
 // -----------------------------------------------------------------------------------------------
 
@@ -77,7 +77,7 @@ void setup () {
     DEBUG_START ();
     const std::pair <String, String> r = getResetDetails ();
     DEBUG_PRINTF ("\n[%s: %s]", r.first.c_str (), r.second.c_str ());
-    DEBUG_PRINTF ("\n*** %s ***\n\n", build_info.c_str ());
+    DEBUG_PRINTF ("\n*** %s ***\n\n", build.c_str ());
 
     // 3-pin connector for DS18B20 is GND/VCC/DAT and DAT connected to ESP32 pin 21
     // --> install DS18B20 to boot to temperature calibration

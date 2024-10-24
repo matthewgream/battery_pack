@@ -2,6 +2,52 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+#include <WiFiUdp.h>
+// announce+response, not lookup, see https://gist.github.com/matthewgream/1c535fa86fd006ae794f4f245216b1a0
+#include <ArduinoLightMDNS.h>
+
+class MulticastDNS: public JsonSerializable {
+public:
+    typedef struct {
+    } Config;
+    using __implementation_t = MDNS;
+
+private:
+    const Config &config;
+
+    WiFiUDP _udp;
+    MDNS _mdns;
+
+public:
+    explicit MulticastDNS (const Config& cfg): config (cfg), _mdns (_udp) {}
+
+    void begin () {
+        MDNSStatus_t status = _mdns.begin ();
+        if (status != MDNSSuccess)
+            DEBUG_PRINTF ("NetworkManager::begin: mdns begin error=%d\n", status);
+    }
+    void start (const IPAddress& address, const String& host) {
+        _mdns.start (address, host.c_str ());
+    }
+    void stop () {
+        _mdns.stop ();
+    }
+    void process () {
+        MDNSStatus_t status = _mdns.process ();
+        if (status != MDNSSuccess)
+            DEBUG_PRINTF ("NetworkManager::process: mdns process error=%d\n", status);
+    }
+    __implementation_t& __implementation () { 
+        return _mdns;      
+    }
+    //
+    void serialize (JsonVariant &obj) const override {
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 
@@ -10,8 +56,8 @@ public:
     typedef struct {
         bool enabled;
         uint16_t port;
-        String url_version;
     } Config;
+    using __implementation_t = AsyncWebServer;
 
     static inline constexpr const char *STRING_404_NOT_FOUND = "Not Found";
 
@@ -19,29 +65,24 @@ private:
     const Config &config;
 
     AsyncWebServer _server;
-    bool _started = false;
-
-    void start () {
-        _started = true;
-        _server.on (config.url_version.c_str (), HTTP_GET, [] (AsyncWebServerRequest *request) {
-            extern const String build_info;
-            request->send (200, "text/plain", build_info);
-        });
-        _server.onNotFound ([] (AsyncWebServerRequest *request) {
-            request->send (404, "text/plain", STRING_404_NOT_FOUND);
-        });
-        _server.begin ();
-        DEBUG_PRINTF ("WebServer::start: active, port=%u, url_version=%s\n", config.port, config.url_version.c_str ());
-    }
+    Initialisable _started;
 
 public:
     explicit WebServer (const Config& cfg): config (cfg), _server (config.port) {}
     void begin () {
+        _server.onNotFound ([] (AsyncWebServerRequest *request) {
+            request->send (404, "text/plain", STRING_404_NOT_FOUND);
+        });
     }
     void process () {
         // only when connected or panic()
-        if (config.enabled && !_started)
-            start ();
+        if (config.enabled && !_started) {
+            _server.begin ();
+            DEBUG_PRINTF ("WebServer::start: active, port=%u\n", config.port);
+        }
+    }
+    __implementation_t& __implementation () { 
+        return _server;      
     }
     //
     void serialize (JsonVariant &obj) const override {

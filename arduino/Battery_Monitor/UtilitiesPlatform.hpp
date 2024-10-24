@@ -73,6 +73,29 @@ public:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+class IntervalableByPersistentTime {
+    interval_t _interval;
+    PersistentValue <uint32_t>& _previous;
+
+public:
+    explicit IntervalableByPersistentTime (const interval_t interval, PersistentValue <uint32_t>& previous) : _interval (interval), _previous (previous) {}
+    operator bool () {
+        const uint32_t timet = static_cast <uint32_t> (time (NULL));
+        if (timet > 0 && ((timet - _previous) > (_interval / 1000))) {
+            _previous = timet;
+            return true;
+        }
+        return false;
+    }
+    interval_t interval () const {
+        const uint32_t timet = static_cast <uint32_t> (time (NULL));
+        return timet > 0 && _previous > static_cast <uint32_t> (0) ? (timet - _previous) * 1000 : 0;
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
 #include <esp_mac.h>
 
 String getMacAddressBase (const char* separator = ":") {

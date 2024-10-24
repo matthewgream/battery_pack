@@ -52,9 +52,14 @@ using TemperatureCalibrator = TemperatureCalibrationManager <HARDWARE_TEMP_SIZE,
 
 // -----------------------------------------------------------------------------------------------
 
+#include "driver/temperature_sensor.h"
+
 class PlatformArduino: public Alarmable, public Diagnosticable {
     static constexpr int HEAP_FREE_PERCENTAGE_MINIMUM = 5;
+    static constexpr int TEMP_RANGE_MINIMUM = 0, TEMP_RANGE_MAXIMUM = 80;
     const unsigned long code_size, heap_size;
+    temperature_sensor_handle_t temp_handle;
+    bool temp_okay;
     const int reset_reason;
     const std::pair <String, String> reset_details;
     const bool reset_okay;
@@ -64,7 +69,11 @@ public:
             AlarmCondition (ALARM_SYSTEM_MEMORYLOW, [this] () { return ((100 * esp_get_minimum_free_heap_size ()) / heap_size) < HEAP_FREE_PERCENTAGE_MINIMUM; }),
             AlarmCondition (ALARM_SYSTEM_BADRESET, [this] () { return !reset_okay; })
         }), code_size (ESP.getSketchSize ()), heap_size (ESP.getHeapSize ()), reset_reason (getResetReason ()), reset_details (getResetDetails (reset_reason)), reset_okay (getResetOkay (reset_reason)) {
-        DEBUG_PRINTF ("PlatformArduino::init: code=%lu, heap=%lu, reset=%d\n", code_size, heap_size, reset_reason);
+        const temperature_sensor_config_t temp_sensor = TEMPERATURE_SENSOR_CONFIG_DEFAULT (TEMP_RANGE_MINIMUM, TEMP_RANGE_MAXIMUM);
+        float temp_read = 0.0f;
+        temp_okay = (temperature_sensor_install (&temp_sensor, &temp_handle) == ESP_OK && temperature_sensor_enable (temp_handle) == ESP_OK && temperature_sensor_get_celsius (temp_handle, &temp_read) == ESP_OK);
+        if (!temp_okay) DEBUG_PRINTF ("PlatformArduino::init: could not enable temperature sensor\n");
+        DEBUG_PRINTF ("PlatformArduino::init: code=%lu, heap=%lu, temp=%.2f, reset=%d\n", code_size, heap_size, temp_read, reset_reason);
     }
 
 protected:
@@ -76,6 +85,9 @@ protected:
                 heap ["size"] = heap_size;
                 heap ["free"] = esp_get_free_heap_size ();
                 heap ["min"] = esp_get_minimum_free_heap_size ();
+            float temp;
+            if (temp_okay && temperature_sensor_get_celsius (temp_handle, &temp) == ESP_OK)
+                system ["temp"] = temp;
             JsonObject reset = system ["reset"].to <JsonObject> ();
                 reset ["okay"] = reset_okay;
                 reset ["reason"] = reset_details.first;
@@ -199,8 +211,8 @@ public:
         fanInterface (config.fanInterface, fanInterfaceSetrategy), fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm,
             [&] () { return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ()); }),
         devices (config.devices, [&] () { return network.available (); }),
-        network (config.network), nettime (config.nettime, [&] () { return network.available (); }),
-        control (config.control, address, devices), deliver (config.deliver, address, devices.blue (), devices.mqtt (), devices.websocket ()), publish (config.publish, address, devices.mqtt (), [&] () { return network.available (); }), storage (config.storage),
+        network (config.network, devices.mdns ()), nettime (config.nettime, [&] () { return network.available (); }),
+        control (config.control, address, devices), deliver (config.deliver, address, devices.blue (), devices.mqtt (), devices.websocket ()), publish (config.publish, address, devices.mqtt ()), storage (config.storage),
         updater (config.updater, [&] () { return network.available (); }),
         alarmsInterface (config.alarmsInterface), alarms (config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
         diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
@@ -218,8 +230,8 @@ public:
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject program = obj ["program"].to <JsonObject> ();
-        extern const String build_info;
-        program ["build"] = build_info;
+        extern const String build;
+        program ["build"] = build;
         program ["uptime"] = uptime;
         program ["cycles"] = cycles;
     }

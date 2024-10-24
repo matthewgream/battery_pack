@@ -20,43 +20,6 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
-class BluetoothReadWriteHandler_TypeSpecific: public BluetoothReadWriteHandler {
-protected:
-    const String _type;
-public:
-    BluetoothReadWriteHandler_TypeSpecific (const String& type): _type (type) {}
-    virtual bool process (BluetoothDevice&, const String&, const String&, JsonDocument&) = 0;
-};
-class BluetoothWriteHandler_TypeSpecific: public BluetoothReadWriteHandler_TypeSpecific {
-public:
-    BluetoothWriteHandler_TypeSpecific (const String& type): BluetoothReadWriteHandler_TypeSpecific (type) {}
-    virtual bool process (BluetoothDevice&, const String&, const String&, JsonDocument&) override = 0;
-    bool process (BluetoothDevice& device, JsonDocument& doc) override {
-        const char *type = doc [_type.c_str ()], *time = doc ["time"];
-        return (type != nullptr && time != nullptr) ? process (device, String (time), _type, doc) : false;
-    }
-};
-class BluetoothReadHandler_TypeSpecific: public BluetoothReadWriteHandler_TypeSpecific {
-public:
-    BluetoothReadHandler_TypeSpecific (const String& type): BluetoothReadWriteHandler_TypeSpecific (type) {}
-    virtual bool process (BluetoothDevice&, const String&, const String&, JsonDocument&) override = 0;
-    bool process (BluetoothDevice& device, JsonDocument& doc) override {
-        const String _time = getTimeString ();
-        doc ["type"] = _type, doc ["time"] = _time;
-        return process (device, _time, _type, doc);
-    }
-};
-
-// -----------------------------------------------------------------------------------------------
-
-class BluetoothWriteHandler_TypeInfo: public BluetoothWriteHandler_TypeSpecific {
-public:
-    BluetoothWriteHandler_TypeInfo (): BluetoothWriteHandler_TypeSpecific ("info") {};
-    bool process (BluetoothDevice& device, const String& time, const String& info, JsonDocument& doc) override;
-};
-
-// -----------------------------------------------------------------------------------------------
-
 class BluetoothDevice: private Singleton <BluetoothDevice>, protected BLEServerCallbacks, protected BLECharacteristicCallbacks, public JsonSerializable {
 public:
     static inline constexpr uint16_t MIN_MTU = 32, MAX_MTU = 517;
@@ -270,7 +233,6 @@ private:
     //
 
     esp_bd_addr_t _peerAddress;
-    String _peerDetails;
     uint16_t _peerConnId = 0;
     uint16_t _peerMtu = 0;
     Intervalable _connectionActiveChecker;
@@ -288,7 +250,6 @@ private:
             _peerMtu = 0;
             _peerConnId = conn_id;
             memcpy (_peerAddress, addr, sizeof (esp_bd_addr_t));
-            _peerDetails = "";
             _connectionSignalTracker.reset ();
             _connectionActiveChecker.reset ();
             _connections ++; _connectionActive = true;
@@ -370,9 +331,7 @@ private:
 public:
     explicit BluetoothDevice (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr): Singleton <BluetoothDevice> (this), config (cfg),
          _connectionActiveChecker (config.intervalConnectionCheck), _connectionSignalTracker (connectionSignalCallback),
-         _connectionWriteManager (this), _connectionReadManager (this) {
-        insert ({ { String ("info"), std::make_shared <BluetoothWriteHandler_TypeInfo> () } });
-    }
+         _connectionWriteManager (this), _connectionReadManager (this) {}
 
     void insert (const ConnectionWriteManager::Handlers& handlers) { _connectionWriteManager += handlers; }
     void insert (const ConnectionReadManager::Handlers& handlers) { _connectionReadManager += handlers; }
@@ -405,8 +364,6 @@ public:
         obj ["macaddr"] = getMacAddressBlue ();
         if ((obj ["connected"] = _connectionActive)) {
             obj ["address"] = _address_to_string (_peerAddress);
-            if (!_peerDetails.isEmpty ())
-                obj ["details"] = _peerDetails;
             obj ["mtu"] = _peerMtu;
             obj ["signal"] = _connectionSignalTracker;
         }
@@ -454,14 +411,6 @@ private:
         }
     }
 };
-
-// -----------------------------------------------------------------------------------------------
-
-bool BluetoothWriteHandler_TypeInfo::process (BluetoothDevice& device, const String& time, const String& info, JsonDocument& doc) {
-    device._peerDetails = doc ["info"] | "(not provided)";
-    DEBUG_PRINTF ("BluetoothWriteHandler_TypeInfo:: type=info, time=%s, info='%s'\n", time.c_str (), device._peerDetails.c_str ());
-    return true;
-}
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------

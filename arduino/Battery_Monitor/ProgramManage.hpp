@@ -111,6 +111,7 @@ class DeviceManager: public Component, public Diagnosticable {
 public:
     typedef struct {
         BluetoothDevice::Config blue;
+        MulticastDNS::Config mdns;
         MQTTPublisher::Config mqtt;
         WebServer::Config webserver;
         WebSocket::Config websocket;
@@ -124,15 +125,18 @@ private:
     const BooleanFunc _networkIsAvailable;
 
     BluetoothDevice _blue;
+    MulticastDNS _mdns;
     MQTTPublisher _mqtt;
     WebServer _webserver;
     WebSocket _websocket;
     LoggingHandler _logging;
 
 public:
-    explicit DeviceManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (networkIsAvailable), _blue (config.blue), _mqtt (config.mqtt), _webserver (config.webserver), _websocket (config.websocket), _logging (config.logging, getMacAddressBase (""), &_mqtt) {}
+    explicit DeviceManager (const Config& cfg, const BooleanFunc networkIsAvailable): config (cfg), _networkIsAvailable (networkIsAvailable), 
+      _blue (config.blue), _mdns (config.mdns), _mqtt (config.mqtt), _webserver (config.webserver), _websocket (config.websocket), _logging (config.logging, getMacAddressBase (""), &_mqtt) {}
     void begin () override {
         _blue.begin ();
+        _mdns.begin ();
         _mqtt.begin ();
         _webserver.begin ();
         _websocket.begin ();
@@ -140,12 +144,14 @@ public:
     void process () override {
         _blue.process ();
         if (_networkIsAvailable ()) {
+            _mdns.process ();
             _mqtt.process ();
             _webserver.process ();
             _websocket.process ();
         }
     }
 
+    MulticastDNS& mdns () { return _mdns; }
     BluetoothDevice& blue () { return _blue; }
     MQTTPublisher& mqtt () { return _mqtt; }
     WebServer& webserver () { return _webserver; }
@@ -155,6 +161,7 @@ protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["devices"].to <JsonObject> ();
             sub ["blue"] = _blue;
+            sub ["mdns"] = _mdns;
             sub ["mqtt"] = _mqtt;
             sub ["webserver"] = _webserver;
             sub ["websocket"] = _websocket;
@@ -163,26 +170,6 @@ protected:
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
-
-class IntervalableByPersistentTime {
-    interval_t _interval;
-    PersistentValue <uint32_t>& _previous;
-
-public:
-    explicit IntervalableByPersistentTime (const interval_t interval, PersistentValue <uint32_t>& previous) : _interval (interval), _previous (previous) {}
-    operator bool () {
-        const uint32_t timet = static_cast <uint32_t> (time (NULL));
-        if (timet > 0 && ((timet - _previous) > (_interval / 1000))) {
-            _previous = timet;
-            return true;
-        }
-        return false;
-    }
-    interval_t interval () const {
-        const uint32_t timet = static_cast <uint32_t> (time (NULL));
-        return timet > 0 && _previous > static_cast <uint32_t> (0) ? (timet - _previous) * 1000 : 0;
-    }
-};
 
 #include <functional>
 

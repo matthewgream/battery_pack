@@ -94,15 +94,16 @@ struct Config {
     // devices
     DeviceManager::Config devices = {
         .blue = { .name = DEFAULT_NAME, .serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", .characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", .pin = DEFAULT_BLUE_PIN, .intervalConnectionCheck = 1*60*1000 },
+        .mdns = {},
         .mqtt = { .client = DEFAULT_NAME, .host = "mqtt.local", .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .port = 1883, .bufferSize = 3*1024 },
-        .webserver = { .enabled  = true, .port = 80, .url_version = "/version" },
+        .webserver = { .enabled  = true, .port = 80 },
         .websocket = { .enabled  = true, .port = 81, .root = "/" },
         .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME }
     };
 
     // network managers
     NetwerkManager::Config network = {
-        .host = DEFAULT_NAME, .ssid = DEFAULT_WIFI_SSID, .pass = DEFAULT_WIFI_PASS, .intervalConnectionCheck = 1*60*1000, .multicastDNS = true
+        .host = DEFAULT_NAME, .ssid = DEFAULT_WIFI_SSID, .pass = DEFAULT_WIFI_PASS, .intervalConnectionCheck = 1*60*1000
     };
     NettimeManager::Config nettime = {
         .useragent = String (DEFAULT_NAME) + String ("/1.0"), .server = "http://matthewgream.net",
@@ -124,7 +125,7 @@ struct Config {
     };
 
     // program
-    ControlManager::Config control = { };
+    ControlManager::Config control = { .url_version = "/version" };
     UpdateManager::Config updater = { .intervalCheck = 1*24*60*60*1000, .intervalLong = (interval_t) 28*24*60*60*1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase () };
     AlarmManager::Config alarms = { }; ActivablePIN::Config alarmsInterface = { .PIN = -1, .ACTIVE = LOW };
     DiagnosticManager::Config diagnostics = { };

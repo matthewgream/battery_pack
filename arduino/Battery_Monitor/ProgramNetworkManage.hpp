@@ -3,9 +3,6 @@
 // -----------------------------------------------------------------------------------------------
 
 #include <WiFi.h>
-#include <WiFiUdp.h>
-// announce+response, not lookup, see https://gist.github.com/matthewgream/1c535fa86fd006ae794f4f245216b1a0
-#include <ArduinoLightMDNS.h>
 
 // -----------------------------------------------------------------------------------------------
 
@@ -14,15 +11,12 @@ public:
     typedef struct {
         String host, ssid, pass;
         interval_t intervalConnectionCheck;
-        bool multicastDNS;
     } Config;
 
 private:
     const Config &config;
 
-    WiFiUDP _udp;
-    MDNS _mdns;
-
+    MulticastDNS &_mdns;
     ConnectionSignalTracker _connectionSignalTracker;
     bool _connected = false, _available = false;
     IPAddress _address;
@@ -60,41 +54,15 @@ private:
     }
     void doAllocated (const IPAddress& address) { // careful, reallocations
         _allocations ++; _available = true; _address = address;
-        mdnsStart ();
+        _mdns.start (address, config.host);
     }
     void doDisconnected (const String& reason) {
-        mdnsStop ();
+        _mdns.stop ();
         _intervalConnectionCheck.reset (); _available = false; _connected = false; _disconnections += reason;
     }
 
-    void mdnsBegin () {
-        if (config.multicastDNS) {
-            MDNSStatus_t status = _mdns.begin ();
-            if (status != MDNSSuccess)
-                DEBUG_PRINTF ("NetworkManager::begin: mdns begin error=%d\n", status);
-            extern const String build_info;
-            _mdns.addServiceRecord (MDNSServiceTCP, 80, "webserver._http", { "build=" + build_info }); // XXX move elsewhere, should not be here
-            _mdns.addServiceRecord (MDNSServiceTCP, 81, "battery_monitor._ws", { "addr=" + getMacAddressBase ("") }); // XXX move elsewhere, should not be here
-        }
-    }
-    void mdnsStart () {
-        if (config.multicastDNS)
-            _mdns.start (_address, config.host.c_str ());
-    }
-    void mdnsProcess () {
-        if (config.multicastDNS) {
-            MDNSStatus_t status = _mdns.process ();
-            if (status != MDNSSuccess)
-                DEBUG_PRINTF ("NetworkManager::process: mdns process error=%d\n", status);
-        }
-    }
-    void mdnsStop () {
-        if (config.multicastDNS)
-            _mdns.stop ();
-    }
-
 public:
-    explicit NetwerkManager (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg), _mdns (_udp), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+    explicit NetwerkManager (const Config& cfg, MulticastDNS& mdns, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg), _mdns (mdns), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
 
     void begin () override {
         WiFi.persistent (false);
@@ -103,12 +71,11 @@ public:
         WiFi.setAutoReconnect (true);
         WiFi.mode (WIFI_STA);
         connect ();
-        mdnsBegin ();
     }
     void connect () {
         DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddressWifi ().c_str (), config.host.c_str ());
         WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
-        WiFi.setTxPower(WIFI_POWER_8_5dBm); // XXX ?!? for AUTH_EXPIRE ... flash access problem ...  https://github.com/espressif/arduino-esp32/issues/2144
+        //WiFi.setTxPower(WIFI_POWER_8_5dBm); // XXX ?!? for AUTH_EXPIRE ... flash access problem ...  https://github.com/espressif/arduino-esp32/issues/2144
     }
     void reset () {
         DEBUG_PRINTF ("NetworkManager::reset\n");
@@ -126,7 +93,6 @@ public:
                 DEBUG_PRINTF ("NetworkManager::process: rssi=%d (%s)\n", _connectionSignalTracker.rssi (), _connectionSignalTracker.toString ().c_str ());
             }
         }
-        mdnsProcess ();
     }
     bool available () const {
         return _available;
