@@ -8,8 +8,8 @@ class PermissionsManagerFactory (private val activity: Activity) {
     companion object {
         private var requestCode = 1000
     }
-    fun create (tag: String, permissions: Array<String>): PermissionsManager {
-        val manager = PermissionsManager (activity, requestCode ++, tag, permissions)
+    fun create (tag: String, permissionsRequired: Array<String>): PermissionsManager {
+        val manager = PermissionsManager (activity, requestCode ++, tag, permissionsRequired)
         if (activity is PermissionsAwareActivity)
             activity.addOnRequestPermissionsResultListener { receivedRequestCode, _, grantResults ->
                 if (receivedRequestCode == manager.requestCode) {
@@ -39,7 +39,7 @@ class PermissionsManager (
     private val activity: Activity,
     val requestCode: Int,
     private val tag: String,
-    private val permissions: Array<String>
+    private val permissionsRequired: Array<String>
 ) {
     var requested: Boolean = false
         private set
@@ -52,9 +52,9 @@ class PermissionsManager (
     fun requestPermissions (onPermissionsAllowed: () -> Unit) {
         this.onAllowed = onPermissionsAllowed
         requested = true
-        if (!permissions.all { activity.checkSelfPermission (it) == PackageManager.PERMISSION_GRANTED }) {
+        if (!permissionsRequired.all { activity.checkSelfPermission (it) == PackageManager.PERMISSION_GRANTED }) {
             Log.d (tag, "Permissions request")
-            activity.requestPermissions (permissions, requestCode)
+            activity.requestPermissions (permissionsRequired, requestCode)
         } else {
             Log.d (tag, "Permissions already granted")
             obtained = true

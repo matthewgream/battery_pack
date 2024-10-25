@@ -7,7 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
 
-class BluetoothStateReceiver (
+class BluetoothDeviceState (
     private val context: Context,
     private val onDisabled: () -> Unit,
     private val onEnabled: () -> Unit

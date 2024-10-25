@@ -2,7 +2,6 @@ package com.example.battery_monitor
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
@@ -22,49 +21,33 @@ class BluetoothDeviceManagerConfig {
     val CHARACTERISTIC_UUID: UUID = UUID.fromString ("beb5483e-36e1-4688-b7f5-ea07361b26a8")
     val MTU = 517 // maximum
     val CONNECTION_TIMEOUT = 30000L // 30 seconds
-    val DISCOVERY_TIMEOUT = 10000L // 10 seconds
 }
 
 @SuppressLint("MissingPermission")
 class BluetoothDeviceManager (
     private val activity: Activity,
-    adapter: BluetoothAdapter,
+    adapter: BluetoothDeviceAdapter,
     private val config: BluetoothDeviceManagerConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
     private val isPermitted: () -> Boolean,
     private val isEnabled: () -> Boolean
-){
+): ConnectivityDeviceManager () {
     private val handler = Handler (Looper.getMainLooper ())
 
     private var bluetoothGatt: BluetoothGatt? = null
     private var isConnected = false
 
-    private lateinit var timeoutName: String
-    private val timeoutRunnable = Runnable {
-        if (!isConnected) {
-            Log.e ("Bluetooth", "Device $timeoutName timeout")
-            disconnect ()
-        }
-    }
-    private fun timeoutStart (name: String, timeout: Long) {
-        timeoutName = name
-        handler.postDelayed (timeoutRunnable, timeout)
-    }
-    private fun timeoutStop () {
-        handler.removeCallbacks (timeoutRunnable)
-    }
-
     private val scanner: BluetoothDeviceScanner = BluetoothDeviceScanner (
-        adapter.bluetoothLeScanner,
+        adapter.adapter.bluetoothLeScanner,
         BluetoothDeviceScannerConfig (config.DEVICE_NAME, config.SERVICE_UUID),
         onFound = { device -> connect (device) }
     )
     private val checker: ConnectivityChecker = ConnectivityChecker (
         "Bluetooth",
         ConnectivityCheckerConfig (
-            CONNECTION_TIMEOUT = 60000L, // 60 seconds
+            CONNECTION_TIMEOUT = config.CONNECTION_TIMEOUT,
             CONNECTION_CHECK = 10000L // 10 seconds
         ),
         isConnected = { isConnected () },
@@ -122,12 +105,12 @@ class BluetoothDeviceManager (
             bluetoothGatt?.writeCharacteristic (characteristic, connectivityInfo.toJsonString().toByteArray(StandardCharsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
         }
     }
-    fun permissionsAllowed () {
+    override fun permitted () {
         statusCallback ()
         if (!isConnected)
             locate ()
     }
-    fun locate () {
+    private fun locate () {
         Log.d ("Bluetooth", "Device locate initiated")
         statusCallback ()
         when {
@@ -140,25 +123,22 @@ class BluetoothDeviceManager (
 
     private fun connect (device: BluetoothDevice) {
         Log.d ("Bluetooth", "Device connect to ${device.name} / ${device.address}")
-        timeoutStart ("connection", config.CONNECTION_TIMEOUT)
+        checker.start ()
         bluetoothGatt = device.connectGatt (activity, true, gattCallback)
     }
 
     private fun connected (gatt: BluetoothGatt) {
         Log.d ("Bluetooth", "Device connected to GATT server")
-        timeoutStop ()
-        isConnected = true
-        statusCallback ()
-        checker.start ()
+        checker.ping ()
         gatt.requestConnectionPriority (BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER)
         gatt.requestMtu (config.MTU)
-        timeoutStart ("discovery", config.DISCOVERY_TIMEOUT)
         gatt.discoverServices ()
     }
 
     private fun discovered (gatt: BluetoothGatt) {
         Log.d ("Bluetooth", "Device discovery completed")
-        timeoutStop ()
+        isConnected = true
+        statusCallback ()
         val characteristic = gatt.getService (config.SERVICE_UUID)?.getCharacteristic (config.CHARACTERISTIC_UUID)
         if (characteristic != null) {
             Log.d ("Bluetooth", "Device notifications enable for ${characteristic.uuid}")
@@ -184,13 +164,12 @@ class BluetoothDeviceManager (
         }
     }
 
-    fun disconnect () {
+    override fun disconnect () {
         if (bluetoothGatt != null) {
             Log.d ("Bluetooth", "Device disconnect")
             bluetoothGatt?.close ()
             bluetoothGatt = null
         }
-        timeoutStop ()
         scanner.stop ()
         checker.stop ()
         isConnected = false
@@ -209,7 +188,7 @@ class BluetoothDeviceManager (
         reconnect ()
     }
 
-    fun reconnect () {
+    override fun reconnect () {
         Log.d ("Bluetooth", "Device reconnect")
         disconnect ()
         handler.postDelayed ({
@@ -217,5 +196,5 @@ class BluetoothDeviceManager (
         }, 50)
     }
 
-    fun isConnected (): Boolean = isConnected
+    override  fun isConnected (): Boolean = isConnected
 }

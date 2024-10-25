@@ -33,7 +33,7 @@
                 android:id="@+id/bluetoothIcon"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/ic_baseline_bluetooth_24"/>
+                android:src="@drawable/ic_baseline_bluetooth"/>
         </LinearLayout>
 
         <!-- Network status -->
@@ -48,7 +48,7 @@
                 android:id="@+id/networkIcon"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/ic_baseline_wifi_24"/>
+                android:src="@drawable/ic_baseline_network"/>
         </LinearLayout>
 
         <!-- Cloud status -->
@@ -63,7 +63,7 @@
                 android:id="@+id/cloudIcon"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/ic_baseline_cloud_24"/>
+                android:src="@drawable/ic_baseline_cloud"/>
         </LinearLayout>
 
     </LinearLayout>

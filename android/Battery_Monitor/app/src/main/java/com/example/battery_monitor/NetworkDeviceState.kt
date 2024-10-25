@@ -7,11 +7,12 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
 
-class NetworkStateReceiver(
+class NetworkDeviceState(
     context: Context,
+    tag: String,
     private val onDisabled: () -> Unit,
     private val onEnabled: () -> Unit
-) : ConnectivityComponent("NetworkStateReceiver") {
+) : ConnectivityComponent(tag) {
 
     private val connectivityManager: ConnectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager

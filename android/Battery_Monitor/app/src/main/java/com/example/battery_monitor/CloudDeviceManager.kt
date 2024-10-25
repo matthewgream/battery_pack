@@ -15,31 +15,33 @@ class CloudDeviceManagerConfig (
     val port: Int = 1883,
     val user: String? = null,
     val pass: String? = null,
-    val client: String = UUID.randomUUID ().toString ()
+    val client: String = UUID.randomUUID ().toString (),
+    val topic: String
 )
 
 class CloudDeviceManager (
     private val activity: Activity,
-    private val adapter: CloudAdapter,
+    private val adapter: CloudDeviceAdapter,
     private val config: CloudDeviceManagerConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
     private val isEnabled: () -> Boolean,
     private val isPermitted: () -> Boolean
-) {
+): ConnectivityDeviceManager () {
+//    private val handler = Handler (Looper.getMainLooper ())
     private var mqttClient: Mqtt5AsyncClient? = null
     private var isConnected = false
     private var isConnecting = false
     private var topic = ""
 
-    fun permissionsAllowed () {
+    override fun permitted () {
         statusCallback ()
         if (!isConnected && !isConnecting)
             connect ()
     }
 
-    fun connect () {
+    private fun connect () {
         Log.d("Cloud", "Cloud connect initiate")
         statusCallback ()
         when {
@@ -88,6 +90,7 @@ class CloudDeviceManager (
                         isConnected = true
                         isConnecting = false
                         statusCallback ()
+                        identify ()
                         if (topic.isNotEmpty ())
                             subscribe (topic)
                     }
@@ -153,7 +156,7 @@ class CloudDeviceManager (
         }
     }
 
-    fun disconnect() {
+    override fun disconnect() {
         try {
             mqttClient?.disconnectWith ()
                 ?.sessionExpiryInterval (0)
@@ -177,10 +180,14 @@ class CloudDeviceManager (
         }
     }
 
-    fun reconnect () {
+    private fun identify() {
+        publish (config.topic, connectivityInfo.toJsonString())
+    }
+
+    override fun reconnect () {
 //        disconnect ()
 //        connect ()
     }
 
-    fun isConnected (): Boolean = isConnected
+    override fun isConnected (): Boolean = isConnected
 }

@@ -17,19 +17,18 @@ class NetworkDeviceManagerConfig {
     val SERVICE_TYPE = "_ws._tcp."
     val SERVICE_NAME = "battery_monitor"
     val CONNECTION_TIMEOUT = 30000L // 30 seconds
-    val DISCOVERY_TIMEOUT = 10000L // 10 seconds
 }
 
 class NetworkDeviceManager(
     activity: Activity,
-    private val adapter: NetworkAdapter,
+    private val adapter: NetworkDeviceAdapter,
     config: NetworkDeviceManagerConfig,
-    private val connectionInfo: ConnectivityInfo,
+    private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
     private val isPermitted: () -> Boolean,
     private val isEnabled: () -> Boolean
-) {
+): ConnectivityDeviceManager () {
     private val nsdManager: NsdManager = activity.getSystemService(Activity.NSD_SERVICE) as NsdManager
     private var isConnected = false
     private var isConnecting = false
@@ -41,14 +40,14 @@ class NetworkDeviceManager(
             SERVICE_TYPE = config.SERVICE_TYPE,
             SERVICE_NAME = config.SERVICE_NAME
         ),
-        connectionInfo,
-        onFound = { serviceInfo -> located(serviceInfo) }
+        connectivityInfo,
+        onFound = { serviceInfo -> located (serviceInfo) }
     )
 
     private val checker: ConnectivityChecker = ConnectivityChecker(
         "Network",
         ConnectivityCheckerConfig(
-            CONNECTION_TIMEOUT = 60000L, // 60 seconds
+            CONNECTION_TIMEOUT = config.CONNECTION_TIMEOUT,
             CONNECTION_CHECK = 10000L    // 10 seconds
         ),
         isConnected = { isConnected() },
@@ -75,11 +74,7 @@ class NetworkDeviceManager(
 
             override fun onOpen(handshakedata: ServerHandshake?) {
                 Log.d("Network", "WebSocket connection established")
-                isConnected = true
-                isConnecting = false
-                statusCallback()
-                checker.start()
-                identify()
+                connected ()
                 pingHandler.post(pingRunnable)
             }
             override fun onMessage(message: String) {
@@ -103,7 +98,7 @@ class NetworkDeviceManager(
     }
 
     private fun identify() {
-        webSocketClient?.send(connectionInfo.toJsonString())
+        webSocketClient?.send(connectivityInfo.toJsonString())
     }
 
     @Suppress("DEPRECATION")
@@ -120,10 +115,8 @@ class NetworkDeviceManager(
             Log.d("Network", "WebSocket connection already in progress or established")
             return
         }
-
         isConnecting = true
         statusCallback()
-
         try {
             webSocketClient = createWebSocketClient(URI(url))
             webSocketClient?.connect()
@@ -133,22 +126,30 @@ class NetworkDeviceManager(
         }
     }
 
+    private fun connected() {
+        isConnecting = false
+        isConnected = true
+        statusCallback()
+        checker.start()
+        identify()
+    }
+
     private fun disconnected() {
         checker.stop()
-        webSocketClient?.close()
-        webSocketClient = null
         isConnected = false
         isConnecting = false
+        webSocketClient?.close()
+        webSocketClient = null
         statusCallback()
     }
 
-    fun permissionsAllowed() {
+    override fun permitted() {
         statusCallback()
         if (!isConnected && !isConnecting)
             locate()
     }
 
-    fun locate() {
+    private fun locate() {
         Log.d("Network", "Device locate initiated")
         statusCallback()
         when {
@@ -159,15 +160,15 @@ class NetworkDeviceManager(
         }
     }
 
-    fun disconnect() {
+    override fun disconnect() {
         scanner.stop()
         disconnected()
     }
 
-    fun reconnect() {
+    override fun reconnect() {
         disconnect()
         locate()
     }
 
-    fun isConnected(): Boolean = isConnected
+    override fun isConnected(): Boolean = isConnected
 }

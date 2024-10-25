@@ -106,12 +106,10 @@ class BluetoothDeviceScannerConfig (
 ) {
     val SCAN_DELAY = 5000L // 5 seconds
     val SCAN_PERIOD = 30000L // 30 seconds
-
     val filter: ScanFilter = ScanFilter.Builder ()
         .setDeviceName (name)
         .setServiceUuid (ParcelUuid (uuid))
         .build ()
-
     val settings: ScanSettings = ScanSettings.Builder ()
         .setLegacy (false)
         .setPhy (ScanSettings.PHY_LE_ALL_SUPPORTED)

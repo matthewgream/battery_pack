@@ -12,7 +12,7 @@ class NotificationsManager (private val activity: Activity) {
 
     private val permissions: PermissionsManager = PermissionsManagerFactory (activity).create (
         tag = "Notifications",
-        permissions = arrayOf (android.Manifest.permission.POST_NOTIFICATIONS)
+        permissionsRequired = arrayOf (android.Manifest.permission.POST_NOTIFICATIONS)
     )
 
     private val channelId = "AlarmChannel"
@@ -40,7 +40,7 @@ class NotificationsManager (private val activity: Activity) {
             val title = if (current.isNotEmpty ()) current.joinToString (", ") { it.first } else channelTitle
             val content = if (current.isNotEmpty ()) current.joinToString ("\n") { "${it.first}: ${it.second}" } else channelContent
             val builder = Notification.Builder (activity, channelId)
-                .setSmallIcon (R.drawable.ic_temp_fan)
+                .setSmallIcon (R.drawable.ic_launcher)
                 .setContentTitle (title)
                 .setContentText (content)
                 .setStyle (Notification.BigTextStyle ().bigText (content))

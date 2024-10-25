@@ -28,8 +28,8 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
     private enum class IconState {
         DISABLED, // Grey - No permissions or not available
         DISCONNECTED, // Red - Available but not connected
-        CONNECTED, // Green - Connected and active
-        STANDBY // Orange - Connected but inactive (for future use)
+        CONNECTED_ACTIVE, // Green - Connected and active
+        CONNECTED_STANDBY // Orange - Connected but inactive (for future use)
     }
 
     init {
@@ -47,42 +47,29 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
         val color = when (state) {
             IconState.DISABLED -> context.getColor(R.color.icon_disabled)
             IconState.DISCONNECTED -> context.getColor(R.color.icon_disconnected)
-            IconState.CONNECTED -> context.getColor(R.color.icon_connected)
-            IconState.STANDBY -> context.getColor(R.color.icon_standby)
+            IconState.CONNECTED_STANDBY -> context.getColor(R.color.icon_connected_standby)
+            IconState.CONNECTED_ACTIVE -> context.getColor(R.color.icon_connected_active)
         }
         icon.setColorFilter(color)
     }
-
-    fun updateStatus(
-        bluetoothConnected: Boolean, networkConnected: Boolean, cloudConnected: Boolean,
-        bluetoothAvailable: Boolean, networkAvailable: Boolean, cloudAvailable: Boolean,
-        bluetoothPermitted: Boolean, networkPermitted: Boolean, cloudPermitted: Boolean
-    ) {
+    fun updateStatus (statuses: Map<ConnectivityType, ConnectivityStatus>) {
         uiHandler.post {
-            val bluetoothState = when {
-                !bluetoothPermitted -> IconState.DISABLED
-                !bluetoothAvailable -> IconState.DISABLED
-                !bluetoothConnected -> IconState.DISCONNECTED
-                else -> IconState.CONNECTED
+            val iconMapping = mapOf(
+                ConnectivityType.BLUETOOTH to bluetoothIcon,
+                ConnectivityType.NETWORK to networkIcon,
+                ConnectivityType.CLOUD to cloudIcon
+            )
+            statuses.forEach { (type, status) ->
+                updateIconState (iconMapping[type] ?: return@forEach, determineIconState (status))
             }
-            updateIconState(bluetoothIcon, bluetoothState)
-
-            val networkState = when {
-                !networkPermitted -> IconState.DISABLED
-                !networkAvailable -> IconState.DISABLED
-                !networkConnected -> IconState.DISCONNECTED
-                else -> IconState.CONNECTED
-            }
-            updateIconState(networkIcon, networkState)
-
-            val cloudState = when {
-                !cloudPermitted -> IconState.DISABLED
-                !cloudAvailable -> IconState.DISABLED
-                !cloudConnected -> IconState.DISCONNECTED
-                else -> IconState.CONNECTED
-            }
-            updateIconState(cloudIcon, cloudState)
         }
+    }
+    private fun determineIconState (status: ConnectivityStatus): IconState = when {
+        !status.permitted -> IconState.DISABLED
+        !status.available -> IconState.DISABLED
+        !status.connected -> IconState.DISCONNECTED
+        status.connected && status.standby -> IconState.CONNECTED_STANDBY
+        else -> IconState.CONNECTED_ACTIVE
     }
 
     @SuppressLint("ClickableViewAccessibility")

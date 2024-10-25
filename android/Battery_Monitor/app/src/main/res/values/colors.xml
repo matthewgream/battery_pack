@@ -30,6 +30,6 @@
 
     <color name="icon_disabled">#757575</color>
     <color name="icon_disconnected">#E53935</color>
-    <color name="icon_connected">#43A047</color>
-    <color name="icon_standby">#FB8C00</color>
+    <color name="icon_connected_active">#43A047</color>
+    <color name="icon_connected_standby">#FB8C00</color>
 </resources>
