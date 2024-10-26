@@ -14,32 +14,27 @@ public:
     } Config;
 
 private:
-    const Config &config;
 
-    MulticastDNS &_mdns;
-    ConnectionSignalTracker _connectionSignalTracker;
-    bool _connected = false, _available = false;
-    IPAddress _address;
-    Intervalable _intervalConnectionCheck;
-    ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
+    //
 
     void events (const WiFiEvent_t event, const WiFiEventInfo_t info) {
         if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED) {
-            const int8_t rssi = WiFi.RSSI ();
+            const int8_t rssi (WiFi.RSSI ());
             DEBUG_PRINTF ("NetworkManager::events: WIFI_CONNECTED, ssid=%s, bssid=%s, channel=%d, authmode=%s, rssi=%d (%s)\n",
                 _ssid_to_string (info.wifi_sta_connected.ssid, info.wifi_sta_connected.ssid_len).c_str (),
                 _bssid_to_string (info.wifi_sta_connected.bssid).c_str (), (int) info.wifi_sta_connected.channel,
-                _authmode_to_string ((wifi_auth_mode_t) info.wifi_sta_connected.authmode).c_str (), rssi, ConnectionSignalTracker::toString (ConnectionSignalTracker::signalQuality (rssi)).c_str ());
-            doConnected (rssi);
+                _authmode_to_string (info.wifi_sta_connected.authmode).c_str (), rssi, ConnectionSignalTracker::toString (ConnectionSignalTracker::signalQuality (rssi)).c_str ());
+            _connected (rssi);
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP) {
-            DEBUG_PRINTF ("NetworkManager::events: WIFI_ALLOCATED, address=%s\n", IPAddress (info.got_ip.ip_info.ip.addr).toString ().c_str ());
-            doAllocated (IPAddress (info.got_ip.ip_info.ip.addr));
+            const IPAddress address (info.got_ip.ip_info.ip.addr);
+            DEBUG_PRINTF ("NetworkManager::events: WIFI_ALLOCATED, address=%s\n", address.toString ().c_str ());
+            _connected_allocated (address);
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
-            const String reason = _error_to_string ((wifi_err_reason_t) info.wifi_sta_disconnected.reason);
+            const String reason (_error_to_string ((wifi_err_reason_t) info.wifi_sta_disconnected.reason));
             DEBUG_PRINTF ("NetworkManager::events: WIFI_DISCONNECTED, ssid=%s, bssid=%s, reason=%s\n",
                 _ssid_to_string (info.wifi_sta_disconnected.ssid, info.wifi_sta_disconnected.ssid_len).c_str (),
                 _bssid_to_string (info.wifi_sta_disconnected.bssid).c_str (), reason.c_str ());
-            doDisconnected (reason);
+            _disconnected (reason);
         }
     }
     static void __wiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info) {
@@ -47,65 +42,87 @@ private:
         if (manager != nullptr) manager->events (event, info);
     }
 
-    void doConnected (const int8_t rssi) {
-        _connectionSignalTracker.reset ();
-        _intervalConnectionCheck.reset (); _connections ++; _connected = true;
-        _connectionSignalTracker.update (rssi);
-    }
-    void doAllocated (const IPAddress& address) { // careful, reallocations
-        _allocations ++; _available = true; _address = address;
-        _mdns.start (address, config.host);
-    }
-    void doDisconnected (const String& reason) {
-        _mdns.stop ();
-        _intervalConnectionCheck.reset (); _available = false; _connected = false; _disconnections += reason;
-    }
+    //
 
-public:
-    explicit NetwerkManager (const Config& cfg, MulticastDNS& mdns, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg), _mdns (mdns), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+    const Config &config;
 
-    void begin () override {
+    MulticastDNS &_mdns;
+    ConnectionSignalTracker _connectionSignalTracker;
+    Intervalable _intervalConnectionCheck;
+    ActivationTracker _connections, _allocations; ActivationTrackerWithDetail _disconnections;
+    IPAddress _address;
+    bool _connectionActive = false, _connectionAvailable = false;
+
+    void _connect () {
+        if (!_connectionActive) {
+            DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddressWifi ().c_str (), config.host.c_str ());
+            WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
+            WiFi.setTxPower (WIFI_POWER_8_5dBm); // XXX ?!? for AUTH_EXPIRE ... flash access problem ...  https://github.com/espressif/arduino-esp32/issues/2144
+        }
+    }
+    void _connected (const int8_t rssi) {
+        if (!_connectionActive) {
+            _connectionSignalTracker.reset ();
+            _intervalConnectionCheck.reset (); _connections ++; _connectionActive = true; _connectionAvailable = false;
+            _connectionSignalTracker.update (rssi);
+        }
+    }
+    void _connected_allocated (const IPAddress& address) { // careful, reallocations
+        if (_connectionActive && !_connectionAvailable) {
+            _allocations ++; _connectionAvailable = true; _address = address;
+            _mdns.start (address, config.host);
+        }
+    }
+    void _disconnected (const String& reason) {
+        if (_connectionActive) {
+            _mdns.stop ();
+            _intervalConnectionCheck.reset (); _connectionAvailable = false; _connectionActive = false; _disconnections += reason;
+        }
+    }
+    void _connection_init () {
         WiFi.persistent (false);
         WiFi.onEvent (__wiFiEventHandler);
         WiFi.setHostname (config.host.c_str ());
         WiFi.setAutoReconnect (true);
         WiFi.mode (WIFI_STA);
-        connect ();
     }
-    void process () override {
-        if (_connected && _intervalConnectionCheck) {
-            if (!_available) {
-                DEBUG_PRINTF ("NetworkManager::check: connection timeout, resetting\n");
-                reset ();
+    void _connection_process () {
+        if (_connectionActive && _intervalConnectionCheck) {
+            if (!_connectionAvailable) {
+                DEBUG_PRINTF ("NetworkManager::check: connection timeout, restarting\n");
+                WiFi.disconnect (true);
+                const String reason ("LOCAL_TIMEOUT");
+                _connectionActive = false; _disconnections += reason;
+                _connect ();
             } else {
                 _connectionSignalTracker.update (WiFi.RSSI ());
                 DEBUG_PRINTF ("NetworkManager::process: rssi=%d (%s)\n", _connectionSignalTracker.rssi (), _connectionSignalTracker.toString ().c_str ());
             }
         }
     }
+
+public:
+    explicit NetwerkManager (const Config& cfg, MulticastDNS& mdns, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) : Singleton <NetwerkManager> (this), config (cfg),
+        _mdns (mdns), _connectionSignalTracker (connectionSignalCallback), _intervalConnectionCheck (config.intervalConnectionCheck) {}
+
+    void begin () override {
+        _connection_init ();
+        _connect ();
+    }
+    void process () override {
+        _connection_process ();
+    }
     bool available () const {
-        return _available;
-    }
-    //
-    void connect () {
-        DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddressWifi ().c_str (), config.host.c_str ());
-        WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
-        WiFi.setTxPower(WIFI_POWER_8_5dBm); // XXX ?!? for AUTH_EXPIRE ... flash access problem ...  https://github.com/espressif/arduino-esp32/issues/2144
-    }
-    void reset () {
-        DEBUG_PRINTF ("NetworkManager::reset\n");
-        const String reason = "LOCAL_TIMEOUT";
-        _available = false; _connected = false; _disconnections += reason;
-        WiFi.disconnect (true);
+        return _connectionAvailable;
     }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["network"].to <JsonObject> ();
             sub ["macaddr"] = getMacAddressWifi ();
-            if ((sub ["connected"] = _connected)) {
-                if ((sub ["available"] = _available))
-                    sub ["ipaddr"] = WiFi.localIP ();
+            if ((sub ["connected"] = _connectionActive)) {
+                if ((sub ["available"] = _connectionAvailable))
+                    sub ["address"] = WiFi.localIP ();
                 obj ["signal"] = _connectionSignalTracker;
             }
             if (_connections)

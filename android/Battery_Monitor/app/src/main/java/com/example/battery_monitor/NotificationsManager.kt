@@ -8,79 +8,89 @@ import android.app.NotificationManager
 import android.content.Context
 
 @SuppressLint("MissingPermission")
-class NotificationsManager (private val activity: Activity) {
+class NotificationsManager(private val activity: Activity) {
 
-    private val permissions: PermissionsManager = PermissionsManagerFactory (activity).create (
+    private val permissions: PermissionsManager = PermissionsManagerFactory(activity).create(
         tag = "Notifications",
-        permissionsRequired = arrayOf (android.Manifest.permission.POST_NOTIFICATIONS)
+        permissionsRequired = arrayOf(android.Manifest.permission.POST_NOTIFICATIONS)
     )
 
     private val channelId = "AlarmChannel"
-    private val channelName = activity.getString (R.string.notification_channel_name)
-    private val channelDescription = activity.getString (R.string.notification_channel_description)
-    private val channelTitle = activity.getString (R.string.notification_channel_title)
-    private val channelContent = activity.getString (R.string.notification_channel_content)
+    private val channelName = activity.getString(R.string.notification_channel_name)
+    private val channelDescription = activity.getString(R.string.notification_channel_description)
+    private val channelTitle = activity.getString(R.string.notification_channel_title)
+    private val channelContent = activity.getString(R.string.notification_channel_content)
 
-    private val manager: NotificationManager = activity.getSystemService (Context.NOTIFICATION_SERVICE) as NotificationManager
+    private val manager: NotificationManager =
+        activity.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private val identifier = 1
     private var active: Int? = null
-    private var previous:  List <Pair <String, String>> = emptyList()
+    private var previous: List<Pair<String, String>> = emptyList()
 
     init {
-        val channel = NotificationChannel (channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT).apply {
+        val channel = NotificationChannel(
+            channelId,
+            channelName,
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
             description = channelDescription
         }
-        manager.createNotificationChannel (channel)
+        manager.createNotificationChannel(channel)
     }
 
     //
 
-    private fun show (current: List<Pair<String, String>>) {
+    private fun show(current: List<Pair<String, String>>) {
         if (current != previous) {
-            val title = if (current.isNotEmpty ()) current.joinToString (", ") { it.first } else channelTitle
-            val content = if (current.isNotEmpty ()) current.joinToString ("\n") { "${it.first}: ${it.second}" } else channelContent
-            val builder = Notification.Builder (activity, channelId)
-                .setSmallIcon (R.drawable.ic_launcher)
-                .setContentTitle (title)
-                .setContentText (content)
-                .setStyle (Notification.BigTextStyle ().bigText (content))
-                .setOngoing (true)
-            manager.notify (identifier, builder.build ())
+            val title =
+                if (current.isNotEmpty()) current.joinToString(", ") { it.first } else channelTitle
+            val content =
+                if (current.isNotEmpty()) current.joinToString("\n") { "${it.first}: ${it.second}" } else channelContent
+            val builder = Notification.Builder(activity, channelId)
+                .setSmallIcon(R.drawable.ic_launcher)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setStyle(Notification.BigTextStyle().bigText(content))
+                .setOngoing(true)
+            manager.notify(identifier, builder.build())
             active = identifier
             previous = current
         }
     }
-    private fun reshow () {
-        if (previous.isNotEmpty ()) {
+
+    private fun reshow() {
+        if (previous.isNotEmpty()) {
             val current = previous
-            previous =  emptyList ()
-            show (current)
+            previous = emptyList()
+            show(current)
         }
     }
-    private fun clear () {
+
+    private fun clear() {
         active?.let {
-            manager.cancel (it)
+            manager.cancel(it)
             active = null
         }
-        previous = emptyList ()
+        previous = emptyList()
     }
 
     //
 
-    fun process (current: List<Pair<String, String>>) {
-        if (current.isNotEmpty ()) {
+    fun process(current: List<Pair<String, String>>) {
+        if (current.isNotEmpty()) {
             when {
                 !permissions.requested -> {
                     previous = current
-                    permissions.requestPermissions (
-                        onPermissionsAllowed = { reshow () }
+                    permissions.requestPermissions(
+                        onPermissionsAllowed = { reshow() }
                     )
                 }
+
                 !permissions.obtained -> previous = current
-                permissions.allowed ->  show (current)
+                permissions.allowed -> show(current)
             }
         } else {
-            clear ()
+            clear()
         }
     }
 }

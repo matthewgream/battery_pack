@@ -2,6 +2,101 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+#include <map>
+
+template <typename C>
+class ConnectionReceiver {
+public:
+    class Handler {
+    public:
+        virtual bool process (C&, JsonDocument&) = 0;
+        virtual ~Handler () {};
+    };
+    using Handlers = std::map <String, std::shared_ptr <Handler>>;
+    class Insertable {
+        ConnectionReceiver <C>* _manager;
+    public:
+        Insertable (ConnectionReceiver <C>* manager): _manager (manager) {}
+        void insertReceivers (const ConnectionReceiver <C>::Handlers &handlers) { (*_manager) += handlers; }
+    };
+private:
+    using Queue = QueueSimpleConcurrentSafe <String>;
+    C* const _c;
+    Queue _queue;
+    Handlers _handlers;
+
+    void processJson (const String& str) {
+        JsonDocument doc;
+        DeserializationError error;
+        if ((error = deserializeJson (doc, str)) != DeserializationError::Ok) {
+            DEBUG_PRINTF ("Receiver::process: deserializeJson fault: %s\n", error.c_str ());
+            _failures += String ("write failed to deserialize Json: ") + String (error.c_str ());
+            return;
+        }
+        const char *type = doc ["type"];
+        if (type != nullptr) {
+            auto handler = _handlers.find (String (type));
+            if (handler != _handlers.end ()) {
+                if (!handler->second->process (*_c, doc))
+                    _failures += String ("write failed in handler for 'type': ") + String (type);
+            } else _failures += String ("write failed to find handler for 'type': ") + String (type);
+        } else _failures += String ("write failed to contain 'type'");
+    }
+public:
+    ActivationTrackerWithDetail _failures;
+    explicit ConnectionReceiver (C* c): _c (c) {}
+    ConnectionReceiver& operator += (const Handlers& handlers) {
+        _handlers.insert (handlers.begin (), handlers.end ());
+        return *this;
+    }
+    void insert (const String& str) {
+        _queue.push (str);
+    }
+    void process () {
+        String str;
+        while (_queue.pull (str)) {
+            DEBUG_PRINTF ("Receiver::process: content=<<<%s>>>\n", str.c_str ());
+            if (str.startsWith ("{\"type\""))
+                processJson (str);
+            else _failures += String ("write failed to identify as Json or have leading 'type'");
+        }
+    }
+    void drain () {
+        _queue.drain ();
+    }
+};
+
+template <typename C>
+class ConnectionSender {
+    using Function = std::function <void (const String&)>;
+    const Function _func;
+public:
+    ActivationTrackerWithDetail _payloadExceeded;
+    explicit ConnectionSender (Function func): _func (func) {}
+    bool send (const String& data, const int maxPayloadSize = -1) {
+        bool result = true;
+        if (maxPayloadSize == -1 || data.length () <= maxPayloadSize) {
+            _func (data);
+            DEBUG_PRINTF ("Sender::send: length=%u\n", data.length ());
+        } else {
+            JsonSplitter splitter (maxPayloadSize, { "type", "time", "addr" });
+            splitter.splitJson (data, [&] (const String& part, const int elements) {
+                const size_t length = part.length ();
+                _func (part);
+                DEBUG_PRINTF ("Sender::send: data=%u, part=%u, elements=%d\n", data.length (), length, elements);
+                if (length > maxPayloadSize)
+                    _payloadExceeded += ArithmeticToString (length), result = false;
+                delay (20);
+            });
+        }
+        return result;
+    }
+};
+
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
 #include <WiFiUdp.h>
 // announce+response, not lookup, see https://gist.github.com/matthewgream/1c535fa86fd006ae794f4f245216b1a0
 #include <ArduinoLightMDNS.h>
@@ -68,20 +163,22 @@ private:
     AsyncWebServer _server;
     Initialisable _started;
 
+    void _connection_init () {
+        _server.onNotFound ([] (AsyncWebServerRequest *request) {
+            request->send (404, "text/plain", STRING_404_NOT_FOUND);
+        });
+        _server.begin ();
+        DEBUG_PRINTF ("WebServer::start: active, port=%u\n", config.port);     
+    }
+
 public:
     explicit WebServer (const Config& cfg): config (cfg), _server (config.port) {}
 
     void begin () {
-        _server.onNotFound ([] (AsyncWebServerRequest *request) {
-            request->send (404, "text/plain", STRING_404_NOT_FOUND);
-        });
     }
     void process () {
-        // only when connected or panic()
-        if (config.enabled && !_started) {
-            _server.begin ();
-            DEBUG_PRINTF ("WebServer::start: active, port=%u\n", config.port);
-        }
+        if (config.enabled && !_started) // only when connected or panic()
+            _connection_init ();
     }
     __implementation_t& __implementation () {
         return _server;
@@ -94,7 +191,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class WebSocket: public JsonSerializable  {
+class WebSocket: private Singleton <WebSocket>, public ConnectionReceiver <WebSocket>::Insertable, public JsonSerializable  {
 public:
     typedef struct {
         bool enabled;
@@ -103,92 +200,137 @@ public:
     } Config;
 
 private:
+
+    //
+
+    void events (AsyncWebSocketClient *client, const AwsEventType type, const void *arg, const uint8_t *data, const size_t len) {
+        if (type == WS_EVT_CONNECT) {
+            DEBUG_PRINTF ("WebSocket[%u]::events: CONNECT address=%s\n", client->id (), client->remoteIP ().toString ().c_str ());
+            _connected (client);
+        } else if (type == WS_EVT_DISCONNECT) {
+            DEBUG_PRINTF ("WebSocket[%u]::events: DISCONNECT\n", client->id ());
+            _disconnected ();
+        } else if (type == WS_EVT_ERROR) {
+            DEBUG_PRINTF ("WebSocket[%u]::events: ERROR: (%u) %s\n", client->id (), *reinterpret_cast <const uint16_t *> (arg), reinterpret_cast <const char*> (data));
+            _connected_error (reinterpret_cast <const char*> (data));
+        } else if (type == WS_EVT_PONG) {
+            DEBUG_PRINTF ("WebSocket[%u]::events: PONG: (%u) %s\n", client->id (), len, len ? reinterpret_cast <const char*> (data) : "");
+        } else if (type == WS_EVT_DATA) {
+            const AwsFrameInfo *info = (const AwsFrameInfo *) arg;
+            if (info->opcode == WS_TEXT && info->final && info->index == 0 && info->len == len) {
+                DEBUG_PRINTF ("WebSocket[%u]::events: message [%lu]: %.*s\n", client->id (), len, len, reinterpret_cast <const char*> (data));
+                _connected_writeReceived (String (data, len));
+                //client->text ("I got your text message");
+            }
+        }
+    }
+    static void __webSocketEventHandler (AsyncWebSocket *, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+        WebSocket *websocket = Singleton <WebSocket>::instance ();
+        if (websocket != nullptr) websocket->events (client, type, arg, data, len);
+    }
+
+    //
+
     const Config &config;
 
     AsyncWebServer _server;
     AsyncWebSocket _socket;
     Initialisable _started;
 
-    static void webSocket_onEvent (AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len) {
-        if (type == WS_EVT_CONNECT){
-            DEBUG_PRINTF ("ws[%s][%u] connect\n", server->url (), client->id ());
-            //client->printf("Hello Client %u :)", client->id());
-            client->ping();
+    ConnectionReceiver <WebSocket> _connectionReceiver;
+    ConnectionSender <WebSocket> _connectionSender;
+    ActivationTracker _connections, _disconnections;
+    ActivationTrackerWithDetail _errors;
+    bool _connectionActive = false;
+    AsyncWebSocketClient *_connectionClient = nullptr;
 
-          } else if(type == WS_EVT_DISCONNECT){
-            DEBUG_PRINTF ("ws[%s][%u] disconnect\n", server->url(), client->id());
-
-          } else if(type == WS_EVT_ERROR){
-            DEBUG_PRINTF ("ws[%s][%u] error(%u): %s\n", server->url(), client->id(), *((uint16_t*)arg), (char*)data);
-
-          } else if(type == WS_EVT_PONG){
-            DEBUG_PRINTF ("ws[%s][%u] pong[%u]: %s\n", server->url(), client->id(), len, (len)?(char*)data:"");
-
-          } else if(type == WS_EVT_DATA){
-            AwsFrameInfo * info = (AwsFrameInfo*)arg;
-            if(info->final && info->index == 0 && info->len == len){
-              DEBUG_PRINTF ("ws[%s][%u] %s-message[%llu]: ", server->url(), client->id(), (info->opcode == WS_TEXT)?"text":"binary", info->len);
-              if(info->opcode == WS_TEXT){
-                data[len] = 0;
-                DEBUG_PRINTF ("%s\n", (char*)data);
-              } else {
-                for(size_t i=0; i < info->len; i++)
-                  DEBUG_PRINTF ("%02x ", data[i]);
-                DEBUG_PRINTF ("\n");
-              }
-              // if(info->opcode == WS_TEXT)
-              //   client->text ("I got your text message");
-              // else
-              //   client->binary ("I got your binary message");
-            } else {
-              if (info->index == 0){
-                if (info->num == 0)
-                  DEBUG_PRINTF ("ws[%s][%u] %s-message start\n", server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
-                DEBUG_PRINTF ("ws[%s][%u] frame[%u] start[%llu]\n", server->url(), client->id(), info->num, info->len);
-              }
-              DEBUG_PRINTF ("ws[%s][%u] frame[%u] %s[%llu - %llu]: ", server->url(), client->id(), info->num, (info->message_opcode == WS_TEXT)?"text":"binary", info->index, info->index + len);
-              if(info->message_opcode == WS_TEXT){
-                data[len] = 0;
-                DEBUG_PRINTF ("%s\n", (char*)data);
-              } else {
-                for(size_t i=0; i < len; i++)
-                  DEBUG_PRINTF ("%02x ", data[i]);
-                DEBUG_PRINTF ("\n");
-              }
-
-              if((info->index + len) == info->len){
-                DEBUG_PRINTF ("ws[%s][%u] frame[%u] end[%llu]\n", server->url(), client->id(), info->num, info->len);
-                if(info->final){
-                  DEBUG_PRINTF ("ws[%s][%u] %s-message end\n", server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
-                  // if(info->message_opcode == WS_TEXT)
-                  //   client->text("I got your text message");
-                  // else
-                  //   client->binary("I got your binary message");
-                }
-              }
-            }
-          }
+    void _connected (AsyncWebSocketClient *client) {
+        _disconnect (); // only one connection
+        if (!_connectionActive) {
+            _connectionClient = client;
+            _connections ++; _connectionActive = true;
+        } 
     }
-
-    void start () {
+    void _connected_error (const String& error) {
+        if (_connectionActive) {
+            _errors += error;
+        }
+    }
+    bool _connected_send (const String& data) {
+        if (_connectionActive) {
+            return _connectionSender.send (data);
+        } else {
+            DEBUG_PRINTF ("WebSocket::send: not connected");
+            return false;
+        }
+    }
+    void _connected_writeReceived (const String& str) {
+        if (_connectionActive) {
+            _connectionReceiver.insert (str);
+        }
+    }
+    void _disconnect () {
+        if (_connectionActive) {
+            _connectionActive = false; _disconnections ++;
+            if (_connectionClient) {
+                _connectionClient->close ();
+                _connectionClient = nullptr;
+            }
+            _connectionReceiver.drain ();
+        }
+    }
+    void _disconnected () {
+        if (_connectionActive) {
+            _connectionActive = false; _disconnections ++;
+            _connectionClient = nullptr;
+            _connectionReceiver.drain ();
+        }
+    }
+    void _connection_init () {
+        _socket.onEvent (__webSocketEventHandler);
+        _server.addHandler (&_socket);
+        _server.begin ();
+        DEBUG_PRINTF ("WebSocket::start: active, port=%u, root=%s\n", config.port, config.root.c_str ());
+    }
+    void _connection_process () {
+        if (_connectionActive) {
+            _connectionReceiver.process ();
+        }
     }
 
 public:
-    explicit WebSocket (const Config& cfg): config (cfg), _server (config.port), _socket (config.root) {}
+    explicit WebSocket (const Config& cfg): Singleton <WebSocket> (this), ConnectionReceiver <WebSocket>::Insertable (&_connectionReceiver), config (cfg), _server (config.port), _socket (config.root),
+        _connectionReceiver (this),
+        _connectionSender ([&] (const String& str) {
+            if (_connectionClient)
+                _connectionClient->text (str); // XXX a bit worried about this
+        }) {}
 
     void begin () {
     }
     void process () {
-        // only when connected or panic()
-        if (config.enabled && !_started) {
-            _socket.onEvent (webSocket_onEvent);
-            _server.addHandler (&_socket);
-            _server.begin ();
-            DEBUG_PRINTF ("WebSocket::start: active, port=%u, root=%s\n", config.port, config.root.c_str ());
-        }
+        if (config.enabled && !_started) // only when connected or panic()
+            _connection_init ();
+        _connection_process ();
     }
     //
+    // json only
+    bool send (const String& data) {
+        return _connected_send (data);
+    }    
+    //
     void serialize (JsonVariant &obj) const override {
+        if ((obj ["connected"] = _connectionActive)) {
+            obj ["address"] = _connectionClient->remoteIP ();
+        }
+        if (_connectionReceiver._failures)
+            obj ["receiveFailures"] = _connectionReceiver._failures;
+        if (_errors)
+            obj ["errors"] = _errors;
+        if (_connections)
+            obj ["connects"] = _connections;
+        if (_disconnections)
+            obj ["disconnects"] = _disconnections;
     }
 };
 

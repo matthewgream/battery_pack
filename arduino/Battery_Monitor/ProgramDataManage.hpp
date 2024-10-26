@@ -1,5 +1,22 @@
 
+// XXX this is all a bit of a mess at the moment ...
+
 // -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
+template <typename C>
+class ConnectionReceiver_TypeSpecific: public ConnectionReceiver <C>::Handler {
+protected:
+    const String _type;
+public:
+    ConnectionReceiver_TypeSpecific (const String& type): _type (type) {}
+    virtual bool process (C&, const String&, JsonDocument&) = 0;
+    bool process (C& c, JsonDocument& doc) override {
+        const char *type = doc [_type.c_str ()], *time = doc ["time"];
+        return (type != nullptr && time != nullptr) ? process (c, String (time), doc) : false;
+    }
+};
+
 // -----------------------------------------------------------------------------------------------
 
 class ControlManager: public Component, public Diagnosticable {
@@ -12,49 +29,33 @@ private:
     const Config &config;
 
     const String _id;
-    DeviceManager& _devices;
+    DeviceManager &_devices;
 
-    class BluetoothReadWriteHandler_TypeSpecific: public BluetoothReadWriteHandler {
-    protected:
-        const String _type;
+    class WebSocketReceiver_TypeInfo: public ConnectionReceiver_TypeSpecific <WebSocket> {
     public:
-        BluetoothReadWriteHandler_TypeSpecific (const String& type): _type (type) {}
-        virtual bool process (BluetoothDevice&, const String&, JsonDocument&) = 0;
-    };
-    class BluetoothWriteHandler_TypeSpecific: public BluetoothReadWriteHandler_TypeSpecific {
-    public:
-        BluetoothWriteHandler_TypeSpecific (const String& type): BluetoothReadWriteHandler_TypeSpecific (type) {}
-        virtual bool process (BluetoothDevice&, const String&, JsonDocument&) override = 0;
-        bool process (BluetoothDevice& device, JsonDocument& doc) override {
-            const char *type = doc [_type.c_str ()], *time = doc ["time"];
-            return (type != nullptr && time != nullptr) ? process (device, String (time), doc) : false;
-        }
-    };
-    class BluetoothReadHandler_TypeSpecific: public BluetoothReadWriteHandler_TypeSpecific {
-    public:
-        BluetoothReadHandler_TypeSpecific (const String& type): BluetoothReadWriteHandler_TypeSpecific (type) {}
-        virtual bool process (BluetoothDevice&, const String&, JsonDocument&) override = 0;
-        bool process (BluetoothDevice& device, JsonDocument& doc) override {
-            const String _time = getTimeString ();
-            doc ["type"] = _type, doc ["time"] = _time;
-            return process (device, _time, doc);
-        }
-    };
-    class BluetoothWriteHandler_TypeInfo: public BluetoothWriteHandler_TypeSpecific {
-    public:
-        BluetoothWriteHandler_TypeInfo (): BluetoothWriteHandler_TypeSpecific ("info") {};
-        bool process (BluetoothDevice& device, const String& time, JsonDocument& doc) override {
+        WebSocketReceiver_TypeInfo (): ConnectionReceiver_TypeSpecific <WebSocket> ("info") {};
+        bool process (WebSocket& device, const String& time, JsonDocument& doc) override {
             String content = doc ["info"] | "(not provided)";
-            DEBUG_PRINTF ("BluetoothWriteHandler_TypeInfo:: type=info, time=%s, info='%s'\n", time.c_str (), content.c_str ());
+            DEBUG_PRINTF ("WebSocketReceiver_TypeInfo:: type=info, time=%s, info='%s'\n", time.c_str (), content.c_str ());
             return true;
         }
     };
-    class BluetoothWriteHandler_TypeCtrl: public BluetoothWriteHandler_TypeSpecific {
+
+    class BluetoothReceiver_TypeInfo: public ConnectionReceiver_TypeSpecific <BluetoothDevice> {
     public:
-        BluetoothWriteHandler_TypeCtrl (): BluetoothWriteHandler_TypeSpecific ("ctrl") {};
+        BluetoothReceiver_TypeInfo (): ConnectionReceiver_TypeSpecific <BluetoothDevice> ("info") {};
+        bool process (BluetoothDevice& device, const String& time, JsonDocument& doc) override {
+            String content = doc ["info"] | "(not provided)";
+            DEBUG_PRINTF ("BluetoothReceiver_TypeInfo:: type=info, time=%s, info='%s'\n", time.c_str (), content.c_str ());
+            return true;
+        }
+    };
+    class BluetoothReceiver_TypeCtrl: public ConnectionReceiver_TypeSpecific <BluetoothDevice> {
+    public:
+        BluetoothReceiver_TypeCtrl (): ConnectionReceiver_TypeSpecific <BluetoothDevice> ("ctrl") {};
         bool process (BluetoothDevice& device, const String& time, JsonDocument& doc) override {
             String content = doc ["ctrl"] | "(not provided)";
-            DEBUG_PRINTF ("BluetoothWriteHandler_TypeCtrl:: type=ctrl, time=%s, ctrl='%s'\n", time.c_str (), content.c_str ());
+            DEBUG_PRINTF ("BluetoothReceiver_TypeCtrl:: type=ctrl, time=%s, ctrl='%s'\n", time.c_str (), content.c_str ());
             // XXX
             // request controllables
             // process controllables
@@ -67,16 +68,6 @@ private:
             return true;
         }
     };
-    class BluetoothReadHandler_TypeCtrl: public BluetoothReadHandler_TypeSpecific {
-    public:
-        BluetoothReadHandler_TypeCtrl (): BluetoothReadHandler_TypeSpecific ("ctrl") {};
-        bool process (BluetoothDevice& device, const String& time, JsonDocument& doc) override {
-            DEBUG_PRINTF ("BluetoothReadHandler_TypeCtrl:: type=ctrl\n");
-            // XXX
-            // send controllables
-            return false;
-        }
-    };
 
 public:
     explicit ControlManager (const Config& cfg, const String& id, DeviceManager& devices): config (cfg), _id (id), _devices (devices) {}
@@ -87,11 +78,10 @@ public:
             request->send (200, "text/plain", build);
         });
         // XXX for now ...
-        _devices.mdns ().__implementation ().addServiceRecord (MDNSServiceTCP, 80, "webserver._http", { "build=" + build, "type=battery_monitor" });
-        _devices.mdns ().__implementation ().addServiceRecord (MDNSServiceTCP, 81, "battery_monitor._ws", { "addr=" + addr, "type=battery_monitor" });
-        _devices.blue ().insert ({ { String ("ctrl"), std::make_shared <BluetoothWriteHandler_TypeCtrl> () } });
-        _devices.blue ().insert ({ { std::make_shared <BluetoothReadHandler_TypeCtrl> () } });
-        _devices.blue ().insert ({ { String ("info"), std::make_shared <BluetoothWriteHandler_TypeInfo> () } });
+        _devices.mdns ().__implementation ().addServiceRecord (MDNSServiceTCP, 80, "webserver._http", { "build=" + build, "type=BatteryMonitor" });
+        _devices.mdns ().__implementation ().addServiceRecord (MDNSServiceTCP, 81, "BatteryMonitor._ws", { "addr=" + addr, "type=BatteryMonitor" });
+        _devices.blue ().insertReceivers ({ { String ("ctrl"), std::make_shared <BluetoothReceiver_TypeCtrl> () }, { String ("info"), std::make_shared <BluetoothReceiver_TypeInfo> () } });
+        _devices.websocket ().insertReceivers ({ { String ("info"), std::make_shared <WebSocketReceiver_TypeInfo> () } });
     }
     //
 
@@ -135,7 +125,7 @@ public:
     }
     //
     bool deliver (const String& data) {
-        if (_blue.notify (data)) {
+        if (_blue.send (data)) {
             _delivers += ArithmeticToString (data.length ());
             _failures = 0;
             return true;

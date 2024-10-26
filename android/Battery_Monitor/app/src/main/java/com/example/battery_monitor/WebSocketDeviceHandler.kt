@@ -7,48 +7,51 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import org.java_websocket.WebSocket
-import java.net.URI
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.framing.Framedata
 import org.java_websocket.handshake.ServerHandshake
+import java.net.URI
 
 @Suppress("PropertyName")
-class NetworkDeviceManagerConfig {
+class WebSocketDeviceHandlerConfig {
     val SERVICE_TYPE = "_ws._tcp."
-    val SERVICE_NAME = "battery_monitor"
+    val SERVICE_NAME = "BatteryMonitor"
     val CONNECTION_TIMEOUT = 30000L // 30 seconds
+    val CONNECTION_CHECK = 15000L // 15 seconds
 }
 
-class NetworkDeviceManager(
+class WebSocketDeviceHandler(
     activity: Activity,
-    private val adapter: NetworkDeviceAdapter,
-    config: NetworkDeviceManagerConfig,
+    private val adapter: WebSocketDeviceAdapter,
+    private val config: WebSocketDeviceHandlerConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
     private val isPermitted: () -> Boolean,
     private val isEnabled: () -> Boolean
-): ConnectivityDeviceManager () {
-    private val nsdManager: NsdManager = activity.getSystemService(Activity.NSD_SERVICE) as NsdManager
+) : ConnectivityDeviceHandler() {
+    private val handler = Handler(Looper.getMainLooper())
+    private val nsdManager: NsdManager =
+        activity.getSystemService(Activity.NSD_SERVICE) as NsdManager
     private var isConnected = false
     private var isConnecting = false
     private var webSocketClient: WebSocketClient? = null
 
-    private val scanner: NetworkDeviceScanner = NetworkDeviceScanner(
+    private val scanner: WebSocketDeviceScanner = WebSocketDeviceScanner(
         nsdManager,
-        NetworkDeviceScannerConfig(
+        WebSocketDeviceScannerConfig(
             SERVICE_TYPE = config.SERVICE_TYPE,
             SERVICE_NAME = config.SERVICE_NAME
         ),
         connectivityInfo,
-        onFound = { serviceInfo -> located (serviceInfo) }
+        onFound = { serviceInfo -> located(serviceInfo) }
     )
 
     private val checker: ConnectivityChecker = ConnectivityChecker(
         "Network",
         ConnectivityCheckerConfig(
             CONNECTION_TIMEOUT = config.CONNECTION_TIMEOUT,
-            CONNECTION_CHECK = 10000L    // 10 seconds
+            CONNECTION_CHECK = config.CONNECTION_CHECK,
         ),
         isConnected = { isConnected() },
         onTimeout = { reconnect() }
@@ -63,7 +66,7 @@ class NetworkDeviceManager(
                     if (isConnected) {
                         try {
                             sendPing()
-                            pingHandler.postDelayed(this, 10000) // Send ping every 10 seconds
+                            pingHandler.postDelayed(this, config.CONNECTION_CHECK)
                         } catch (e: Exception) {
                             Log.e("Network", "Failed to send ping", e)
                             disconnected()
@@ -74,22 +77,26 @@ class NetworkDeviceManager(
 
             override fun onOpen(handshakedata: ServerHandshake?) {
                 Log.d("Network", "WebSocket connection established")
-                connected ()
+                connected()
                 pingHandler.post(pingRunnable)
             }
+
             override fun onMessage(message: String) {
                 Log.d("Network", "WebSocket message received: $message")
                 checker.ping()
                 dataCallback(message)
             }
+
             override fun onClose(code: Int, reason: String, remote: Boolean) {
                 Log.d("Network", "WebSocket closing: $code / $reason")
                 disconnected()
             }
+
             override fun onError(ex: Exception?) {
                 Log.e("Network", "WebSocket failure: ${ex?.message}")
                 disconnected()
             }
+
             override fun onWebsocketPong(conn: WebSocket?, f: Framedata?) {
                 Log.d("Network", "WebSocket pong received")
                 checker.ping()
@@ -111,11 +118,10 @@ class NetworkDeviceManager(
     }
 
     private fun connect(url: String) {
-        if (isConnecting || isConnected) {
+        if (isConnected) {
             Log.d("Network", "WebSocket connection already in progress or established")
             return
         }
-        isConnecting = true
         statusCallback()
         try {
             webSocketClient = createWebSocketClient(URI(url))
@@ -155,8 +161,12 @@ class NetworkDeviceManager(
         when {
             !isEnabled() -> Log.e("Network", "Network not enabled or available")
             !isPermitted() -> Log.e("Network", "Network access not permitted")
+            isConnecting -> Log.d("Network", "Network connection already in progress")
             isConnected -> Log.d("Network", "Network connection already active, will not locate")
-            else -> scanner.start()
+            else -> {
+                isConnecting = true
+                scanner.start()
+            }
         }
     }
 
@@ -167,7 +177,9 @@ class NetworkDeviceManager(
 
     override fun reconnect() {
         disconnect()
-        locate()
+        handler.postDelayed({
+            locate()
+        }, 50)
     }
 
     override fun isConnected(): Boolean = isConnected

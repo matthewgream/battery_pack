@@ -11,16 +11,7 @@
 
 // -----------------------------------------------------------------------------------------------
 
-class BluetoothDevice;
-class BluetoothReadWriteHandler {
-public:
-    virtual bool process (BluetoothDevice&, JsonDocument&) = 0;
-    virtual ~BluetoothReadWriteHandler () {};
-};
-
-// -----------------------------------------------------------------------------------------------
-
-class BluetoothDevice: private Singleton <BluetoothDevice>, protected BLEServerCallbacks, protected BLECharacteristicCallbacks, public JsonSerializable {
+class BluetoothDevice: private Singleton <BluetoothDevice>, public ConnectionReceiver <BluetoothDevice>::Insertable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks, public JsonSerializable {
 public:
     static inline constexpr uint16_t MIN_MTU = 32, MAX_MTU = 517;
 
@@ -31,7 +22,6 @@ public:
     } Config;
 
 private:
-    const Config &config;
 
     //
 
@@ -48,7 +38,7 @@ private:
         // param->offset, param->is_long
         DEBUG_PRINTF ("BluetoothDevice::events: BLE_CHARACTERISTIC_READ, (uuid=%s, offset=%d, is_long=%d)\n", characteristic->getUUID ().toString ().c_str (), param->read.offset, param->read.is_long);
         String str;
-        _connected_readRequested (str);
+        _connected_readRequested (str); // XXX uuid
         if (!str.isEmpty ()) characteristic->setValue (str.c_str ());
     }
     void onWrite (BLECharacteristic *characteristic, esp_ble_gatts_cb_param_t *) override {
@@ -84,6 +74,8 @@ private:
     }
 
     //
+
+    const Config &config;
 
     BLEServer *_server = nullptr;
     BLECharacteristic *_characteristic = nullptr;
@@ -132,114 +124,14 @@ private:
 
     //
 
-    friend class BluetoothWriteHandler_TypeInfo;
-    class ConnectionWriteManager {
-    public:
-        using Queue = QueueSimpleConcurrentSafe <String>;
-        using Handlers = std::map <String, std::shared_ptr <BluetoothReadWriteHandler>>;
-    private:
-        BluetoothDevice* const _device;
-        Queue _queue;
-        Handlers _handlers;
-
-        void processJson (const String& str) {
-            JsonDocument doc;
-            DeserializationError error;
-            if ((error = deserializeJson (doc, str)) != DeserializationError::Ok) {
-                DEBUG_PRINTF ("BluetoothDeviceWriteManager::process: deserializeJson fault: %s\n", error.c_str ());
-                _failures += String ("write failed to deserialize Json: ") + String (error.c_str ());
-                return;
-            }
-            const char *type = doc ["type"];
-            if (type != nullptr) {
-                auto handler = _handlers.find (String (type));
-                if (handler != _handlers.end ()) {
-                    if (!handler->second->process (*_device, doc))
-                        _failures += String ("write failed in handler for 'type': ") + String (type);
-                } else _failures += String ("write failed to find handler for 'type': ") + String (type);
-            } else _failures += String ("write failed to contain 'type'");
-        }
-    public:
-        ActivationTrackerWithDetail _failures;
-        explicit ConnectionWriteManager (BluetoothDevice* device): _device (device) {}
-        ConnectionWriteManager& operator += (const Handlers& handlers) {
-            _handlers.insert (handlers.begin (), handlers.end ());
-            return *this;
-        }
-        void insert (const String& str) {
-            _queue.push (str);
-        }
-        void process () {
-            String str;
-            while (_queue.pull (str)) {
-                DEBUG_PRINTF ("BluetoothDeviceWriteManager::process: content=<<<%s>>>\n", str.c_str ());
-                if (str.startsWith ("{\"type\""))
-                    processJson (str);
-                else _failures += String ("write failed to identify as Json or have leading 'type'");
-            }
-        }
-        void drain () {
-            _queue.drain ();
-        }
-    };
-
-    //
-
-    class ConnectionReadManager {
-    public:
-        using Handlers = std::vector <std::shared_ptr <BluetoothReadWriteHandler>>;
-    private:
-        BluetoothDevice* const _device;
-        Handlers _handlers;
-    public:
-        explicit ConnectionReadManager (BluetoothDevice* device): _device (device) {}
-        ConnectionReadManager& operator += (const Handlers& handlers) {
-            _handlers.insert (_handlers.end (), handlers.begin (), handlers.end ());
-            return *this;
-        }
-        void process (String& str) {
-            JsonDocument doc;
-            for (auto& handler : _handlers)
-                handler->process (*_device, doc);
-            if (doc.size ())
-                serializeJson (doc, str);
-        }
-    };
-
-    //
-
-    ActivationTrackerWithDetail _notify_payloadExceeded;
-    bool _connectionNotifyManager_notify (const String& data, const uint16_t maxPayloadSize) {
-        bool result = true;
-        if (data.length () <= maxPayloadSize) {
-            _characteristic->setValue (data.c_str ());
-            _characteristic->notify ();
-            DEBUG_PRINTF ("BluetoothDevice::notify: length=%u\n", data.length ());
-        } else {
-            JsonSplitter splitter (maxPayloadSize, { "type", "time", "addr" });
-            splitter.splitJson (data, [&] (const String& part, const int elements) {
-                const size_t length = part.length ();
-                _characteristic->setValue (part.c_str ());
-                _characteristic->notify ();
-                DEBUG_PRINTF ("BluetoothDevice::notify: data=%u, part=%u, elements=%d\n", data.length (), length, elements);
-                if (length > maxPayloadSize)
-                    _notify_payloadExceeded += ArithmeticToString (length), result = false;
-                delay (20);
-            });
-        }
-        return result;
-    }
-
-    //
-
     esp_bd_addr_t _peerAddress;
     uint16_t _peerConnId = 0;
     uint16_t _peerMtu = 0;
+    ConnectionReceiver <BluetoothDevice> _connectionReceiver;
+    ConnectionSender <BluetoothDevice> _connectionSender;
+    ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
     Intervalable _connectionActiveChecker;
     ConnectionSignalTracker _connectionSignalTracker;
-    ConnectionWriteManager _connectionWriteManager;
-    ConnectionReadManager _connectionReadManager;
-    ActivationTracker _connections; ActivationTrackerWithDetail _disconnections;
     bool _connectionActive = false;
     void _connect () {
          _advertisingEnable ();
@@ -269,26 +161,26 @@ private:
     }
     void _connected_writeReceived (const String& str) {
         if (_connectionActive) {
-            _connectionWriteManager.insert (str);
+            _connectionReceiver.insert (str);
         }
     }
     void _connected_readRequested (String& str) {
         if (_connectionActive) {
-            _connectionReadManager.process (str);
+            //
         }
     }
-    bool _connected_notify (const String& data) {
+    bool _connected_send (const String& data) {
         if (_connectionActive) {
             if (!_peerMtu) {
-                DEBUG_PRINTF ("BluetoothDevice::notify: awaiting peer MTU negotiation, sliently discarding");
+                DEBUG_PRINTF ("BluetoothDevice::send: awaiting peer MTU negotiation, sliently discarding");
                 return true;
             } else if (_peerMtu < MIN_MTU) {
-                DEBUG_PRINTF ("BluetoothDevice::notify: peer MTU size (%u) is below minimum (%u)", _peerMtu, MIN_MTU);
+                DEBUG_PRINTF ("BluetoothDevice::send: peer MTU size (%u) is below minimum (%u)", _peerMtu, MIN_MTU);
                 return false;
             }
-            return _connectionNotifyManager_notify (data, _peerMtu - 3);
+            return _connectionSender.send (data, _peerMtu - 3);
         } else {
-            DEBUG_PRINTF ("BluetoothDevice::notify: not connected");
+            DEBUG_PRINTF ("BluetoothDevice::send: not connected");
             return false;
         }
     }
@@ -298,14 +190,14 @@ private:
             _server->disconnect (_peerConnId);
             _connectionActive = false; _disconnections += String ("Locally initiated");
             if (forced) delay (500);
-            _connectionWriteManager.drain ();
+            _connectionReceiver.drain ();
             _connect ();
         }
     }
     void _disconnected (const uint16_t conn_id, const esp_bd_addr_t& addr, const String& reason) {
         if (_connectionActive) {
             _connectionActive = false; _disconnections += reason;
-            _connectionWriteManager.drain ();
+            _connectionReceiver.drain ();
             _connect ();
         }
     }
@@ -322,16 +214,23 @@ private:
                     esp_ble_gap_read_rssi (_peerAddress);
                 }
             }
-            _connectionWriteManager.process ();
+            _connectionReceiver.process ();
         }
     }
 
     //
 
 public:
-    explicit BluetoothDevice (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr): Singleton <BluetoothDevice> (this), config (cfg),
-         _connectionActiveChecker (config.intervalConnectionCheck), _connectionSignalTracker (connectionSignalCallback),
-         _connectionWriteManager (this), _connectionReadManager (this) {}
+    explicit BluetoothDevice (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr): 
+        Singleton <BluetoothDevice> (this), ConnectionReceiver <BluetoothDevice>::Insertable (&_connectionReceiver), config (cfg),
+        _connectionReceiver (this),
+        _connectionSender ([&] (const String& str) {
+            _characteristic->setValue (str.c_str ());
+            _characteristic->notify ();
+        }),
+        _connectionActiveChecker (config.intervalConnectionCheck),
+        _connectionSignalTracker (connectionSignalCallback)
+    {}
 
     void begin () {
         _serverInitAndStartService ();
@@ -351,14 +250,12 @@ public:
     }
     //
     // json only
-    bool notify (const String& data) {
-        return _connected_notify (data);
+    bool send (const String& data) {
+        return _connected_send (data);
     }
     bool payloadExceeded () const {
-        return _notify_payloadExceeded > 0;
+        return _connectionSender._payloadExceeded;
     }
-    void insert (const ConnectionWriteManager::Handlers& handlers) { _connectionWriteManager += handlers; }
-    void insert (const ConnectionReadManager::Handlers& handlers) { _connectionReadManager += handlers; }
     //
     void serialize (JsonVariant &obj) const override {
         obj ["macaddr"] = getMacAddressBlue ();
@@ -367,10 +264,10 @@ public:
             obj ["mtu"] = _peerMtu;
             obj ["signal"] = _connectionSignalTracker;
         }
-        if (_notify_payloadExceeded)
-            obj ["payloadExceeded"] = _notify_payloadExceeded;
-        if (_connectionWriteManager._failures)
-            obj ["writeFailures"] = _connectionWriteManager._failures;
+        if (_connectionSender._payloadExceeded)
+            obj ["payloadExceeded"] = _connectionSender._payloadExceeded;
+        if (_connectionReceiver._failures)
+            obj ["receiveFailures"] = _connectionReceiver._failures;
         if (_connections)
             obj ["connects"] = _connections;
         if (_disconnections)

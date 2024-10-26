@@ -7,7 +7,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
 
-class NetworkDeviceState(
+class StateManagerNetwork(
     context: Context,
     tag: String,
     private val onDisabled: () -> Unit,
@@ -23,6 +23,7 @@ class NetworkDeviceState(
             Log.d(tag, "Network available")
             onEnabled()
         }
+
         override fun onLost(network: Network) {
             super.onLost(network)
             Log.d(tag, "Network lost")
@@ -36,6 +37,7 @@ class NetworkDeviceState(
             .build()
         connectivityManager.registerNetworkCallback(networkRequest, networkCallback)
     }
+
     override fun onStop() {
         connectivityManager.unregisterNetworkCallback(networkCallback)
     }

@@ -1,200 +1,39 @@
 package com.example.battery_monitor
 
-import android.annotation.SuppressLint
 import android.app.Activity
-import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothGatt
-import android.bluetooth.BluetoothGattCallback
-import android.bluetooth.BluetoothGattCharacteristic
-import android.bluetooth.BluetoothGattDescriptor
-import android.bluetooth.BluetoothProfile
-import android.os.Handler
-import android.os.Looper
-import android.util.Log
-import java.nio.charset.StandardCharsets
-import java.util.UUID
 
-@Suppress("PropertyName")
-class BluetoothDeviceManagerConfig {
-    val DEVICE_NAME = "BatteryMonitor"
-    val SERVICE_UUID: UUID = UUID.fromString ("4fafc201-1fb5-459e-8fcc-c5c9c331914b")
-    val CHARACTERISTIC_UUID: UUID = UUID.fromString ("beb5483e-36e1-4688-b7f5-ea07361b26a8")
-    val MTU = 517 // maximum
-    val CONNECTION_TIMEOUT = 30000L // 30 seconds
-}
-
-@SuppressLint("MissingPermission")
-class BluetoothDeviceManager (
-    private val activity: Activity,
-    adapter: BluetoothDeviceAdapter,
-    private val config: BluetoothDeviceManagerConfig,
-    private val connectivityInfo: ConnectivityInfo,
-    private val dataCallback: (String) -> Unit,
-    private val statusCallback: () -> Unit,
-    private val isPermitted: () -> Boolean,
-    private val isEnabled: () -> Boolean
-): ConnectivityDeviceManager () {
-    private val handler = Handler (Looper.getMainLooper ())
-
-    private var bluetoothGatt: BluetoothGatt? = null
-    private var isConnected = false
-
-    private val scanner: BluetoothDeviceScanner = BluetoothDeviceScanner (
-        adapter.adapter.bluetoothLeScanner,
-        BluetoothDeviceScannerConfig (config.DEVICE_NAME, config.SERVICE_UUID),
-        onFound = { device -> connect (device) }
+class BluetoothDeviceManager(
+    activity: Activity,
+    connectivityInfo: ConnectivityInfo,
+    dataCallback: (String) -> Unit,
+    statusCallback: () -> Unit
+) : ConnectivityDeviceManager<BluetoothDeviceAdapter, BluetoothDeviceHandler, BluetoothDeviceHandlerConfig, StateManagerBluetooth>(
+    activity,
+    "Bluetooth",
+    arrayOf(
+        android.Manifest.permission.ACCESS_COARSE_LOCATION,
+        android.Manifest.permission.ACCESS_FINE_LOCATION,
+        android.Manifest.permission.BLUETOOTH,
+        android.Manifest.permission.BLUETOOTH_ADMIN,
+        android.Manifest.permission.BLUETOOTH_SCAN,
+        android.Manifest.permission.BLUETOOTH_CONNECT
+    ),
+    connectivityInfo,
+    dataCallback,
+    statusCallback
+) {
+    override val adapter: BluetoothDeviceAdapter = BluetoothDeviceAdapter(activity)
+    override val device: BluetoothDeviceHandler = BluetoothDeviceHandler(activity,
+        adapter,
+        BluetoothDeviceHandlerConfig(),
+        connectivityInfo,
+        dataCallback,
+        statusCallback,
+        isPermitted = { permissions.allowed },
+        isEnabled = { adapter.isEnabled() }
     )
-    private val checker: ConnectivityChecker = ConnectivityChecker (
-        "Bluetooth",
-        ConnectivityCheckerConfig (
-            CONNECTION_TIMEOUT = config.CONNECTION_TIMEOUT,
-            CONNECTION_CHECK = 10000L // 10 seconds
-        ),
-        isConnected = { isConnected () },
-        onTimeout = { reconnect () }
+    override val checker: StateManagerBluetooth = StateManagerBluetooth(activity,
+        onDisabled = { onDisconnect() },
+        onEnabled = { onPermitted() }
     )
-
-    private val gattCallback = object : BluetoothGattCallback () {
-        override fun onConnectionStateChange (gatt: BluetoothGatt, status: Int, newState: Int) {
-            when (status) {
-                BluetoothGatt.GATT_SUCCESS -> {
-                    when (newState) {
-                        BluetoothProfile.STATE_CONNECTED -> connected (gatt)
-                        BluetoothProfile.STATE_DISCONNECTED -> disconnected ()
-                    }
-                    return
-                }
-                0x3E -> Log.e ("Bluetooth", "Device connection terminated by local host")
-                0x3B -> Log.e ("Bluetooth", "Device connection terminated by remote device")
-                0x85 -> Log.e ("Bluetooth", "Device connection timed out")
-                else -> Log.e ("Bluetooth", "Device connection state change error: $status")
-            }
-            disconnect ()
-        }
-        override fun onServicesDiscovered (gatt: BluetoothGatt, status: Int) {
-            if (status != BluetoothGatt.GATT_SUCCESS) {
-                Log.e ("Bluetooth", "Device discovery error: $status")
-                disconnect ()
-            } else {
-                discovered (gatt)
-            }
-        }
-        override fun onCharacteristicWrite (gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int) {
-            super.onCharacteristicWrite (gatt, characteristic, status)
-            if (status != BluetoothGatt.GATT_SUCCESS) {
-                Log.e ("Bluetooth", "Device write error: $status")
-            }
-        }
-        override fun onCharacteristicChanged (gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
-            dataReceived (characteristic.uuid, value)
-        }
-        override fun onMtuChanged (gatt: BluetoothGatt, mtu: Int, status: Int) {
-            if (status != BluetoothGatt.GATT_SUCCESS) {
-                Log.e ("Bluetooth", "Device MTU change error: $status")
-                // disconnect ??
-            } else {
-                Log.d ("Bluetooth", "Device MTU changed to $mtu")
-            }
-        }
-    }
-
-    @SuppressLint("MissingPermission")
-    fun transmitTypeInfo () {
-        val characteristic = bluetoothGatt?.getService (config.SERVICE_UUID)?.getCharacteristic (config.CHARACTERISTIC_UUID)
-        if (characteristic != null) {
-            bluetoothGatt?.writeCharacteristic (characteristic, connectivityInfo.toJsonString().toByteArray(StandardCharsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
-        }
-    }
-    override fun permitted () {
-        statusCallback ()
-        if (!isConnected)
-            locate ()
-    }
-    private fun locate () {
-        Log.d ("Bluetooth", "Device locate initiated")
-        statusCallback ()
-        when {
-            !isEnabled () -> Log.e ("Bluetooth", "Bluetooth not enabled or available")
-            !isPermitted () -> Log.e ("Bluetooth", "Bluetooth access not permitted")
-            isConnected -> Log.d ("Bluetooth", "Bluetooth connection already active, will not locate")
-            else -> scanner.start ()
-        }
-    }
-
-    private fun connect (device: BluetoothDevice) {
-        Log.d ("Bluetooth", "Device connect to ${device.name} / ${device.address}")
-        checker.start ()
-        bluetoothGatt = device.connectGatt (activity, true, gattCallback)
-    }
-
-    private fun connected (gatt: BluetoothGatt) {
-        Log.d ("Bluetooth", "Device connected to GATT server")
-        checker.ping ()
-        gatt.requestConnectionPriority (BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER)
-        gatt.requestMtu (config.MTU)
-        gatt.discoverServices ()
-    }
-
-    private fun discovered (gatt: BluetoothGatt) {
-        Log.d ("Bluetooth", "Device discovery completed")
-        isConnected = true
-        statusCallback ()
-        val characteristic = gatt.getService (config.SERVICE_UUID)?.getCharacteristic (config.CHARACTERISTIC_UUID)
-        if (characteristic != null) {
-            Log.d ("Bluetooth", "Device notifications enable for ${characteristic.uuid}")
-            bluetoothGatt?.setCharacteristicNotification (characteristic, true)
-            val descriptor = characteristic.getDescriptor (UUID.fromString ("00002902-0000-1000-8000-00805f9b34fb"))
-            bluetoothGatt?.writeDescriptor (descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
-            handler.postDelayed ({
-                transmitTypeInfo ()
-            }, 1000)
-        } else {
-            Log.e ("Bluetooth", "Device service ${config.SERVICE_UUID} or characteristic ${config.CHARACTERISTIC_UUID} not found")
-            disconnect ()
-        }
-    }
-
-    private fun dataReceived (uuid: UUID, value: ByteArray) {
-        Log.d ("Bluetooth", "Device characteristic changed on ${uuid}: ${String (value)}")
-        checker.ping ()
-        try {
-            dataCallback (String (value))
-        } catch (e: Exception) {
-            Log.e ("Bluetooth", "Device data processing error", e)
-        }
-    }
-
-    override fun disconnect () {
-        if (bluetoothGatt != null) {
-            Log.d ("Bluetooth", "Device disconnect")
-            bluetoothGatt?.close ()
-            bluetoothGatt = null
-        }
-        scanner.stop ()
-        checker.stop ()
-        isConnected = false
-        statusCallback ()
-    }
-
-    private fun disconnected () {
-        Log.d ("Bluetooth", "Device disconnected from GATT server")
-        if (bluetoothGatt != null) {
-            bluetoothGatt?.close ()
-            bluetoothGatt = null
-        }
-        checker.stop ()
-        isConnected = false
-        statusCallback ()
-        reconnect ()
-    }
-
-    override fun reconnect () {
-        Log.d ("Bluetooth", "Device reconnect")
-        disconnect ()
-        handler.postDelayed ({
-            locate ()
-        }, 50)
-    }
-
-    override  fun isConnected (): Boolean = isConnected
 }

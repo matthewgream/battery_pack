@@ -2,14 +2,14 @@ package com.example.battery_monitor
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.MotionEvent
-import android.widget.LinearLayout
 import android.widget.ImageView
-import android.os.Handler
-import android.os.Looper
+import android.widget.LinearLayout
 
 class DataViewConnectivityStatus @JvmOverloads constructor(
     context: Context,
@@ -21,22 +21,22 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
     private lateinit var doubleTapListener: () -> Unit
     private lateinit var gestureDetector: GestureDetector
 
-    private val bluetoothIcon: ImageView
+    private val localIcon: ImageView
     private val networkIcon: ImageView
     private val cloudIcon: ImageView
 
     private enum class IconState {
         DISABLED, // Grey - No permissions or not available
         DISCONNECTED, // Red - Available but not connected
-        CONNECTED_ACTIVE, // Green - Connected and active
-        CONNECTED_STANDBY // Orange - Connected but inactive (for future use)
+        CONNECTED_STANDBY,// Orange - Connected but inactive (for future use)
+        CONNECTED_ACTIVE // Green - Connected and active
     }
 
     init {
         orientation = VERTICAL
         LayoutInflater.from(context).inflate(R.layout.view_connectivity_status, this, true)
 
-        bluetoothIcon = findViewById(R.id.bluetoothIcon)
+        localIcon = findViewById(R.id.localIcon)
         networkIcon = findViewById(R.id.networkIcon)
         cloudIcon = findViewById(R.id.cloudIcon)
 
@@ -52,19 +52,21 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
         }
         icon.setColorFilter(color)
     }
-    fun updateStatus (statuses: Map<ConnectivityType, ConnectivityStatus>) {
+
+    fun updateStatus(statuses: Map<ConnectivityType, ConnectivityStatus>) {
         uiHandler.post {
             val iconMapping = mapOf(
-                ConnectivityType.BLUETOOTH to bluetoothIcon,
+                ConnectivityType.LOCAL to localIcon,
                 ConnectivityType.NETWORK to networkIcon,
                 ConnectivityType.CLOUD to cloudIcon
             )
             statuses.forEach { (type, status) ->
-                updateIconState (iconMapping[type] ?: return@forEach, determineIconState (status))
+                updateIconState(iconMapping[type] ?: return@forEach, determineIconState(status))
             }
         }
     }
-    private fun determineIconState (status: ConnectivityStatus): IconState = when {
+
+    private fun determineIconState(status: ConnectivityStatus): IconState = when {
         !status.permitted -> IconState.DISABLED
         !status.available -> IconState.DISABLED
         !status.connected -> IconState.DISCONNECTED
@@ -75,12 +77,13 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
     @SuppressLint("ClickableViewAccessibility")
     fun setOnDoubleTapListener(listener: () -> Unit) {
         this.doubleTapListener = listener
-        gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDoubleTap(e: MotionEvent): Boolean {
-                doubleTapListener.invoke()
-                return true
-            }
-        })
+        gestureDetector =
+            GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    doubleTapListener.invoke()
+                    return true
+                }
+            })
 
         setOnTouchListener { _, event ->
             gestureDetector.onTouchEvent(event)
