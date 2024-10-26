@@ -8,8 +8,8 @@ import android.content.IntentFilter
 import android.util.Log
 
 class StateManagerBluetooth(
-    private val context: Context,
     tag: String,
+    private val context: Context,
     private val onDisabled: () -> Unit,
     private val onEnabled: () -> Unit
 ) : ConnectivityComponent(tag) {

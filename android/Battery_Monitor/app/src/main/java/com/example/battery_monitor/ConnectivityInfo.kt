@@ -9,11 +9,13 @@ import org.json.JSONObject
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
-class ConnectivityInfo(activity: Activity) {
+class ConnectivityInfo(
+    activity: Activity,
+    val name: String
+) {
 
     private val prefs: SharedPreferences = activity.getSharedPreferences("ConnectionInfo", Context.MODE_PRIVATE)
 
-    private val name = "batterymonitor"
     private val version = try {
         activity.packageManager.getPackageInfo(activity.packageName, PackageManager.PackageInfoFlags.of(0)).versionName
     } catch (e: PackageManager.NameNotFoundException) {
@@ -21,6 +23,8 @@ class ConnectivityInfo(activity: Activity) {
     }
     private val platform = "android${Build.VERSION.SDK_INT}"
     private val device = "${Build.MANUFACTURER} ${Build.MODEL}"
+    var identity: String = "$name-custom-$platform-v$version ($device)"
+        private set
 
     var deviceAddress: String = ""
         private set
@@ -38,7 +42,7 @@ class ConnectivityInfo(activity: Activity) {
         return JSONObject().apply {
             put("type", "info")
             put("time", DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
-            put("info", "$name-custom-$platform-v$version ($device)")
+            put("info", identity)
             put("peer", deviceAddress)
         }.toString()
     }

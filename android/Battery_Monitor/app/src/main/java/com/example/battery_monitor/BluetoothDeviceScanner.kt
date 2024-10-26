@@ -7,9 +7,7 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
-import android.os.ParcelUuid
 import android.util.Log
-import java.util.UUID
 
 /*
 class AdaptiveBluetoothScanner(private val bluetoothAdapter: BluetoothAdapter) {
@@ -99,34 +97,20 @@ class DutyCycleScanner(private val bluetoothAdapter: BluetoothAdapter) {
 
 */
 
-@Suppress("PropertyName")
 class BluetoothDeviceScannerConfig(
     val name: String,
-    uuid: UUID,
-    val SCAN_DELAY : Long = 5000L, // 5 seconds
-    val SCAN_PERIOD : Long = 30000L, // 30 seconds
-    val filter: ScanFilter = ScanFilter.Builder()
-        .setDeviceName(name)
-        .setServiceUuid(ParcelUuid(uuid))
-        .build(),
-    val settings: ScanSettings = ScanSettings.Builder()
-        .setLegacy(false)
-        .setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
-        .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-        .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
-        .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
-        .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
-        .setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
-        .setReportDelay(0L)
-        .build()
+    val scanDelay : Long,
+    val scanPeriod : Long,
+    val filter: ScanFilter,
+    val settings: ScanSettings
 )
-
 @SuppressLint("MissingPermission")
 class BluetoothDeviceScanner(
+    tag: String,
     private val scanner: BluetoothLeScanner,
     private val config: BluetoothDeviceScannerConfig,
     private val onFound: (BluetoothDevice) -> Unit
-) : ConnectivityComponent("Bluetooth") {
+) : ConnectivityComponent(tag) {
 
     private val retryRunnable = Runnable {
         start()
@@ -164,11 +148,11 @@ class BluetoothDeviceScanner(
 
     private fun restartAfterDelay() {
         stop()
-        handler.postDelayed(retryRunnable, config.SCAN_DELAY)
+        handler.postDelayed(retryRunnable, config.scanDelay)
     }
 
     override val timer: Long
-        get() = config.SCAN_PERIOD
+        get() = config.scanPeriod
 
     override fun onStart() {
         scanner.startScan(listOf(config.filter), config.settings, callback)

@@ -3,13 +3,15 @@ package com.example.battery_monitor
 import android.app.Activity
 
 class CloudMqttDeviceManager(
+    tag: String,
     activity: Activity,
+    config: CloudMqttDeviceConfig,
     connectivityInfo: ConnectivityInfo,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
-) : ConnectivityDeviceManager<CloudMqttDeviceAdapter, CloudMqttDeviceHandler, CloudMqttDeviceHandlerConfig, StateManagerNetwork>(
+) : ConnectivityDeviceManager<CloudMqttDeviceAdapter, CloudMqttDeviceHandler, CloudMqttDeviceConfig, StateManagerNetwork>(
+    tag,
     activity,
-    "CloudMqtt",
     arrayOf(
         android.Manifest.permission.INTERNET,
         android.Manifest.permission.ACCESS_NETWORK_STATE
@@ -19,22 +21,16 @@ class CloudMqttDeviceManager(
     statusCallback
 ) {
     override val adapter: CloudMqttDeviceAdapter = CloudMqttDeviceAdapter(activity)
-    override val device: CloudMqttDeviceHandler = CloudMqttDeviceHandler(activity,
+    override val device: CloudMqttDeviceHandler = CloudMqttDeviceHandler(tag, activity,
         adapter,
-        CloudMqttDeviceHandlerConfig(
-            host = SECRET_MQTT_HOST,
-            port = SECRET_MQTT_PORT,
-            user = SECRET_MQTT_USER,
-            pass = SECRET_MQTT_PASS,
-            topic = "BatteryMonitor"
-        ),
+        config,
         connectivityInfo,
         dataCallback,
         statusCallback,
         isEnabled = { adapter.isEnabled() && connectivityInfo.deviceAddress.isNotEmpty() },
         isPermitted = { permissions.allowed }
     )
-    override val checker: StateManagerNetwork = StateManagerNetwork(activity, "CloudMqtt",
+    override val checker: StateManagerNetwork = StateManagerNetwork(tag, activity,
         onDisabled = { onDisconnected() },
         onEnabled = { onPermitted() }
     )

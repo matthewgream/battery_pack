@@ -16,8 +16,8 @@ abstract class ConnectivityDeviceAdapter {
 }
 
 abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, TDevice : ConnectivityDeviceHandler, TConfig, TChecker : ConnectivityComponent>(
-    protected val activity: Activity,
     tag: String,
+    protected val activity: Activity,
     permissionsRequired: Array<String>,
     protected val connectivityInfo: ConnectivityInfo,
     protected val dataCallback: (String) -> Unit,

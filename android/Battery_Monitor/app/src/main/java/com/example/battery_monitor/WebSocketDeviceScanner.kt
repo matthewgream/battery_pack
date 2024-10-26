@@ -5,20 +5,19 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
 
-@Suppress("PropertyName")
 class WebSocketDeviceScannerConfig(
-    val SERVICE_TYPE: String,
-    val SERVICE_NAME: String,
-    val SCAN_DELAY: Long = 5000L, // 5 seconds
-    val SCAN_PERIOD: Long = 30000L // 30 seconds
+    val type: String,
+    val name: String,
+    val scanDelay: Long,
+    val scanPeriod: Long
 )
-
 class WebSocketDeviceScanner(
+    tag: String,
     private val context: Context,
     private val config: WebSocketDeviceScannerConfig,
     private val connectionInfo: ConnectivityInfo,
     private val onFound: (NsdServiceInfo) -> Unit
-) : ConnectivityComponent("WebSocket") {
+) : ConnectivityComponent(tag) {
 
     private val nsdManager: NsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
     private var isDiscoveryActive = false
@@ -47,7 +46,7 @@ class WebSocketDeviceScanner(
         }
         override fun onServiceFound(serviceInfo: NsdServiceInfo) {
             Log.d(tag, "discoveryListener::onServiceFound: name=${serviceInfo.serviceName}")
-            if (serviceInfo.serviceName == config.SERVICE_NAME)
+            if (serviceInfo.serviceName == config.name)
                 resolve(serviceInfo)
         }
     }
@@ -85,16 +84,16 @@ class WebSocketDeviceScanner(
 
     private fun restartAfterDelay() {
         stop()
-        handler.postDelayed(retryRunnable, config.SCAN_DELAY)
+        handler.postDelayed(retryRunnable, config.scanDelay)
     }
 
     override val timer: Long
-        get() = config.SCAN_PERIOD
+        get() = config.scanPeriod
 
     override fun onStart() {
         if (!isDiscoveryActive) {
             try {
-                nsdManager.discoverServices(config.SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+                nsdManager.discoverServices(config.type, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
             } catch (e: IllegalArgumentException) {
                 Log.e(tag, "Service discovery start: error=${e.message}")
                 try {
@@ -103,7 +102,7 @@ class WebSocketDeviceScanner(
                     Log.e(tag, "Service discovery stop: error=${e.message}")
                 }
                 handler.postDelayed({
-                    nsdManager.discoverServices(config.SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+                    nsdManager.discoverServices(config.type, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
                 }, 100)
             }
             isDiscoveryActive = true

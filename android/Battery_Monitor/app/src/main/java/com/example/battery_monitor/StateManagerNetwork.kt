@@ -8,8 +8,8 @@ import android.net.NetworkRequest
 import android.util.Log
 
 class StateManagerNetwork(
-    context: Context,
     tag: String,
+    context: Context,
     private val onDisabled: () -> Unit,
     private val onEnabled: () -> Unit
 ) : ConnectivityComponent(tag) {

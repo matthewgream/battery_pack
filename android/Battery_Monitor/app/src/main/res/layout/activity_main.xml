@@ -36,6 +36,7 @@
                     android:layout_height="wrap_content"
                     android:textStyle="bold"
                     android:textSize="16sp"
+                    android:textIsSelectable="true"
                     android:layout_marginTop="8dp" />
 
                 <TextView
@@ -44,6 +45,7 @@
                     android:layout_height="wrap_content"
                     android:textStyle="bold"
                     android:textSize="16sp"
+                    android:textIsSelectable="true"
                     android:layout_marginTop="2dp" />
 
                 <TextView
@@ -52,6 +54,7 @@
                     android:layout_height="wrap_content"
                     android:textStyle="bold"
                     android:textSize="16sp"
+                    android:textIsSelectable="true"
                     android:layout_marginTop="2dp" />
 
                 <TextView
@@ -60,6 +63,7 @@
                     android:layout_height="wrap_content"
                     android:textStyle="bold"
                     android:textSize="16sp"
+                    android:textIsSelectable="true"
                     android:layout_marginTop="2dp" />
 
                 <com.example.battery_monitor.DataViewBatteryTemperature
@@ -74,6 +78,7 @@
                     android:layout_height="wrap_content"
                     android:textSize="16sp"
                     android:textStyle="bold"
+                    android:textIsSelectable="true"
                     android:layout_marginBottom="8dp"
                     android:layout_marginTop="8dp" />
 
@@ -88,6 +93,7 @@
             android:layout_height="wrap_content"
             android:textSize="16sp"
             android:textStyle="bold"
+            android:textIsSelectable="true"
             android:gravity="center"
             android:padding="4dp"
             android:layout_marginLeft="4dp"

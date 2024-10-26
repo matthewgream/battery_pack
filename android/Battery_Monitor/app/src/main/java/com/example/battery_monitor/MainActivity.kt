@@ -6,100 +6,67 @@ import android.os.PowerManager
 import android.util.Log
 import org.json.JSONObject
 
-enum class ConnectivityType {
-    LOCAL,
-    NETWORK,
-    CLOUD
-}
-
-data class ConnectivityStatus(
-    val permitted: Boolean,
-    val available: Boolean,
-    val connected: Boolean,
-    val standby: Boolean
-)
-
 class MainActivity : PermissionsAwareActivity() {
 
-    private var powerSaveState: Boolean = false
+    private val config: ApplicationConfig = ApplicationConfig()
 
-    private val connectivityInfo by lazy { ConnectivityInfo(this) }
-    private val connectivityStatusView: DataViewConnectivityStatus by lazy {
-        findViewById(R.id.connectivityStatusView)
+    private var powermanageState: Boolean = false
+    private fun powermanageSetup() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        powermanageState = powerManager.isPowerSaveMode
+        powerManager.addThermalStatusListener { status ->
+            when (status) {
+                PowerManager.THERMAL_STATUS_SEVERE,
+                PowerManager.THERMAL_STATUS_CRITICAL ->
+                    if (!powermanageState) {
+                        powermanageState = true
+                        onPowerSave()
+                    }
+                else ->
+                    if (powermanageState) {
+                        powermanageState = false
+                        onPowerBack()
+                    }
+            }
+        }
+    }
+
+    //
+
+    private var processingHandler: DataProcessor? = null
+    private fun processingSetup () {
+        processingHandler = DataProcessor(this,
+            NotificationsManager(this, NotificationsManagerConfig (this)))
+    }
+
+    //
+
+    private val connectivityInfo by lazy {
+        ConnectivityInfo(this, config.name)
     }
     private val connectivityManagerLocal: BluetoothDeviceManager by lazy {
-        BluetoothDeviceManager(this, connectivityInfo,
+        BluetoothDeviceManager("Bluetooth", this, connectivityInfo,
             dataCallback = { data ->
                 val json = JSONObject(data)
-                connectivityManagerAddressUpdate(json)
-                dataProcessor.processDataReceived(json)
+                connectivityManagerAddressBinder(json)
+                processingHandler?.processDataReceived(json)
             },
             statusCallback = { connectivityStatusUpdate() })
     }
     private val connectivityManagerNetwork: WebSocketDeviceManager by lazy {
-        WebSocketDeviceManager(this, connectivityInfo,
-            dataCallback = { data -> dataProcessor.processDataReceived(JSONObject(data)) },
+        WebSocketDeviceManager("WebSocket", this, WebSocketDeviceConfig (), connectivityInfo,
+            dataCallback = { data -> processingHandler?.processDataReceived(JSONObject(data)) },
             statusCallback = { connectivityStatusUpdate() })
     }
     private val connectivityManagerCloud: CloudMqttDeviceManager by lazy {
-        CloudMqttDeviceManager(this, connectivityInfo,
-            dataCallback = { data -> dataProcessor.processDataReceived(JSONObject(data)) },
+        CloudMqttDeviceManager("CloudMqtt", this, CloudMqttDeviceConfig (), connectivityInfo,
+            dataCallback = { data -> processingHandler?.processDataReceived(JSONObject(data)) },
             statusCallback = { connectivityStatusUpdate() })
     }
     private val connectivityManagers by lazy {
         listOf(connectivityManagerLocal, connectivityManagerNetwork, connectivityManagerCloud)
     }
-
-    //
-
-    private val notificationsManager: NotificationsManager by lazy {
-        NotificationsManager(this)
-    }
-    private lateinit var dataProcessor: DataProcessor
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        dataProcessor = DataProcessor(this, notificationsManager)
-        connectivityManagerOnDoubleTap()
-        setupPowerSave()
-        connectivityManagers.forEach { it.onCreate() }
-    }
-
-    override fun onDestroy() {
-        Log.d("Main", "onDestroy")
-        super.onDestroy()
-        connectivityManagers.forEach { it.onDestroy() }
-    }
-
-    override fun onPause() {
-        Log.d("Main", "onPause")
-        super.onPause()
-        connectivityManagers.forEach { it.onPause() }
-    }
-
-    override fun onResume() {
-        Log.d("Main", "onResume")
-        super.onResume()
-        connectivityManagers.forEach { it.onResume() }
-    }
-
-    private fun onPowerSave() {
-        Log.d("Main", "onPowerSave")
-        connectivityManagers.forEach { it.onPowerSave() }
-    }
-
-    private fun onPowerBack() {
-        Log.d("Main", "onPowerBack")
-        connectivityManagers.forEach { it.onPowerBack() }
-    }
-
-    private fun onDoubleTap() {
-        Log.d("Main", "onDoubleTap")
-        connectivityManagers.forEach { it.onDoubleTap() }
-    }
-
-    private fun connectivityManagerAddressUpdate(json: JSONObject) {
+    private fun connectivityManagerAddressBinder(json: JSONObject) {
         try {
             if (json.getString("type") == "data" && json.has("addr")) {
                 val deviceAddress = json.getString("addr")
@@ -113,13 +80,14 @@ class MainActivity : PermissionsAwareActivity() {
             Log.e("Main", "Error processing bluetooth address: error=${e.message}")
         }
     }
-
-    private fun connectivityManagerOnDoubleTap() {
+    private val connectivityStatusView: DataViewConnectivityStatus by lazy {
+        findViewById(R.id.connectivityStatusView)
+    }
+    private fun connectivityStatusListenerDoubleTap() {
         connectivityStatusView.setOnDoubleTapListener {
             onDoubleTap()
         }
     }
-
     private fun connectivityStatusUpdate() {
         val statuses = connectivityManagers.associate { manager ->
             when (manager) {
@@ -136,25 +104,45 @@ class MainActivity : PermissionsAwareActivity() {
         }
         connectivityStatusView.updateStatus(statuses)
     }
+    private fun connectivitySetup () {
+        connectivityManagers.forEach { it.onCreate() }
+        connectivityStatusListenerDoubleTap()
+    }
 
-    private fun setupPowerSave() {
-        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        powerSaveState = powerManager.isPowerSaveMode
-        powerManager.addThermalStatusListener { status ->
-            when (status) {
-                PowerManager.THERMAL_STATUS_SEVERE,
-                PowerManager.THERMAL_STATUS_CRITICAL ->
-                    if (!powerSaveState) {
-                        powerSaveState = true
-                        onPowerSave()
-                    }
+    //
 
-                else ->
-                    if (powerSaveState) {
-                        powerSaveState = false
-                        onPowerBack()
-                    }
-            }
-        }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        processingSetup ()
+        connectivitySetup ()
+        powermanageSetup()
+    }
+    override fun onDestroy() {
+        Log.d("Main", "onDestroy")
+        super.onDestroy()
+        connectivityManagers.forEach { it.onDestroy() }
+    }
+    override fun onPause() {
+        Log.d("Main", "onPause")
+        super.onPause()
+        connectivityManagers.forEach { it.onPause() }
+    }
+    override fun onResume() {
+        Log.d("Main", "onResume")
+        super.onResume()
+        connectivityManagers.forEach { it.onResume() }
+    }
+    private fun onPowerSave() {
+        Log.d("Main", "onPowerSave")
+        connectivityManagers.forEach { it.onPowerSave() }
+    }
+    private fun onPowerBack() {
+        Log.d("Main", "onPowerBack")
+        connectivityManagers.forEach { it.onPowerBack() }
+    }
+    private fun onDoubleTap() {
+        Log.d("Main", "onDoubleTap")
+        connectivityManagers.forEach { it.onDoubleTap() }
     }
 }

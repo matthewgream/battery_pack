@@ -11,18 +11,11 @@ import org.java_websocket.framing.Framedata
 import org.java_websocket.handshake.ServerHandshake
 import java.net.URI
 
-@Suppress("PropertyName")
-class WebSocketDeviceHandlerConfig (
-    val SERVICE_TYPE: String = "_ws._tcp.",
-    val SERVICE_NAME: String = "BatteryMonitor",
-    val CONNECTION_TIMEOUT: Long = 30000L, // 30 seconds
-    val CONNECTION_CHECK: Long = 15000L // 15 seconds
-)
-
 class WebSocketDeviceHandler(
+    private val tag: String,
     activity: Activity,
     private val adapter: WebSocketDeviceAdapter,
-    private val config: WebSocketDeviceHandlerConfig,
+    private val config: WebSocketDeviceConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
@@ -32,9 +25,10 @@ class WebSocketDeviceHandler(
 
     private val handler = Handler(Looper.getMainLooper())
 
-    private val scanner: WebSocketDeviceScanner = WebSocketDeviceScanner(activity, WebSocketDeviceScannerConfig(SERVICE_TYPE = config.SERVICE_TYPE, SERVICE_NAME = config.SERVICE_NAME), connectivityInfo,
+    private val scanner: WebSocketDeviceScanner = WebSocketDeviceScanner(tag, activity,
+        WebSocketDeviceScannerConfig (config.serviceType, config.serviceName, config.connectionScanDelay, config.connectionScanPeriod), connectivityInfo,
         onFound = { serviceInfo -> located(serviceInfo) })
-    private val checker: ConnectivityChecker = ConnectivityChecker("WebSocket", ConnectivityCheckerConfig(CONNECTION_TIMEOUT = config.CONNECTION_TIMEOUT, CONNECTION_CHECK = config.CONNECTION_CHECK),
+    private val checker: ConnectivityChecker = ConnectivityChecker(tag, config.connectionActiveTimeout, config.connectionActiveCheck,
         isConnected = { isConnected() },
         onTimeout = { reconnect() })
 
@@ -48,34 +42,35 @@ class WebSocketDeviceHandler(
                     if (isConnected) {
                         try {
                             sendPing()
-                            handler.postDelayed(this, config.CONNECTION_CHECK)
+                            handler.postDelayed(this, config.connectionActiveCheck)
                         } catch (e: Exception) {
-                            Log.e("WebSocket", "sendPing failed: error=${e.message}")
-                            disconnected()
+                            Log.e(tag, "sendPing failed", e)
+                         //   disconnected()
                         }
                     }
                 }
             }
             override fun onOpen(handshakedata: ServerHandshake?) {
-                Log.d("WebSocket", "onOpen")
+                Log.d(tag, "onOpen")
                 connected()
-                handler.post(pinger)
+                handler.postDelayed(pinger, config.connectionActiveCheck)
             }
             override fun onMessage(message: String) {
-                Log.d("WebSocket", "onMessage: message=$message")
+                Log.d(tag, "onMessage: message=$message")
                 receive(message)
             }
             override fun onClose(code: Int, reason: String, remote: Boolean) {
-                Log.d("WebSocket", "onClose: remote=$remote, code=$code, reason='$reason'")
+                Log.d(tag, "onClose: remote=$remote, code=$code, reason='$reason'")
+                handler.removeCallbacksAndMessages(pinger)
                 if (remote)
                     disconnected()
             }
             override fun onError(ex: Exception?) {
-                Log.e("WebSocket", "onError: error=${ex?.message}")
+                Log.e(tag, "onError: error=${ex?.message}")
                 disconnected()
             }
             override fun onWebsocketPong(conn: WebSocket?, f: Framedata?) {
-                Log.d("WebSocket", "onWebSocketPong")
+                Log.d(tag, "onWebSocketPong")
                 checker.ping()
             }
         }
@@ -87,7 +82,7 @@ class WebSocketDeviceHandler(
             websocketClient?.connect()
             return true
         } catch (e: Exception) {
-            Log.e("WebSocket", "Device connect failed: error=${e.message}")
+            Log.e(tag, "Device connect failed: error=${e.message}")
             return false
         }
     }
@@ -95,14 +90,14 @@ class WebSocketDeviceHandler(
         try {
             websocketClient?.send(value)
         } catch (e: Exception) {
-            Log.e("WebSocket", "Device send failed: error=${e.message}")
+            Log.e(tag, "Device send failed: error=${e.message}")
         }
     }
     private fun websocketDisconnect () {
         try {
             websocketClient?.close()
         } catch (e: Exception) {
-            Log.e("WebSocket", "Device close failed: error=${e.message}")
+            Log.e(tag, "Device close failed: error=${e.message}")
         }
         websocketClient = null
     }
@@ -118,13 +113,13 @@ class WebSocketDeviceHandler(
             locate()
     }
     private fun locate() {
-        Log.d("WebSocket", "Device locate initiated")
+        Log.d(tag, "Device locate initiated")
         statusCallback()
         when {
-            !isEnabled() -> Log.e("WebSocket", "Device not enabled or available")
-            !isPermitted() -> Log.e("WebSocket", "Device access not permitted")
-            isConnecting -> Log.d("WebSocket", "Device connection already in progress")
-            isConnected -> Log.d("WebSocket", "Device connection already active, will not locate")
+            !isEnabled() -> Log.e(tag, "Device not enabled or available")
+            !isPermitted() -> Log.e(tag, "Device access not permitted")
+            isConnecting -> Log.d(tag, "Device connection already in progress")
+            isConnected -> Log.d(tag, "Device connection already active, will not locate")
             else -> {
                 isConnecting = true
                 scanner.start()
@@ -136,18 +131,18 @@ class WebSocketDeviceHandler(
         val name = serviceInfo.serviceName
         val host = serviceInfo.host.hostAddress
         val port = serviceInfo.port
-        Log.d("WebSocket", "Device located '$name'/$host:$port")
+        Log.d(tag, "Device located '$name'/$host:$port")
         connect("ws://$host:$port/")
     }
     private fun connect(url: String) {
-        Log.d("WebSocket", "Device connect to $url")
+        Log.d(tag, "Device connect to $url")
         statusCallback()
         checker.start()
         if (!websocketConnect (url))
             disconnected()
     }
     private fun connected() {
-        Log.d("WebSocket", "Device connected")
+        Log.d(tag, "Device connected")
         checker.ping()
         isConnecting = false
         isConnected = true
@@ -160,12 +155,12 @@ class WebSocketDeviceHandler(
         websocketWrite(connectivityInfo.toJsonString())
     }
     private fun receive(value: String) {
-        Log.d("WebSocket", "Device received: $value")
+        Log.d(tag, "Device received: $value")
         checker.ping()
         dataCallback(value)
     }
     private fun disconnect() {
-        Log.d("WebSocket", "Device disconnect")
+        Log.d(tag, "Device disconnect")
         websocketDisconnect()
         scanner.stop()
         checker.stop()
@@ -174,7 +169,7 @@ class WebSocketDeviceHandler(
         statusCallback()
     }
     override fun disconnected() {
-        Log.d("WebSocket", "Device disconnected")
+        Log.d(tag, "Device disconnected")
         websocketDisconnect()
         scanner.stop()
         checker.stop()
@@ -186,7 +181,7 @@ class WebSocketDeviceHandler(
         }, 1000)
     }
     override fun reconnect() {
-        Log.d("WebSocket", "Device reconnect")
+        Log.d(tag, "Device reconnect")
         disconnect()
         handler.postDelayed({
             locate()

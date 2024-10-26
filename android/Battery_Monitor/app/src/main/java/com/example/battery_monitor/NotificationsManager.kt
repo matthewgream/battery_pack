@@ -9,7 +9,8 @@ import android.content.Context
 
 @SuppressLint("MissingPermission")
 class NotificationsManager(
-    private val activity: Activity
+    private val activity: Activity,
+    private val config: NotificationsManagerConfig
 ) {
     private val permissions: PermissionsManager = PermissionsManagerFactory(activity).create(
         tag = "Notifications",
@@ -17,10 +18,6 @@ class NotificationsManager(
     )
 
     private val channelId = "AlarmChannel"
-    private val channelName = activity.getString(R.string.notification_channel_name)
-    private val channelDescription = activity.getString(R.string.notification_channel_description)
-    private val channelTitle = activity.getString(R.string.notification_channel_title)
-    private val channelContent = activity.getString(R.string.notification_channel_content)
 
     private val manager: NotificationManager = activity.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private val identifier = 1
@@ -28,8 +25,8 @@ class NotificationsManager(
     private var previous: List<Pair<String, String>> = emptyList()
 
     init {
-        val channel = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = channelDescription
+        val channel = NotificationChannel(channelId, config.name, NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = config.description
         }
         manager.createNotificationChannel(channel)
     }
@@ -38,8 +35,8 @@ class NotificationsManager(
 
     private fun show(current: List<Pair<String, String>>) {
         if (current != previous) {
-            val title = if (current.isNotEmpty()) current.joinToString(", ") { it.first } else channelTitle
-            val content = if (current.isNotEmpty()) current.joinToString("\n") { "${it.first}: ${it.second}" } else channelContent
+            val title = if (current.isNotEmpty()) current.joinToString(", ") { it.first } else config.title
+            val content = if (current.isNotEmpty()) current.joinToString("\n") { "${it.first}: ${it.second}" } else config.content
             val builder = Notification.Builder(activity, channelId)
                 .setSmallIcon(R.drawable.ic_launcher)
                 .setContentTitle(title)
