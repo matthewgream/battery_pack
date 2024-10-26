@@ -4,7 +4,9 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 
-abstract class ConnectivityComponent(protected open val tag: String) {
+abstract class ConnectivityComponent(
+    protected open val tag: String
+) {
 
     protected val handler = Handler(Looper.getMainLooper())
     private var active: Boolean = false
@@ -21,6 +23,7 @@ abstract class ConnectivityComponent(protected open val tag: String) {
 
     fun start() {
         if (!active) {
+            Log.d(tag, "Start")
             onStart()
             active = true
             if (timer > 0) {
@@ -36,19 +39,20 @@ abstract class ConnectivityComponent(protected open val tag: String) {
                 }
                 handler.postDelayed(runnable!!, timer)
             }
-            Log.d(tag, "Started")
+            //Log.d(tag, "Started")
         }
     }
 
     fun stop() {
         if (active) {
+            Log.d(tag, "Stop")
             active = false
             runnable?.let {
                 handler.removeCallbacks(it)
                 runnable = null
             }
             onStop()
-            Log.d(tag, "Stopped")
+            //Log.d(tag, "Stopped")
         }
     }
 }

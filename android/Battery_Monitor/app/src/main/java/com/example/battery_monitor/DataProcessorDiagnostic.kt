@@ -10,20 +10,21 @@ import android.widget.TextView
 import org.json.JSONObject
 
 @SuppressLint("ClickableViewAccessibility")
-class DataProcessorDiagnostic(private val activity: Activity) {
+class DataProcessorDiagnostic(
+    private val activity: Activity
+) {
 
     private val scrollView: ScrollView = activity.findViewById(R.id.diagnosticScrollView)
     private val textView: TextView = activity.findViewById(R.id.diagDataTextView)
     private var isScrolledToBottom = true
 
     init {
-        val detector =
-            GestureDetector(activity, object : GestureDetector.SimpleOnGestureListener() {
-                override fun onDoubleTap(e: MotionEvent): Boolean {
-                    clear()
-                    return true
-                }
-            })
+        val detector = GestureDetector(activity, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                clear()
+                return true
+            }
+        })
         textView.setOnTouchListener { v, event ->
             if (!detector.onTouchEvent(event))
                 v.performClick()

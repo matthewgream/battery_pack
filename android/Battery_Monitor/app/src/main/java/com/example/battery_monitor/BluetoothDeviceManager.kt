@@ -32,8 +32,8 @@ class BluetoothDeviceManager(
         isPermitted = { permissions.allowed },
         isEnabled = { adapter.isEnabled() }
     )
-    override val checker: StateManagerBluetooth = StateManagerBluetooth(activity,
-        onDisabled = { onDisconnect() },
+    override val checker: StateManagerBluetooth = StateManagerBluetooth(activity, "Bluetooth",
+        onDisabled = { onDisconnected() },
         onEnabled = { onPermitted() }
     )
 }

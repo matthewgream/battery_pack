@@ -14,8 +14,7 @@ class StateManagerNetwork(
     private val onEnabled: () -> Unit
 ) : ConnectivityComponent(tag) {
 
-    private val connectivityManager: ConnectivityManager =
-        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val connectivityManager: ConnectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -23,7 +22,6 @@ class StateManagerNetwork(
             Log.d(tag, "Network available")
             onEnabled()
         }
-
         override fun onLost(network: Network) {
             super.onLost(network)
             Log.d(tag, "Network lost")

@@ -1,6 +1,8 @@
 package com.example.battery_monitor
 
 import android.app.Activity
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.hivemq.client.mqtt.MqttClient
 import com.hivemq.client.mqtt.mqtt5.Mqtt5AsyncClient
@@ -29,34 +31,13 @@ class CloudMqttDeviceHandler(
     private val isEnabled: () -> Boolean,
     private val isPermitted: () -> Boolean
 ) : ConnectivityDeviceHandler() {
-    //    private val handler = Handler (Looper.getMainLooper ())
+
+    private val handler = Handler (Looper.getMainLooper ())
+
+    //
+
     private var mqttClient: Mqtt5AsyncClient? = null
-    private var isConnected = false
-    private var isConnecting = false
-    private var topic = ""
-
-    override fun permitted() {
-        statusCallback()
-        if (!isConnected && !isConnecting)
-            connect()
-    }
-
-    private fun connect() {
-        Log.d("Cloud", "Cloud connect initiate")
-        statusCallback()
-        when {
-            !isEnabled() -> Log.e("Cloud", "Network not enabled or available")
-            !isPermitted() -> Log.e("Cloud", "Cloud access not permitted")
-            isConnecting -> Log.d("Cloud", "Cloud connection already in progress")
-            isConnected -> Log.d("Cloud", "Cloud connection already active, will not connect")
-            else -> {
-                isConnecting = true
-                connectMqtt()
-            }
-        }
-    }
-
-    private fun connectMqtt() {
+    private fun mqttConnect() {
         try {
             mqttClient = MqttClient.builder()
                 .useMqttVersion5()
@@ -66,144 +47,180 @@ class CloudMqttDeviceHandler(
                 .automaticReconnectWithDefaultConfig()
                 .build()
                 .toAsync()
-
             val connect = mqttClient?.connectWith()
                 ?.cleanStart(true)
                 ?.sessionExpiryInterval(30L)
                 ?.keepAlive(30)
-
             if (config.user != null && config.pass != null)
                 connect?.simpleAuth()
                     ?.username(config.user)
                     ?.password(config.pass.toByteArray())
                     ?.applySimpleAuth()
-
             connect?.send()
                 ?.whenComplete { connAck: Mqtt5ConnAck, throwable ->
                     if (throwable != null) {
-                        Log.e("Cloud", "MQTT broker connection failure: ", throwable)
-                        isConnected = false
-                        isConnecting = false
-                        statusCallback()
-                        // XXX retry
+                        Log.e("CloudMqtt", "MQTT broker connection failure: error=${throwable.message}")
+                        disconnected()
                     } else {
-                        Log.d(
-                            "Cloud",
-                            "MQTT broker connection success: ${
-                                connAck.reasonString.map { it.toString() }.orElse("Success")
-                            }"
-                        )
-                        isConnected = true
-                        isConnecting = false
-                        statusCallback()
-                        identify()
-                        if (topic.isNotEmpty())
-                            subscribe(topic)
+                        Log.d("CloudMqtt", "MQTT broker connection success: ${connAck.reasonString.map { it.toString() }.orElse("Success")}")
+                        connected()
                     }
                 }
         } catch (e: Exception) {
-            Log.e("Cloud", "MQTT client configuration failure: ", e)
-            isConnected = false
-            isConnecting = false
-            statusCallback()
-            // XXX retry
+            Log.e("CloudMqtt", "MQTT client configuration failure: error=${e.message}")
+            disconnected()
         }
     }
-
-    fun subscribe(topic: String) {
-        if (!isConnected) {
-            Log.e("Cloud", "MQTT broker subscribe '$topic' failure: not connected")
-            return
-        }
+    private fun mqttSubscribe(topic: String) : Boolean {
+        val client = mqttClient ?: return false
         try {
-            mqttClient?.subscribeWith()
-                ?.topicFilter(topic)
-                ?.retainAsPublished(true)
-                ?.noLocal(true)
-                ?.callback { publish: Mqtt5Publish ->
+            client.subscribeWith()
+                .topicFilter(topic)
+                .retainAsPublished(true)
+                .noLocal(true)
+                .callback { publish: Mqtt5Publish ->
                     val message = String(publish.payloadAsBytes, StandardCharsets.UTF_8)
-                    Log.d(
-                        "Cloud",
-                        "MQTT broker subscribe '${publish.topic}' message: '$message' [type=${
-                            publish.contentType.map { it.toString() }.orElse(null)
-                        }, topic=${publish.responseTopic.map { it.toString() }.orElse(null)}]"
-                    )
-                    dataCallback(message)
+                    Log.d("CloudMqtt", "MQTT broker subscribe topic='${publish.topic}', message='$message', type=${publish.contentType.map { it.toString() }.orElse(null)}, topic=${publish.responseTopic.map { it.toString() }.orElse(null)}")
+                    receive(message)
                 }
-                ?.send()
-                ?.whenComplete { subAck: Mqtt5SubAck, throwable ->
-                    if (throwable != null)
-                        Log.e("Cloud", "MQTT broker subscribe '$topic' failure: ", throwable)
-                    else {
+                .send()
+                .whenComplete { subAck: Mqtt5SubAck, throwable ->
+                    if (throwable != null) {
+                        Log.e("CloudMqtt", "MQTT broker subscribe topic='$topic' failure: error=${throwable.message}")
+                        if (throwable.message?.contains("not connected", ignoreCase = true) == true)
+                            disconnected()
+                    } else {
                         this.topic = topic
-                        Log.d(
-                            "Cloud",
-                            "MQTT broker subscribe '$topic' success: ${
-                                subAck.reasonCodes.joinToString(", ")
-                            }"
-                        )
+                        Log.d("CloudMqtt","MQTT broker subscribe topic='$topic' success: ${subAck.reasonCodes.joinToString(", ")}")
                     }
                 }
+            return true
         } catch (e: Exception) {
-            Log.e("Cloud", "MQTT broker subscribe '$topic' failure: ", e)
+            Log.e("CloudMqtt", "MQTT broker subscribe topic='$topic' failure: error=${e.message}")
+            return false
         }
     }
-
-    fun publish(topic: String, message: String) {
-        if (!isConnected) {
-            Log.e("Cloud", "MQTT broker publish '${topic}' failure: not connected")
-            return
-        }
+    private fun mqttPublish(topic: String, message: String) : Boolean {
+        val client = mqttClient ?: return false
         try {
-            mqttClient?.publishWith()
-                ?.topic(topic)
-                ?.payload(message.toByteArray())
-                ?.contentType("application/json")
-                ?.messageExpiryInterval(60)
-                ?.send()
-                ?.whenComplete { _, throwable ->
+            client.publishWith()
+                .topic(topic)
+                .payload(message.toByteArray())
+                .contentType("application/json")
+                .messageExpiryInterval(60)
+                .send()
+                .whenComplete { _, throwable ->
+                    if (throwable != null) {
+                        Log.e("CloudMqtt", "MQTT broker publish topic='$topic' failure: error=${throwable.message}")
+                        if (throwable.message?.contains("not connected", ignoreCase = true) == true)
+                            disconnected()
+                    } else
+                        Log.d("CloudMqtt", "MQTT broker publish topic='$topic', message='$message'")
+                }
+            return true
+        } catch (e: Exception) {
+            Log.e("CloudMqtt", "MQTT broker publish topic='$topic' failure: error=${e.message}")
+            return false
+        }
+    }
+    private fun mqttDisconnect() {
+        val client = mqttClient ?: return
+        try {
+            client.disconnectWith()
+                .sessionExpiryInterval(0)
+                .send()
+                .whenComplete { _, throwable ->
                     if (throwable != null)
-                        Log.e("Cloud", "MQTT broker publish '${topic}' failure: ", throwable)
+                        Log.e("CloudMqtt", "MQTT broker disconnect failure: error=${throwable.message}")
                     else
-                        Log.d("Cloud", "MQTT broker publish '${topic}' success")
+                        Log.d("CloudMqtt", "MQTT broker disconnect success")
                 }
         } catch (e: Exception) {
-            Log.e("Cloud", "MQTT broker publish '${topic}' failure: ", e)
+            Log.e("CloudMqtt", "MQTT broker disconnect failure: error=${e.message}")
+        }
+        mqttClient = null
+    }
+    //
+
+    private var isConnected = false
+    private var isConnecting = false
+
+    private var topic = ""
+
+    override fun permitted() {
+        statusCallback()
+        if (!isConnecting && !isConnected)
+            connect()
+    }
+    private fun connect() {
+        Log.d("CloudMqtt", "Device connect initiate")
+        statusCallback()
+        when {
+            !isEnabled() -> Log.e("CloudMqtt", "Device not enabled or available")
+            !isPermitted() -> Log.e("CloudMqtt", "Device access not permitted")
+            isConnecting -> Log.d("CloudMqtt", "Device connection already in progress")
+            isConnected -> Log.d("CloudMqtt", "Device connection already active, will not connect")
+            else -> {
+                isConnecting = true
+                mqttConnect()
+            }
         }
     }
-
-    override fun disconnect() {
-        try {
-            mqttClient?.disconnectWith()
-                ?.sessionExpiryInterval(0)
-                ?.send()
-                ?.whenComplete { _, throwable ->
-                    if (throwable != null)
-                        Log.e("Cloud", "MQTT broker disconnect failure: ", throwable)
-                    else
-                        Log.d("Cloud", "MQTT broker disconnect success")
-                    mqttClient = null
-                    isConnected = false
-                    isConnecting = false
-                    statusCallback()
-                }
-        } catch (e: Exception) {
-            Log.e("Cloud", "MQTT broker disconnect failure: ", e)
-            mqttClient = null
-            isConnected = false
-            isConnecting = false
-            statusCallback()
-        }
+    private fun connected() {
+        Log.d("CloudMqtt", "Device connected")
+        isConnected = true
+        isConnecting = false
+        statusCallback()
+        handler.postDelayed({
+            identify()
+        }, 1000)
+        if (topic.isNotEmpty())
+            subscribe(topic)
     }
-
     private fun identify() {
         publish("${config.topic}/${connectivityInfo.deviceAddress}/peer", connectivityInfo.toJsonString())
     }
-
-    override fun reconnect() {
-//        disconnect ()
-//        connect ()
+    fun subscribe(topic: String): Boolean {
+        if (!isConnected) {
+            Log.e("CloudMqtt", "Device subscribe '$topic' failure: not connected")
+            return false
+        }
+        return mqttSubscribe(topic)
     }
-
+    fun publish(topic: String, message: String): Boolean {
+        if (!isConnected) {
+            Log.e("CloudMqtt", "Device publish '${topic}' failure: not connected")
+            return false
+        }
+        return mqttPublish(topic, message)
+    }
+    private fun receive(value: String) {
+        Log.d("CloudMqtt", "Device received: $value")
+        dataCallback(value)
+    }
+    private fun disconnect() {
+        Log.d("CloudMqtt", "Device disconnect")
+        mqttDisconnect()
+        isConnected = false
+        isConnecting = false
+        statusCallback()
+    }
+    override fun disconnected() {
+        Log.d("CloudMqtt", "Device disconnected")
+        mqttDisconnect()
+        isConnected = false
+        isConnecting = false
+        statusCallback()
+        handler.postDelayed({
+            connect()
+        }, 1000)
+    }
+    override fun reconnect() {
+        Log.d("CloudMqtt", "Device reconnect")
+        disconnect()
+        handler.postDelayed({
+            connect()
+        }, 1000)
+    }
     override fun isConnected(): Boolean = isConnected
 }

@@ -11,15 +11,11 @@ import java.time.format.DateTimeFormatter
 
 class ConnectivityInfo(activity: Activity) {
 
-    private val prefs: SharedPreferences =
-        activity.getSharedPreferences("ConnectionInfo", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = activity.getSharedPreferences("ConnectionInfo", Context.MODE_PRIVATE)
 
     private val name = "batterymonitor"
     private val version = try {
-        activity.packageManager.getPackageInfo(
-            activity.packageName,
-            PackageManager.PackageInfoFlags.of(0)
-        ).versionName
+        activity.packageManager.getPackageInfo(activity.packageName, PackageManager.PackageInfoFlags.of(0)).versionName
     } catch (e: PackageManager.NameNotFoundException) {
         "?.?.?"
     }

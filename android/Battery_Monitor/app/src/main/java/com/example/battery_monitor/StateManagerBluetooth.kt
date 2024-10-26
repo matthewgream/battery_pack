@@ -9,23 +9,20 @@ import android.util.Log
 
 class StateManagerBluetooth(
     private val context: Context,
+    tag: String,
     private val onDisabled: () -> Unit,
     private val onEnabled: () -> Unit
-) : ConnectivityComponent("BluetoothStateReceiver") {
+) : ConnectivityComponent(tag) {
 
     private val receiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 BluetoothAdapter.ACTION_STATE_CHANGED -> {
-                    when (intent.getIntExtra(
-                        BluetoothAdapter.EXTRA_STATE,
-                        BluetoothAdapter.ERROR
-                    )) {
+                    when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
                         BluetoothAdapter.STATE_OFF -> {
                             Log.d(tag, "Adapter disabled")
                             onDisabled()
                         }
-
                         BluetoothAdapter.STATE_ON -> {
                             Log.d(tag, "Adapter enabled")
                             onEnabled()

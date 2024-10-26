@@ -9,7 +9,7 @@ class WebSocketDeviceManager(
     statusCallback: () -> Unit
 ) : ConnectivityDeviceManager<WebSocketDeviceAdapter, WebSocketDeviceHandler, WebSocketDeviceHandlerConfig, StateManagerNetwork>(
     activity,
-    "Network",
+    "WebSocket",
     arrayOf(
         android.Manifest.permission.INTERNET,
         android.Manifest.permission.ACCESS_NETWORK_STATE
@@ -28,9 +28,8 @@ class WebSocketDeviceManager(
         isPermitted = { permissions.allowed },
         isEnabled = { adapter.isEnabled() && connectivityInfo.deviceAddress.isNotEmpty() }
     )
-    override val checker: StateManagerNetwork = StateManagerNetwork(activity,
-        "NetworkDeviceState",
-        onDisabled = { onDisconnect() },
+    override val checker: StateManagerNetwork = StateManagerNetwork(activity, "WebSocket",
+        onDisabled = { onDisconnected() },
         onEnabled = { onPermitted() }
     )
 }

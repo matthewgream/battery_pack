@@ -105,18 +105,12 @@ class MainActivity : PermissionsAwareActivity() {
                 val deviceAddress = json.getString("addr")
                 if (deviceAddress != connectivityInfo.deviceAddress) {
                     connectivityInfo.updateDeviceAddress(deviceAddress)
-                    Log.d(
-                        "MainActivity",
-                        "Device address changed, triggering network and cloud connection attempts"
-                    )
-                    listOf(
-                        connectivityManagerNetwork,
-                        connectivityManagerCloud
-                    ).forEach { it.onDoubleTap() }
+                    Log.d("Main", "Device address changed, triggering network and cloud connection attempts")
+                    listOf(connectivityManagerNetwork, connectivityManagerCloud).forEach { it.onDoubleTap() }
                 }
             }
         } catch (e: Exception) {
-            Log.e("MainActivity", "Error processing bluetooth address", e)
+            Log.e("Main", "Error processing bluetooth address: error=${e.message}")
         }
     }
 
@@ -132,7 +126,7 @@ class MainActivity : PermissionsAwareActivity() {
                 is BluetoothDeviceManager -> ConnectivityType.LOCAL
                 is WebSocketDeviceManager -> ConnectivityType.NETWORK
                 is CloudMqttDeviceManager -> ConnectivityType.CLOUD
-                else -> throw IllegalStateException("Unknown manager type")
+                else -> throw IllegalStateException ("Unknown manager type")
             } to ConnectivityStatus(
                 permitted = manager.isPermitted(),
                 available = manager.isAvailable(),

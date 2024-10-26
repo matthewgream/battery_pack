@@ -9,7 +9,7 @@ class CloudMqttDeviceManager(
     statusCallback: () -> Unit
 ) : ConnectivityDeviceManager<CloudMqttDeviceAdapter, CloudMqttDeviceHandler, CloudMqttDeviceHandlerConfig, StateManagerNetwork>(
     activity,
-    "CloudManager",
+    "CloudMqtt",
     arrayOf(
         android.Manifest.permission.INTERNET,
         android.Manifest.permission.ACCESS_NETWORK_STATE
@@ -34,19 +34,17 @@ class CloudMqttDeviceManager(
         isEnabled = { adapter.isEnabled() && connectivityInfo.deviceAddress.isNotEmpty() },
         isPermitted = { permissions.allowed }
     )
-    override val checker: StateManagerNetwork = StateManagerNetwork(activity,
-        "CloudDeviceState",
-        onDisabled = { onDisconnect() },
+    override val checker: StateManagerNetwork = StateManagerNetwork(activity, "CloudMqtt",
+        onDisabled = { onDisconnected() },
         onEnabled = { onPermitted() }
     )
 
     //
 
-    fun publish(topic: String, message: String) {
-        device.publish(topic, message)
+    fun publish(topic: String, message: String) : Boolean {
+        return device.publish(topic, message)
     }
-
-    fun subscribe(topic: String) {
-        device.subscribe(topic)
+    fun subscribe(topic: String) : Boolean {
+        return device.subscribe(topic)
     }
 }

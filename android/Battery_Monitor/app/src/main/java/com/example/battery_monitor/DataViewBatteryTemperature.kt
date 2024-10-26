@@ -112,14 +112,12 @@ class DataViewBatteryTemperature @JvmOverloads constructor(
             val areaPath = Path()
             olderValues.forEachIndexed { index, temp ->
                 val x = paddingHorizontal + (drawableWidth * index / (count - 1))
-                val y =
-                    paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
+                val y = paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
                 if (index == 0) areaPath.moveTo(x, y) else areaPath.lineTo(x, y)
             }
             for (index in newerValues.indices.reversed()) {
                 val x = paddingHorizontal + (drawableWidth * index / (count - 1))
-                val y =
-                    paddingTop + drawableHeight - (drawableHeight * (newerValues[index] - minTemp) / (maxTemp - minTemp))
+                val y = paddingTop + drawableHeight - (drawableHeight * (newerValues[index] - minTemp) / (maxTemp - minTemp))
                 areaPath.lineTo(x, y)
             }
             areaPath.close()
@@ -144,8 +142,7 @@ class DataViewBatteryTemperature @JvmOverloads constructor(
             val linePath = Path()
             values.forEachIndexed { index, temp ->
                 val x = paddingHorizontal + (drawableWidth * index / (count - 1))
-                val y =
-                    paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
+                val y = paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
                 if (index == 0) linePath.moveTo(x, y) else linePath.lineTo(x, y)
             }
             val linePaint = Paint(paintLine).apply { color = interpolateColor(fraction) }
@@ -155,8 +152,7 @@ class DataViewBatteryTemperature @JvmOverloads constructor(
         for ((temp, label, color) in thresholds) {
             if (temp in minTemp..maxTemp) {
                 val x = paddingHorizontal
-                val y =
-                    paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
+                val y = paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
                 val paint = Paint(paintLineThreshold).apply { this.color = color }
                 canvas.drawLine(x, y, width - paddingHorizontal, y, paint)
                 canvas.drawText(label, x + 10f, y - 10f, paintText)
@@ -166,16 +162,14 @@ class DataViewBatteryTemperature @JvmOverloads constructor(
         val linePath = Path()
         temperatureValues.forEachIndexed { index, temp ->
             val x = paddingHorizontal + (drawableWidth * index / (count - 1))
-            val y =
-                paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
+            val y = paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
             if (index == 0) linePath.moveTo(x, y) else linePath.lineTo(x, y)
         }
         canvas.drawPath(linePath, paintLinePath)
 
         temperatureValues.forEachIndexed { index, temp ->
             val x = paddingHorizontal + (drawableWidth * index / (count - 1))
-            val y =
-                paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
+            val y = paddingTop + drawableHeight - (drawableHeight * (temp - minTemp) / (maxTemp - minTemp))
             canvas.drawLine(x, paddingTop, x, height - paddingBottom, paintLineDashed)
             val text = String.format("%.1f°C", temp)
             val textWidth = paintText.measureText(text)

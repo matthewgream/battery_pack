@@ -13,17 +13,9 @@ object DataManagerAlarm {
         "STORE_FAIL" to Alarm("STORE_FAIL", "Store fail", "Storage system has failed"),
         "STORE_SIZE" to Alarm("STORE_SIZE", "Store full", "Storage system is full"),
         "PUBLISH_FAIL" to Alarm("PUBLISH_FAIL", "Publish fail", "Publish to network (MQTT) failed"),
-        "PUBLISH_SIZE" to Alarm(
-            "PUBLISH_SIZE",
-            "Publish size",
-            "Publish to network (MQTT) too large"
-        ),
+        "PUBLISH_SIZE" to Alarm("PUBLISH_SIZE", "Publish size", "Publish to network (MQTT) too large"),
         "DELIVER_FAIL" to Alarm("DELIVER_FAIL", "Deliver fail", "Deliver to device (BLE) failed"),
-        "DELIVER_SIZE" to Alarm(
-            "DELIVER_SIZE",
-            "Deliver size",
-            "Deliver to device (BLE) too large"
-        ),
+        "DELIVER_SIZE" to Alarm("DELIVER_SIZE", "Deliver size", "Deliver to device (BLE) too large"),
         "UPDATE_VERS" to Alarm("UPDATE_VERS", "Device update", "Device update available"),
         "UPDATE_LONG" to Alarm("UPDATE_LONG", "Device check", "Device update check needed"),
         "SYSTEM_MEMLOW" to Alarm("SYSTEM_MEMLOW", "Device memory", "Device memory low"),
@@ -31,7 +23,6 @@ object DataManagerAlarm {
     )
 
     fun translateAlarms(alarmCodes: String): List<Pair<String, String>> {
-        return alarmCodes.split(",").mapNotNull { alarmMap[it.trim()] }
-            .map { Pair(it.name, it.description) }
+        return alarmCodes.split(",").mapNotNull { alarmMap[it.trim()] }.map { Pair(it.name, it.description) }
     }
 }

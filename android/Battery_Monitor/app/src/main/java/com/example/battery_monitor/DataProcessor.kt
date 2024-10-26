@@ -18,7 +18,7 @@ class DataProcessor(
                 notificationsManager.process(DataManagerAlarm.translateAlarms(json.getString("alm")))
             }
             "diag" -> dataProcessorDiagnostic.render(json)
-            else -> Log.w("DataProcessor", "JSON type unknown: $type")
+            else -> Log.w("DataProcessor", "JSON type unknown: type=$type")
         }
     }
 }

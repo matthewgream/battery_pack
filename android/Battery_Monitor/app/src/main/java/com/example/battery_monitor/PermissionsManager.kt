@@ -4,7 +4,9 @@ import android.app.Activity
 import android.content.pm.PackageManager
 import android.util.Log
 
-class PermissionsManagerFactory(private val activity: Activity) {
+class PermissionsManagerFactory(
+    private val activity: Activity
+) {
     companion object {
         private var requestCode = 1000
     }
@@ -24,18 +26,12 @@ class PermissionsManagerFactory(private val activity: Activity) {
 }
 
 open class PermissionsAwareActivity : Activity() {
-    private val permissionsListeners =
-        mutableListOf<(Int, Array<out String>, IntArray) -> Boolean>()
+    private val permissionsListeners = mutableListOf<(Int, Array<out String>, IntArray) -> Boolean>()
 
     fun addOnRequestPermissionsResultListener(listener: (Int, Array<out String>, IntArray) -> Boolean) {
         permissionsListeners.add(listener)
     }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         for (listener in permissionsListeners)
             if (listener(requestCode, permissions, grantResults))
                 return
@@ -70,7 +66,6 @@ class PermissionsManager(
             onPermissionsAllowed()
         }
     }
-
     fun receivePermissions(grantResults: IntArray) {
         obtained = true
         if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {

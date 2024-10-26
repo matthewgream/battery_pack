@@ -6,7 +6,7 @@ import android.os.Looper
 
 abstract class ConnectivityDeviceHandler {
     abstract fun isConnected(): Boolean
-    abstract fun disconnect()
+    abstract fun disconnected()
     abstract fun reconnect()
     abstract fun permitted()
 }
@@ -25,8 +25,7 @@ abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, T
 ) {
     private val handler = Handler(Looper.getMainLooper())
 
-    protected val permissions: PermissionsManager =
-        PermissionsManagerFactory(activity).create(tag, permissionsRequired)
+    protected val permissions: PermissionsManager = PermissionsManagerFactory(activity).create(tag, permissionsRequired)
     protected abstract val adapter: TAdapter
     protected abstract val device: TDevice
     protected abstract val checker: TChecker
@@ -43,7 +42,7 @@ abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, T
 
     fun onDestroy() {
         checker.stop()
-        onDisconnect()
+        onDisconnected()
     }
 
     fun onPause() {}
@@ -51,7 +50,7 @@ abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, T
     fun onPowerSave() {}
     fun onPowerBack() {}
 
-    protected fun onDisconnect() = device.disconnect()
+    protected fun onDisconnected() = device.disconnected()
     fun onDoubleTap() = device.reconnect()
     protected fun onPermitted() {
         checker.start()

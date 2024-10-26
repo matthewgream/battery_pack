@@ -25,7 +25,7 @@ class ConnectivityChecker(
 
     override fun onTimer(): Boolean {
         if (isConnected() && System.currentTimeMillis() - checked > config.CONNECTION_TIMEOUT) {
-            Log.d(tag, "Device connection checker timeout")
+            Log.d(tag, "Connection checker timeout")
             onTimeout()
             return false
         }

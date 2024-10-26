@@ -103,13 +103,12 @@ class DutyCycleScanner(private val bluetoothAdapter: BluetoothAdapter) {
 class BluetoothDeviceScannerConfig(
     val name: String,
     uuid: UUID,
-) {
-    val SCAN_DELAY = 5000L // 5 seconds
-    val SCAN_PERIOD = 30000L // 30 seconds
+    val SCAN_DELAY : Long = 5000L, // 5 seconds
+    val SCAN_PERIOD : Long = 30000L, // 30 seconds
     val filter: ScanFilter = ScanFilter.Builder()
         .setDeviceName(name)
         .setServiceUuid(ParcelUuid(uuid))
-        .build()
+        .build(),
     val settings: ScanSettings = ScanSettings.Builder()
         .setLegacy(false)
         .setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
@@ -120,14 +119,14 @@ class BluetoothDeviceScannerConfig(
         .setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
         .setReportDelay(0L)
         .build()
-}
+)
 
 @SuppressLint("MissingPermission")
 class BluetoothDeviceScanner(
     private val scanner: BluetoothLeScanner,
     private val config: BluetoothDeviceScannerConfig,
     private val onFound: (BluetoothDevice) -> Unit
-) : ConnectivityComponent("BluetoothDeviceScanner") {
+) : ConnectivityComponent("Bluetooth") {
 
     private val retryRunnable = Runnable {
         start()
@@ -137,29 +136,17 @@ class BluetoothDeviceScanner(
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             if (result.scanRecord?.deviceName == config.name) {
                 stop()
-                Log.d(
-                    tag,
-                    "Device scan located, device ${result.scanRecord?.deviceName} / ${result.device.address} [txPower=${result.scanRecord?.txPowerLevel}, rssi=${result.rssi}]"
-                )
+                Log.d(tag,"Device scan located name=${result.scanRecord?.deviceName}, address=${result.device.address}, txPower=${result.scanRecord?.txPowerLevel}, rssi=${result.rssi}")
                 onFound(result.device)
             }
         }
-
         override fun onScanFailed(errorCode: Int) {
             when (errorCode) {
                 SCAN_FAILED_ALREADY_STARTED -> Log.e(tag, "Device scan failed: already started")
-                SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> Log.e(
-                    "Bluetooth",
-                    "Device scan failed: application registration failed"
-                )
-
-                SCAN_FAILED_FEATURE_UNSUPPORTED -> Log.e(
-                    tag,
-                    "Device scan failed: feature unsupported"
-                )
-
+                SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> Log.e(tag,"Device scan failed: application registration failed")
+                SCAN_FAILED_FEATURE_UNSUPPORTED -> Log.e(tag, "Device scan failed: feature unsupported")
                 SCAN_FAILED_INTERNAL_ERROR -> Log.e(tag, "Device scan failed: internal error")
-                else -> Log.e(tag, "Device scan failed: error $errorCode")
+                else -> Log.e(tag, "Device scan failed: error=$errorCode")
             }
             restartAfterDelay()
         }
@@ -186,12 +173,10 @@ class BluetoothDeviceScanner(
     override fun onStart() {
         scanner.startScan(listOf(config.filter), config.settings, callback)
     }
-
     override fun onStop() {
         handler.removeCallbacks(retryRunnable)
         scanner.stopScan(callback)
     }
-
     override fun onTimer(): Boolean {
         restartAfterDelay()
         return false
