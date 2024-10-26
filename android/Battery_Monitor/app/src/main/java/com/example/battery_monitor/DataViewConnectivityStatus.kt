@@ -21,9 +21,9 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
     private lateinit var doubleTapListener: () -> Unit
     private lateinit var gestureDetector: GestureDetector
 
-    private val localIcon: ImageView
-    private val networkIcon: ImageView
-    private val cloudIcon: ImageView
+    private val iconDirect: ImageView
+    private val iconLocal: ImageView
+    private val iconCloud: ImageView
 
     private enum class IconState {
         DISABLED, // Grey - No permissions or not available
@@ -36,9 +36,9 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
         orientation = VERTICAL
         LayoutInflater.from(context).inflate(R.layout.view_connectivity_status, this, true)
 
-        localIcon = findViewById(R.id.localIcon)
-        networkIcon = findViewById(R.id.networkIcon)
-        cloudIcon = findViewById(R.id.cloudIcon)
+        iconDirect = findViewById(R.id.iconDirect)
+        iconLocal = findViewById(R.id.iconLocal)
+        iconCloud = findViewById(R.id.iconCloud)
 
         elevation = 4f
     }
@@ -56,9 +56,9 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
     fun updateStatus(statuses: Map<ConnectivityType, ConnectivityStatus>) {
         uiHandler.post {
             val iconMapping = mapOf(
-                ConnectivityType.LOCAL to localIcon,
-                ConnectivityType.NETWORK to networkIcon,
-                ConnectivityType.CLOUD to cloudIcon
+                ConnectivityType.DIRECT to iconDirect,
+                ConnectivityType.LOCAL to iconLocal,
+                ConnectivityType.CLOUD to iconCloud
             )
             statuses.forEach { (type, status) ->
                 updateIconState(iconMapping[type] ?: return@forEach, determineIconState(status))

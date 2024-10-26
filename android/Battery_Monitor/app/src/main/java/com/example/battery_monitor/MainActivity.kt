@@ -8,7 +8,7 @@ import org.json.JSONObject
 
 class MainActivity : PermissionsAwareActivity() {
 
-    private val config: ApplicationConfig = ApplicationConfig()
+    private val config: MainConfig = MainConfig()
 
     private var powermanageState: Boolean = false
     private fun powermanageSetup() {
@@ -36,7 +36,7 @@ class MainActivity : PermissionsAwareActivity() {
     private var processingHandler: DataProcessor? = null
     private fun processingSetup () {
         processingHandler = DataProcessor(this,
-            NotificationsManager(this, NotificationsManagerConfig (this)))
+            NotificationsManager(this, NotificationsConfig (this)))
     }
 
     //
@@ -44,8 +44,8 @@ class MainActivity : PermissionsAwareActivity() {
     private val connectivityInfo by lazy {
         ConnectivityInfo(this, config.name)
     }
-    private val connectivityManagerLocal: BluetoothDeviceManager by lazy {
-        BluetoothDeviceManager("Bluetooth", this, connectivityInfo,
+    private val connectivityManagerDirect: BluetoothDeviceManager by lazy {
+        BluetoothDeviceManager("Bluetooth", this, BluetoothDeviceConfig (), connectivityInfo,
             dataCallback = { data ->
                 val json = JSONObject(data)
                 connectivityManagerAddressBinder(json)
@@ -53,7 +53,7 @@ class MainActivity : PermissionsAwareActivity() {
             },
             statusCallback = { connectivityStatusUpdate() })
     }
-    private val connectivityManagerNetwork: WebSocketDeviceManager by lazy {
+    private val connectivityManagerLocal: WebSocketDeviceManager by lazy {
         WebSocketDeviceManager("WebSocket", this, WebSocketDeviceConfig (), connectivityInfo,
             dataCallback = { data -> processingHandler?.processDataReceived(JSONObject(data)) },
             statusCallback = { connectivityStatusUpdate() })
@@ -64,7 +64,7 @@ class MainActivity : PermissionsAwareActivity() {
             statusCallback = { connectivityStatusUpdate() })
     }
     private val connectivityManagers by lazy {
-        listOf(connectivityManagerLocal, connectivityManagerNetwork, connectivityManagerCloud)
+        listOf(connectivityManagerDirect, connectivityManagerLocal, connectivityManagerCloud)
     }
     private fun connectivityManagerAddressBinder(json: JSONObject) {
         try {
@@ -73,7 +73,7 @@ class MainActivity : PermissionsAwareActivity() {
                 if (deviceAddress != connectivityInfo.deviceAddress) {
                     connectivityInfo.updateDeviceAddress(deviceAddress)
                     Log.d("Main", "Device address changed, triggering network and cloud connection attempts")
-                    listOf(connectivityManagerNetwork, connectivityManagerCloud).forEach { it.onDoubleTap() }
+                    listOf(connectivityManagerLocal, connectivityManagerCloud).forEach { it.onDoubleTap() }
                 }
             }
         } catch (e: Exception) {
@@ -91,8 +91,8 @@ class MainActivity : PermissionsAwareActivity() {
     private fun connectivityStatusUpdate() {
         val statuses = connectivityManagers.associate { manager ->
             when (manager) {
-                is BluetoothDeviceManager -> ConnectivityType.LOCAL
-                is WebSocketDeviceManager -> ConnectivityType.NETWORK
+                is BluetoothDeviceManager -> ConnectivityType.DIRECT
+                is WebSocketDeviceManager -> ConnectivityType.LOCAL
                 is CloudMqttDeviceManager -> ConnectivityType.CLOUD
                 else -> throw IllegalStateException ("Unknown manager type")
             } to ConnectivityStatus(

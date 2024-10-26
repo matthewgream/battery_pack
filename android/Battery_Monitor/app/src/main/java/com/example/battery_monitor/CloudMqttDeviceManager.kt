@@ -1,6 +1,20 @@
 package com.example.battery_monitor
 
 import android.app.Activity
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+
+class CloudMqttDeviceAdapter(
+    context: Context
+) : ConnectivityDeviceAdapter() {
+    private val connectivityManager: ConnectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    override fun isEnabled(): Boolean {
+        val network = connectivityManager.activeNetwork
+        val capabilities = connectivityManager.getNetworkCapabilities(network)
+        return capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+    }
+}
 
 class CloudMqttDeviceManager(
     tag: String,
@@ -9,7 +23,7 @@ class CloudMqttDeviceManager(
     connectivityInfo: ConnectivityInfo,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
-) : ConnectivityDeviceManager<CloudMqttDeviceAdapter, CloudMqttDeviceHandler, CloudMqttDeviceConfig, StateManagerNetwork>(
+) : ConnectivityDeviceManager<CloudMqttDeviceAdapter, CloudMqttDeviceHandler, CloudMqttDeviceConfig, StateManagerInternet>(
     tag,
     activity,
     arrayOf(
@@ -30,16 +44,18 @@ class CloudMqttDeviceManager(
         isEnabled = { adapter.isEnabled() && connectivityInfo.deviceAddress.isNotEmpty() },
         isPermitted = { permissions.allowed }
     )
-    override val checker: StateManagerNetwork = StateManagerNetwork(tag, activity,
+    override val state: StateManagerInternet = StateManagerInternet(tag, activity,
         onDisabled = { onDisconnected() },
         onEnabled = { onPermitted() }
     )
 
     //
 
+    @Suppress("unused")
     fun publish(topic: String, message: String) : Boolean {
         return device.publish(topic, message)
     }
+    @Suppress("unused")
     fun subscribe(topic: String) : Boolean {
         return device.subscribe(topic)
     }

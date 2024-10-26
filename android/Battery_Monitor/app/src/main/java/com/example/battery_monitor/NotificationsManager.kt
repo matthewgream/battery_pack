@@ -10,45 +10,45 @@ import android.content.Context
 @SuppressLint("MissingPermission")
 class NotificationsManager(
     private val activity: Activity,
-    private val config: NotificationsManagerConfig
+    private val config: NotificationsConfig
 ) {
-    private val permissions: PermissionsManager = PermissionsManagerFactory(activity).create(
-        tag = "Notifications",
-        permissionsRequired = arrayOf(android.Manifest.permission.POST_NOTIFICATIONS)
+    private val permissions: PermissionsManager = PermissionsManagerFactory (activity).create("Notifications",
+        arrayOf(
+            android.Manifest.permission.POST_NOTIFICATIONS
+        )
     )
 
-    private val channelId = "AlarmChannel"
-
+    private val channel = "AlarmChannel"
     private val manager: NotificationManager = activity.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    private val identifier = 1
-    private var active: Int? = null
-    private var previous: List<Pair<String, String>> = emptyList()
 
     init {
-        val channel = NotificationChannel(channelId, config.name, NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = config.description
-        }
-        manager.createNotificationChannel(channel)
+        manager.createNotificationChannel(
+            NotificationChannel(channel, config.name, NotificationManager.IMPORTANCE_DEFAULT).apply { description = config.description }
+        )
     }
 
     //
 
+    private val identifier = 1
+    private var active: Int? = null
+    private var previous: List<Pair<String, String>> = emptyList()
     private fun show(current: List<Pair<String, String>>) {
         if (current != previous) {
-            val title = if (current.isNotEmpty()) current.joinToString(", ") { it.first } else config.title
-            val content = if (current.isNotEmpty()) current.joinToString("\n") { "${it.first}: ${it.second}" } else config.content
-            val builder = Notification.Builder(activity, channelId)
-                .setSmallIcon(R.drawable.ic_launcher)
-                .setContentTitle(title)
-                .setContentText(content)
-                .setStyle(Notification.BigTextStyle().bigText(content))
-                .setOngoing(true)
-            manager.notify(identifier, builder.build())
+            val title = current.joinToString(", ")
+            val text = current.joinToString("\n") { "${it.first}: ${it.second}" }
+            manager.notify(identifier,
+                Notification.Builder(activity, channel)
+                    .setSmallIcon(R.drawable.ic_launcher)
+                    .setContentTitle(title)
+                    .setContentText(text)
+                    .setStyle(Notification.BigTextStyle().bigText(text))
+                    .setOngoing(true)
+                    .build()
+            )
             active = identifier
             previous = current
         }
     }
-
     private fun reshow() {
         if (previous.isNotEmpty()) {
             val current = previous
@@ -56,7 +56,6 @@ class NotificationsManager(
             show(current)
         }
     }
-
     private fun clear() {
         active?.let {
             manager.cancel(it)

@@ -36,7 +36,6 @@ class StateManagerBluetooth(
     override fun onStart() {
         context.registerReceiver(receiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
     }
-
     override fun onStop() {
         context.unregisterReceiver(receiver)
     }

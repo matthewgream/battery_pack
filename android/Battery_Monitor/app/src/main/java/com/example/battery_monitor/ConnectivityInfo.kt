@@ -13,7 +13,6 @@ class ConnectivityInfo(
     activity: Activity,
     val name: String
 ) {
-
     private val prefs: SharedPreferences = activity.getSharedPreferences("ConnectionInfo", Context.MODE_PRIVATE)
 
     private val version = try {

@@ -13,8 +13,8 @@ import java.nio.charset.StandardCharsets
 
 class CloudMqttDeviceHandler(
     private val tag: String,
-    private val activity: Activity,
-    private val adapter: CloudMqttDeviceAdapter,
+    @Suppress("unused") private val activity: Activity,
+    @Suppress("unused") private val adapter: CloudMqttDeviceAdapter,
     private val config: CloudMqttDeviceConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
@@ -40,8 +40,8 @@ class CloudMqttDeviceHandler(
                 .toAsync()
             val connect = mqttClient?.connectWith()
                 ?.cleanStart(true)
-                ?.sessionExpiryInterval(config.connectionActiveTimeout/1000)
-                ?.keepAlive((config.connectionActiveCheck/1000).toInt())
+                ?.sessionExpiryInterval(config.connectionActiveTimeout.toLong())
+                ?.keepAlive(config.connectionActiveCheck)
             if (config.user != null && config.pass != null)
                 connect?.simpleAuth()
                     ?.username(config.user)
@@ -133,8 +133,8 @@ class CloudMqttDeviceHandler(
     }
     //
 
-    private var isConnected = false
     private var isConnecting = false
+    private var isConnected = false
 
     private var topic = ""
 

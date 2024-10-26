@@ -4,10 +4,11 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 
+@Suppress("ReplaceNotNullAssertionWithElvisReturn")
 abstract class ConnectivityComponent(
-    protected open val tag: String
+    protected open val tag: String,
+    private val timer: Int = 0
 ) {
-
     protected val handler = Handler(Looper.getMainLooper())
     private var active: Boolean = false
 
@@ -16,8 +17,6 @@ abstract class ConnectivityComponent(
     protected open fun onTimer(): Boolean {
         return false
     }
-
-    open val timer: Long = 0L
 
     private var runnable: Runnable? = null
 
@@ -34,10 +33,10 @@ abstract class ConnectivityComponent(
                 runnable = Runnable {
                     if (active) {
                         if (onTimer())
-                            handler.postDelayed(runnable!!, timer)
+                            handler.postDelayed(runnable!!, timer*1000L)
                     }
                 }
-                handler.postDelayed(runnable!!, timer)
+                handler.postDelayed(runnable!!, timer*1000L)
             }
             //Log.d(tag, "Started")
         }

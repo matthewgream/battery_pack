@@ -1,14 +1,27 @@
 package com.example.battery_monitor
 
 import android.app.Activity
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
+import android.content.Context
+
+class BluetoothDeviceAdapter(
+    context: Context
+) : ConnectivityDeviceAdapter() {
+    val adapter: BluetoothAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
+    override fun isEnabled(): Boolean {
+        return adapter.isEnabled
+    }
+}
 
 class BluetoothDeviceManager(
     tag: String,
     activity: Activity,
+    config: BluetoothDeviceConfig,
     connectivityInfo: ConnectivityInfo,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
-) : ConnectivityDeviceManager<BluetoothDeviceAdapter, BluetoothDeviceHandler, BluetoothDeviceHandlerConfig, StateManagerBluetooth>(
+) : ConnectivityDeviceManager<BluetoothDeviceAdapter, BluetoothDeviceHandler, BluetoothDeviceConfig, StateManagerBluetooth>(
     tag,
     activity,
     arrayOf(
@@ -26,14 +39,14 @@ class BluetoothDeviceManager(
     override val adapter: BluetoothDeviceAdapter = BluetoothDeviceAdapter(activity)
     override val device: BluetoothDeviceHandler = BluetoothDeviceHandler(tag, activity,
         adapter,
-        BluetoothDeviceHandlerConfig(),
+        config,
         connectivityInfo,
         dataCallback,
         statusCallback,
         isPermitted = { permissions.allowed },
         isEnabled = { adapter.isEnabled() }
     )
-    override val checker: StateManagerBluetooth = StateManagerBluetooth(tag, activity,
+    override val state: StateManagerBluetooth = StateManagerBluetooth(tag, activity,
         onDisabled = { onDisconnected() },
         onEnabled = { onPermitted() }
     )

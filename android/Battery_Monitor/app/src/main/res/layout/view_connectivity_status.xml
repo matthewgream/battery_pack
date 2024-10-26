@@ -12,30 +12,44 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Battery Monitor"
+            android:text="@string/app_name"
             android:textStyle="bold"
             android:textSize="16sp"/>
 
-        <!-- Spacer -->
         <Space
             android:layout_width="16dp"
             android:layout_height="wrap_content"/>
 
-        <!-- Bluetooth status -->
+        <!-- Direct status (Bluetooth) -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:gravity="center">
 
-            <ImageView android:contentDescription="local"
-                android:id="@+id/localIcon"
+            <ImageView android:contentDescription="@string/textview_direct_connection_status"
+                android:id="@+id/iconDirect"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_device_direct"/>
+        </LinearLayout>
+
+        <!-- Local status (WiFi) -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginStart="16dp">
+
+            <ImageView android:contentDescription="@string/textview_local_connection_status"
+                android:id="@+id/iconLocal"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@drawable/ic_device_local"/>
         </LinearLayout>
 
-        <!-- Network status -->
+        <!-- Cloud status (mqtt) -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -43,23 +57,8 @@
             android:gravity="center"
             android:layout_marginStart="16dp">
 
-            <ImageView android:contentDescription="network"
-                android:id="@+id/networkIcon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_device_network"/>
-        </LinearLayout>
-
-        <!-- Cloud status -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:layout_marginStart="16dp">
-
-            <ImageView android:contentDescription="cloud"
-                android:id="@+id/cloudIcon"
+            <ImageView android:contentDescription="@string/textview_cloud_connection_status"
+                android:id="@+id/iconCloud"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@drawable/ic_device_cloud"/>

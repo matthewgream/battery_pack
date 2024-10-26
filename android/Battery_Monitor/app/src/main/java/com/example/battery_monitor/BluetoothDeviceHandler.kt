@@ -23,7 +23,7 @@ class BluetoothDeviceHandler(
     private val tag: String,
     private val activity: Activity,
     adapter: BluetoothDeviceAdapter,
-    private val config: BluetoothDeviceHandlerConfig,
+    private val config: BluetoothDeviceConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     private val statusCallback: () -> Unit,
@@ -33,8 +33,8 @@ class BluetoothDeviceHandler(
 
     private val handler = Handler(Looper.getMainLooper())
 
-    private val scanner: BluetoothDeviceScanner = BluetoothDeviceScanner(tag, adapter.adapter.bluetoothLeScanner,
-        BluetoothDeviceScannerConfig (config.deviceName, config.connectionScanDelay, config.connectionScanPeriod,
+    private val scanner: BluetoothDeviceScanner = BluetoothDeviceScanner(tag, adapter,
+        BluetoothDeviceScanner.Config (config.deviceName, config.connectionScanDelay, config.connectionScanPeriod,
             ScanFilter.Builder()
                 .setDeviceName(config.deviceName)
                 .setServiceUuid(ParcelUuid(config.serviceUuid))
@@ -51,7 +51,7 @@ class BluetoothDeviceHandler(
                 .build()
         ),
         onFound = { device -> located(device) })
-    private val checker: ConnectivityChecker = ConnectivityChecker(tag, config.connectionActiveTimeout, 10000L,
+    private val checker: ConnectivityChecker = ConnectivityChecker(tag, config.connectionActiveCheck, config.connectionActiveTimeout,
         isConnected = { isConnected() }, onTimeout = { reconnect() })
 
     //
@@ -68,7 +68,6 @@ class BluetoothDeviceHandler(
                         }
                         return
                     }
-
                     0x3E -> Log.e(tag, "onConnectionStateChange: terminated by local host")
                     0x3B -> Log.e(tag, "onConnectionStateChange: terminated by remote device")
                     0x85 -> Log.e(tag, "onConnectionStateChange: timed out")
@@ -85,8 +84,10 @@ class BluetoothDeviceHandler(
             }
             override fun onCharacteristicWrite(gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int) {
                 super.onCharacteristicWrite(gatt, characteristic, status)
-                if (status != BluetoothGatt.GATT_SUCCESS)
+                if (status != BluetoothGatt.GATT_SUCCESS) {
                     Log.e(tag, "onCharacteristicWrite: error=$status")
+                    reconnect()
+                }
             }
             override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
                 received(characteristic.uuid, String (value))
@@ -212,7 +213,8 @@ class BluetoothDeviceHandler(
         bluetoothDiscover()
     }
     private fun discovered() {
-        Log.d(tag, "Device discovery completed")
+        Log.d(tag, "Device discovered")
+        checker.ping()
         isConnected = true
         isConnecting = false
         statusCallback()
@@ -223,14 +225,14 @@ class BluetoothDeviceHandler(
             }, 1000)
         } else {
             Log.e(tag, "Device service ${config.serviceUuid} or characteristic ${config.characteristicUuid} not found")
-            disconnect()
+            disconnected()
         }
     }
     private fun identify() {
         bluetoothWrite (connectivityInfo.toJsonString())
     }
     private fun received(uuid: UUID, value: String) {
-        Log.d(tag, "Device received on $uuid: $value")
+        Log.d(tag, "Device received ($uuid): $value")
         checker.ping()
         dataCallback(value)
     }

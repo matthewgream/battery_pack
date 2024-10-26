@@ -15,7 +15,7 @@
             android:layout_marginBottom="8dp"
             android:elevation="4dp"/>
 
-        <!-- Operational Data Frame -->
+        <!-- Operational Information -->
         <FrameLayout
             android:id="@+id/operationalDataFrame"
             android:layout_width="match_parent"
@@ -86,7 +86,7 @@
 
         </FrameLayout>
 
-        <!-- Alarms Information (Moved and Restyled) -->
+        <!-- Alarm Information  -->
         <TextView
             android:id="@+id/alarmsTextView"
             android:layout_width="match_parent"
@@ -100,11 +100,12 @@
             android:layout_marginRight="4dp"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="8dp"
+            android:contentDescription="@string/textview_alarm_information"
             android:clickable="true"
             android:focusable="true"
             android:elevation="4dp"/>
 
-        <!-- Diagnostic Data Frame -->
+        <!-- Diagnostic Information -->
         <FrameLayout
             android:id="@+id/diagnosticDataFrame"
             android:layout_width="match_parent"
@@ -116,13 +117,15 @@
             <ScrollView
                 android:id="@+id/diagnosticScrollView"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent">
+                android:layout_height="match_parent"
+                tools:ignore="UselessParent">
 
                 <TextView
                     android:id="@+id/diagDataTextView"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textIsSelectable="true"
+                    android:contentDescription="@string/textview_diagnostic_information"
                     android:fontFamily="monospace" />
 
             </ScrollView>

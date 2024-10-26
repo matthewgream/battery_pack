@@ -5,19 +5,20 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
 
-class WebSocketDeviceScannerConfig(
-    val type: String,
-    val name: String,
-    val scanDelay: Long,
-    val scanPeriod: Long
-)
 class WebSocketDeviceScanner(
     tag: String,
     private val context: Context,
-    private val config: WebSocketDeviceScannerConfig,
+    private val config: Config,
     private val connectionInfo: ConnectivityInfo,
     private val onFound: (NsdServiceInfo) -> Unit
-) : ConnectivityComponent(tag) {
+) : ConnectivityComponent(tag, config.scanPeriod) {
+
+    class Config(
+        val type: String,
+        val name: String,
+        val scanDelay: Int,
+        val scanPeriod: Int
+    )
 
     private val nsdManager: NsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
     private var isDiscoveryActive = false
@@ -65,14 +66,14 @@ class WebSocketDeviceScanner(
             val txtRecords = updatedServiceInfo.attributes.map { "${it.key}=${String(it.value)}" }
             val serviceAddr = txtRecords.firstOrNull { it.startsWith("addr=") }?.split("=")?.getOrNull(1)
             if (connectionInfo.deviceAddress.isEmpty()) {
-                Log.d(tag, "serviceInfo::onServiceUpdated, no target address matched, but found $serviceAddr, with TXT records: $txtRecords")
+                Log.d(tag, "serviceInfo::onServiceUpdated, address unspecified, but found $serviceAddr, with TXT records: $txtRecords")
                 restartAfterDelay()
             } else if (serviceAddr == connectionInfo.deviceAddress) {
-                Log.d(tag, "serviceInfo::onServiceUpdated, matched address $serviceAddr, with TXT records $txtRecords")
+                Log.d(tag, "serviceInfo::onServiceUpdated, address matched $serviceAddr, with TXT records $txtRecords")
                 stop()
                 onFound(updatedServiceInfo)
             } else {
-                Log.d(tag, "serviceInfo::onServiceUpdated, unmatched address, expected ${connectionInfo.deviceAddress}, but found $serviceAddr, with TXT records: $txtRecords")
+                Log.d(tag, "serviceInfo::onServiceUpdated, address unmatched, expected ${connectionInfo.deviceAddress}, but found $serviceAddr, with TXT records: $txtRecords")
                 restartAfterDelay()
             }
         }
@@ -84,11 +85,8 @@ class WebSocketDeviceScanner(
 
     private fun restartAfterDelay() {
         stop()
-        handler.postDelayed(retryRunnable, config.scanDelay)
+        handler.postDelayed(retryRunnable, config.scanDelay*1000L)
     }
-
-    override val timer: Long
-        get() = config.scanPeriod
 
     override fun onStart() {
         if (!isDiscoveryActive) {

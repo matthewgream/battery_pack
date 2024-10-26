@@ -1,8 +1,8 @@
 package com.example.battery_monitor
 
 enum class ConnectivityType {
+    DIRECT,
     LOCAL,
-    NETWORK,
     CLOUD
 }
 data class ConnectivityStatus(

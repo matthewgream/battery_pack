@@ -2,7 +2,6 @@ package com.example.battery_monitor
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
-import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
@@ -97,20 +96,23 @@ class DutyCycleScanner(private val bluetoothAdapter: BluetoothAdapter) {
 
 */
 
-class BluetoothDeviceScannerConfig(
-    val name: String,
-    val scanDelay : Long,
-    val scanPeriod : Long,
-    val filter: ScanFilter,
-    val settings: ScanSettings
-)
 @SuppressLint("MissingPermission")
 class BluetoothDeviceScanner(
     tag: String,
-    private val scanner: BluetoothLeScanner,
-    private val config: BluetoothDeviceScannerConfig,
+    adapter: BluetoothDeviceAdapter,
+    private val config: Config,
     private val onFound: (BluetoothDevice) -> Unit
-) : ConnectivityComponent(tag) {
+) : ConnectivityComponent(tag, config.scanPeriod) {
+
+    class Config(
+        val name: String,
+        val scanDelay : Int,
+        val scanPeriod : Int,
+        val filter: ScanFilter,
+        val settings: ScanSettings
+    )
+
+    private val scanner = adapter.adapter.bluetoothLeScanner
 
     private val retryRunnable = Runnable {
         start()
@@ -119,8 +121,8 @@ class BluetoothDeviceScanner(
     private val callback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             if (result.scanRecord?.deviceName == config.name) {
+                Log.d(tag,"Device scan located name=${result.scanRecord?.deviceName}, address=${result.device.address}, txpower=${result.scanRecord?.txPowerLevel}, rssi=${result.rssi}")
                 stop()
-                Log.d(tag,"Device scan located name=${result.scanRecord?.deviceName}, address=${result.device.address}, txPower=${result.scanRecord?.txPowerLevel}, rssi=${result.rssi}")
                 onFound(result.device)
             }
         }
@@ -148,11 +150,8 @@ class BluetoothDeviceScanner(
 
     private fun restartAfterDelay() {
         stop()
-        handler.postDelayed(retryRunnable, config.scanDelay)
+        handler.postDelayed(retryRunnable, config.scanDelay*1000L)
     }
-
-    override val timer: Long
-        get() = config.scanPeriod
 
     override fun onStart() {
         scanner.startScan(listOf(config.filter), config.settings, callback)

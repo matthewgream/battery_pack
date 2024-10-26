@@ -4,6 +4,9 @@ import android.app.Activity
 import android.os.Handler
 import android.os.Looper
 
+abstract class ConnectivityDeviceAdapter {
+    abstract fun isEnabled(): Boolean
+}
 abstract class ConnectivityDeviceHandler {
     abstract fun isConnected(): Boolean
     abstract fun disconnected()
@@ -11,11 +14,8 @@ abstract class ConnectivityDeviceHandler {
     abstract fun permitted()
 }
 
-abstract class ConnectivityDeviceAdapter {
-    abstract fun isEnabled(): Boolean
-}
-
-abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, TDevice : ConnectivityDeviceHandler, TConfig, TChecker : ConnectivityComponent>(
+@Suppress("EmptyMethod")
+abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, TDevice : ConnectivityDeviceHandler, TConfig, TState : ConnectivityComponent>(
     tag: String,
     protected val activity: Activity,
     permissionsRequired: Array<String>,
@@ -28,7 +28,7 @@ abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, T
     protected val permissions: PermissionsManager = PermissionsManagerFactory(activity).create(tag, permissionsRequired)
     protected abstract val adapter: TAdapter
     protected abstract val device: TDevice
-    protected abstract val checker: TChecker
+    protected abstract val state: TState
 
     fun onCreate() {
         permissions.requestPermissions(
@@ -41,7 +41,7 @@ abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, T
     }
 
     fun onDestroy() {
-        checker.stop()
+        state.stop()
         onDisconnected()
     }
 
@@ -53,7 +53,7 @@ abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, T
     protected fun onDisconnected() = device.disconnected()
     fun onDoubleTap() = device.reconnect()
     protected fun onPermitted() {
-        checker.start()
+        state.start()
         device.permitted()
     }
 
