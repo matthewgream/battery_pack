@@ -120,7 +120,7 @@ public:
             AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.payloadExceeded (); })
         }), config (cfg), _id (id), _blue (blue), _mqtt (mqtt), _webs (webs) {}
 
-    bool available () { 
+    bool available () {
         return _blue.available ();
     }
     //

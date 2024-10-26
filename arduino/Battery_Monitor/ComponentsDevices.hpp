@@ -16,7 +16,7 @@ public:
     class Insertable {
         ConnectionReceiver <C>* _manager;
     public:
-        Insertable (ConnectionReceiver <C>* manager): _manager (manager) {}
+        explicit Insertable (ConnectionReceiver <C>* manager): _manager (manager) {}
         void insertReceivers (const ConnectionReceiver <C>::Handlers &handlers) { (*_manager) += handlers; }
     };
 private:
@@ -93,7 +93,6 @@ public:
     }
 };
 
-
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
@@ -168,7 +167,7 @@ private:
             request->send (404, "text/plain", STRING_404_NOT_FOUND);
         });
         _server.begin ();
-        DEBUG_PRINTF ("WebServer::start: active, port=%u\n", config.port);     
+        DEBUG_PRINTF ("WebServer::start: active, port=%u\n", config.port);
     }
 
 public:
@@ -216,7 +215,7 @@ private:
         } else if (type == WS_EVT_PONG) {
             DEBUG_PRINTF ("WebSocket[%u]::events: PONG: (%u) %s\n", client->id (), len, len ? reinterpret_cast <const char*> (data) : "");
         } else if (type == WS_EVT_DATA) {
-            const AwsFrameInfo *info = (const AwsFrameInfo *) arg;
+            const AwsFrameInfo *info = reinterpret_cast <const AwsFrameInfo *> (arg);
             if (info->opcode == WS_TEXT && info->final && info->index == 0 && info->len == len) {
                 DEBUG_PRINTF ("WebSocket[%u]::events: message [%lu]: %.*s\n", client->id (), len, len, reinterpret_cast <const char*> (data));
                 _connected_writeReceived (String (data, len));
@@ -249,7 +248,7 @@ private:
         if (!_connectionActive) {
             _connectionClient = client;
             _connections ++; _connectionActive = true;
-        } 
+        }
     }
     void _connected_error (const String& error) {
         if (_connectionActive) {
@@ -317,7 +316,7 @@ public:
     // json only
     bool send (const String& data) {
         return _connected_send (data);
-    }    
+    }
     //
     void serialize (JsonVariant &obj) const override {
         if ((obj ["connected"] = _connectionActive)) {

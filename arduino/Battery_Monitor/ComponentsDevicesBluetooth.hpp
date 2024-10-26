@@ -221,7 +221,7 @@ private:
     //
 
 public:
-    explicit BluetoothDevice (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr): 
+    explicit BluetoothDevice (const Config& cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr):
         Singleton <BluetoothDevice> (this), ConnectionReceiver <BluetoothDevice>::Insertable (&_connectionReceiver), config (cfg),
         _connectionReceiver (this),
         _connectionSender ([&] (const String& str) {
