@@ -24,7 +24,7 @@ class CloudMqttDeviceHandler(
     //
 
     private var mqttClient: Mqtt5AsyncClient? = null
-    private fun mqttConnect() : Boolean {
+    private fun mqttConnect(): Boolean {
         try {
             mqttClient = MqttClient.builder()
                 .useMqttVersion5()
@@ -63,7 +63,7 @@ class CloudMqttDeviceHandler(
         }
         return false
     }
-    private fun mqttSubscribe(topic: String) : Boolean {
+    private fun mqttSubscribe(topic: String): Boolean {
         val client = mqttClient ?: return false
         try {
             client.subscribeWith()
@@ -94,7 +94,7 @@ class CloudMqttDeviceHandler(
         }
         return false
     }
-    private fun mqttUnsubscribe(topic: String) : Boolean {
+    private fun mqttUnsubscribe(topic: String): Boolean {
         val client = mqttClient ?: return false
         try {
             client.unsubscribeWith()
@@ -118,7 +118,7 @@ class CloudMqttDeviceHandler(
         }
         return false
     }
-    private fun mqttPublish(topic: String, message: String) : Boolean {
+    private fun mqttPublish(topic: String, message: String): Boolean {
         val client = mqttClient ?: return false
         try {
             client.publishWith()
@@ -166,7 +166,7 @@ class CloudMqttDeviceHandler(
     private var root = "${config.root}/${connectivityInfo.deviceAddress}"
     private var topic = ""
 
-    override fun doConnectionStart() : Boolean  {
+    override fun doConnectionStart(): Boolean  {
         Log.d(tag, "Device connect")
         return mqttConnect()
     }
@@ -174,7 +174,7 @@ class CloudMqttDeviceHandler(
         Log.d(tag, "Device disconnect")
         mqttDisconnect()
     }
-    override fun doConnectionIdentify() : Boolean {
+    override fun doConnectionIdentify(): Boolean {
         return mqttPublish("${root}/peer", connectivityInfo.toJsonString())
     }
 
@@ -207,7 +207,7 @@ class CloudMqttDeviceHandler(
 
     fun subscribe(): Boolean {
         Log.d(tag, "Device subscribe")
-        if (!isConnected ()) {
+        if (!isConnected()) {
             this.topic = "${root}/#"
             return true
         }
@@ -215,18 +215,18 @@ class CloudMqttDeviceHandler(
     }
     fun unsubscribe(): Boolean {
         Log.d(tag, "Device unsubscribe")
-        if (!isConnected ()) {
+        if (!isConnected()) {
             if (this.topic == "${root}/#") this.topic = ""
             return true
         }
         return mqttUnsubscribe(topic)
     }
     fun publish(type: String, message: String): Boolean {
-        if (!isConnected ()) {
+        if (!isConnected()) {
             Log.e(tag, "Device publish failure: not connected")
             return false
         }
         Log.d(tag, "Device publish")
-        return mqttPublish("${root}/$type", message)
+        return mqttPublish("${root}/${type}", message)
     }
 }

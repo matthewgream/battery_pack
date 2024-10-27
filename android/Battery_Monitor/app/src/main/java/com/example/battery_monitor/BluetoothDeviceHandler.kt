@@ -32,7 +32,7 @@ class BluetoothDeviceHandler(
     //
 
     private var bluetoothGatt: BluetoothGatt? = null
-    private fun bluetoothCreate () : BluetoothGattCallback {
+    private fun bluetoothCreate() : BluetoothGattCallback {
         return object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
                 when (status) {
@@ -76,16 +76,16 @@ class BluetoothDeviceHandler(
             }
         }
     }
-    private fun bluetoothConnect (device: BluetoothDevice) : Boolean {
+    private fun bluetoothConnect(device: BluetoothDevice) : Boolean {
         try {
             bluetoothGatt = device.connectGatt(activity, true, bluetoothCreate ())
             return true
         } catch (e: Exception) {
-            Log.e(tag, "GATT connect: error=${e.message}")
+            Log.e(tag, "GATT connect: exception", e)
         }
         return false
     }
-    private fun bluetoothDiscover () : Boolean {
+    private fun bluetoothDiscover() : Boolean {
         val gatt = bluetoothGatt ?: return false
         try {
             gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER)
@@ -97,7 +97,7 @@ class BluetoothDeviceHandler(
         }
         return false
     }
-    private fun bluetoothNotificationsEnable (): Boolean {
+    private fun bluetoothNotificationsEnable(): Boolean {
         val gatt = bluetoothGatt ?: return false
         try {
             val service = gatt.getService(config.serviceUuid) ?: return false
@@ -117,7 +117,7 @@ class BluetoothDeviceHandler(
         }
         return false
     }
-    private fun bluetoothWrite (value: String): Boolean {
+    private fun bluetoothWrite(value: String): Boolean {
         val gatt = bluetoothGatt ?: return false
         try {
             val service = gatt.getService(config.serviceUuid)
@@ -130,17 +130,17 @@ class BluetoothDeviceHandler(
                 Log.e(tag, "GATT characteristic not found")
                 return false
             }
-            if (gatt.writeCharacteristic(characteristic, value.toByteArray(StandardCharsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) !=  BluetoothStatusCodes.SUCCESS) {
+            if (gatt.writeCharacteristic(characteristic, value.toByteArray(StandardCharsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) != BluetoothStatusCodes.SUCCESS) {
                 Log.e(tag, "GATT characteristic failed to write")
                 return false
             }
             return true
         } catch (e: Exception) {
-            Log.e(tag, "GATT set characteristic: error=${e.message}")
+            Log.e(tag, "GATT set characteristic: exception", e)
         }
         return false
     }
-    private fun bluetoothDisconnect () {
+    private fun bluetoothDisconnect() {
         val gatt = bluetoothGatt ?: return
         try {
             gatt.close()
@@ -171,7 +171,7 @@ class BluetoothDeviceHandler(
 
     //
 
-    override fun doConnectionStart () : Boolean {
+    override fun doConnectionStart() : Boolean {
         Log.d(tag, "Device locate")
         bluetoothScanner.start()
         return true
@@ -190,13 +190,13 @@ class BluetoothDeviceHandler(
     private fun onBluetoothLocated(device: BluetoothDevice) {
         Log.d(tag, "Device located '${device.name}'/${device.address}")
         Log.d(tag, "Device connecting: '${device.name}'/${device.address}")
-        setConnectionIsActive ()
+        setConnectionIsActive()
         if (!bluetoothConnect(device))
             setConnectionDoReconnect()
     }
     private fun onBluetoothConnected() {
         Log.d(tag, "Device connected")
-        setConnectionIsActive ()
+        setConnectionIsActive()
         if (!bluetoothDiscover())
             setConnectionDoReconnect()
     }
@@ -206,9 +206,9 @@ class BluetoothDeviceHandler(
     }
     private fun onBluetoothDiscovered() {
         Log.d(tag, "Device discovered")
-        if (bluetoothNotificationsEnable ()) {
+        if (bluetoothNotificationsEnable()) {
             Log.d(tag, "Device notifications enabled on ${config.characteristicUuid}")
-            setConnectionIsConnected ()
+            setConnectionIsConnected()
         } else {
             Log.e(tag, "Device service ${config.serviceUuid} or characteristic ${config.characteristicUuid} not found")
             setConnectionDoReconnect()
@@ -220,7 +220,7 @@ class BluetoothDeviceHandler(
     }
     private fun onBluetoothReceived(uuid: UUID, value: String) {
         Log.d(tag, "Device received ($uuid): $value")
-        setConnectionIsActive ()
+        setConnectionIsActive()
         dataCallback(value)
     }
 }

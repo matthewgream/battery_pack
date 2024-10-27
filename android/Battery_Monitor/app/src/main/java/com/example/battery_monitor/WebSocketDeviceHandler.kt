@@ -49,7 +49,7 @@ class WebSocketDeviceHandler(
             }
         }
     }
-    private fun websocketConnect (url: String): Boolean {
+    private fun websocketConnect(url: String): Boolean {
         try {
             websocketClient = websocketCreate(URI(url))
             @Suppress("UsePropertyAccessSyntax")
@@ -61,7 +61,7 @@ class WebSocketDeviceHandler(
         }
         return false
     }
-    private fun websocketWrite (value: String) : Boolean {
+    private fun websocketWrite(value: String) : Boolean {
         try {
             websocketClient?.send(value)
             return true
@@ -70,22 +70,25 @@ class WebSocketDeviceHandler(
         }
         return false
     }
-    private fun websocketDisconnect () {
+    private fun websocketDisconnect() {
         try {
-            websocketClient?.close()
+            websocketClient?.let {
+                it.close ()
+                websocketClient = null
+            }
         } catch (e: Exception) {
             Log.e(tag, "Device close failed: exception", e)
         }
-        websocketClient = null
     }
 
-    private val websocketScanner: WebSocketDeviceScanner = WebSocketDeviceScanner("${tag}Scanner", activity,
+    private val websocketScanner = WebSocketDeviceScanner("${tag}Scanner", activity,
         WebSocketDeviceScanner.Config (config.serviceType, config.serviceName, config.connectionScanDelay, config.connectionScanPeriod), connectivityInfo,
-        onFound = { serviceInfo -> onWebsocketLocated(serviceInfo) })
+        onFound = { serviceInfo -> onWebsocketLocated(serviceInfo)
+    })
 
     //
 
-    override fun doConnectionStart () : Boolean {
+    override fun doConnectionStart() : Boolean {
         Log.d(tag, "Device locate")
         websocketScanner.start()
         return true
@@ -107,14 +110,14 @@ class WebSocketDeviceHandler(
         val url = "ws://${serviceInfo.host.hostAddress}:${serviceInfo.port}/"
         Log.d(tag, "Device connecting to $url")
         setConnectionIsActive()
-        if (!websocketConnect (url))
+        if (!websocketConnect(url))
             setConnectionDoReconnect()
     }
     private fun onWebsocketConnected() {
         Log.d(tag, "Device connected")
         setConnectionIsConnected()
     }
-    private fun onWebsocketDisconnected () {
+    private fun onWebsocketDisconnected() {
         Log.d(tag, "Device disconnected")
         setConnectionDoReconnect ()
     }
@@ -127,7 +130,7 @@ class WebSocketDeviceHandler(
         Log.d(tag, "Device error")
         setConnectionDoReconnect()
     }
-    private fun onWebsocketKeepalive () {
-        setConnectionIsActive ()
+    private fun onWebsocketKeepalive() {
+        setConnectionIsActive()
     }
 }

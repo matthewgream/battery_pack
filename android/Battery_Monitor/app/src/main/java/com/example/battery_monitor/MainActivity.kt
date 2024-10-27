@@ -118,7 +118,8 @@ class MainActivity : PermissionsAwareActivity() {
                 connected = manager.isConnected()
             )
         }
-        connectivityManagerSubscriberUpdate (statuses[ConnectivityType.DIRECT]?.connected!! || statuses[ConnectivityType.LOCAL]?.connected!!)
+        val directOrLocal = statuses[ConnectivityType.DIRECT]?.connected!! || statuses[ConnectivityType.LOCAL]?.connected!!
+        connectivityManagerSubscriberUpdate(directOrLocal)
         connectivityStatusView.updateStatus(statuses)
     }
     private fun connectivitySetup () {

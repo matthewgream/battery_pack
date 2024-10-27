@@ -7,14 +7,14 @@ import android.util.Log
 
 abstract class ConnectivityDeviceAdapter (
     tag: String
-): ConnectivityComponent(tag) {
+) : ConnectivityComponent(tag) {
     abstract fun isEnabled(): Boolean
 }
 
 class ConnectivityDeviceState(
     override val tag: String,
-    periodCheck : Int,
-    private val periodTimeout : Int,
+    periodCheck: Int,
+    private val periodTimeout: Int,
     private val onTimeout: () -> Unit
 ) : ConnectivityComponent(tag, periodCheck) {
 
@@ -23,15 +23,15 @@ class ConnectivityDeviceState(
     var isConnected: Boolean = false
         private set
 
-    fun connecting () {
+    fun connecting() {
         if (!isConnecting && !isConnected) {
             isConnecting = true
             isConnected = false
-            start ()
+            start()
         } else
             Log.w (tag, "connecting: in bad state")
     }
-    fun connected () {
+    fun connected() {
         if (isConnecting && !isConnected) {
             isConnecting = false
             isConnected = true
@@ -39,7 +39,7 @@ class ConnectivityDeviceState(
         } else
             Log.w (tag, "connected: in bad state")
     }
-    fun disconnected () {
+    fun disconnected() {
         isConnecting = false
         isConnected = false
         stop()
@@ -90,7 +90,7 @@ abstract class ConnectivityDeviceHandler (
             else -> {
                 state.connecting ()
                 statusCallback()
-                if (!doConnectionStart ())
+                if (!doConnectionStart())
                     handler.postDelayed({
                         initiate()
                     }, 1000)
@@ -99,7 +99,7 @@ abstract class ConnectivityDeviceHandler (
         }
         statusCallback()
     }
-    fun setConnectionIsConnected () {
+    fun setConnectionIsConnected() {
         state.connected()
         statusCallback()
         handler.postDelayed({
@@ -125,7 +125,7 @@ abstract class ConnectivityDeviceHandler (
         }, 1000)
     }
 
-    private val state: ConnectivityDeviceState = ConnectivityDeviceState(tag, activeCheck, activeTimeout,
+    private val state = ConnectivityDeviceState(tag, activeCheck, activeTimeout,
         onTimeout = { setConnectionDoReconnect() })
     fun isConnected (): Boolean = state.isConnected
 }
@@ -154,12 +154,10 @@ abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, T
             }
         )
     }
-
     fun onDestroy() {
         adapter.stop()
         onDisconnected()
     }
-
     fun onPause() {}
     fun onResume() {}
     fun onPowerSave() {}

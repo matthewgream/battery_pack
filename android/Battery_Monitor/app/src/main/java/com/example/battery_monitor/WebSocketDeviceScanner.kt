@@ -25,9 +25,9 @@ class WebSocketDeviceScanner(
     private var isDiscovering = Activable()
     private var isResolving = Activable()
 
-    private val retryRunnable = Runnable {
-        start()
-    }
+    private val retryRunnable = Runnable { start() }
+    private fun retrySchedule() { handler.postDelayed(retryRunnable, config.scanDelay*1000L) }
+    private fun retryCancel() { handler.removeCallbacks(retryRunnable) }
 
     private val discoveryListener = object : NsdManager.DiscoveryListener {
         override fun onDiscoveryStarted(serviceType: String) {
@@ -103,7 +103,7 @@ class WebSocketDeviceScanner(
             nsdManager.registerServiceInfoCallback(serviceInfo, context.mainExecutor, serviceInfoCallback)
     }
     private fun resolveStop() {
-        if (isResolving.toInactive ())
+        if (isResolving.toInactive())
             nsdManager.unregisterServiceInfoCallback(serviceInfoCallback)
     }
 
@@ -111,20 +111,19 @@ class WebSocketDeviceScanner(
 
     private fun restartAfterDelay() {
         stop()
-        handler.postDelayed(retryRunnable, config.scanDelay*1000L)
+        retrySchedule()
     }
     override fun onStart() {
-        if (isDiscovering.toActive ())
+        if (isDiscovering.toActive())
             discoverStart()
     }
     override fun onStop() {
-        if (isDiscovering.toInactive ()) {
+        retryCancel()
+        if (isDiscovering.toInactive()) {
             resolveStop()
             discoverStop()
         }
-        handler.removeCallbacks(retryRunnable)
     }
-
     override fun onTimer(): Boolean {
         restartAfterDelay()
         return false

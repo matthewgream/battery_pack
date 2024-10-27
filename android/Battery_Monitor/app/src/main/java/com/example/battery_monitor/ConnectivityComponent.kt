@@ -7,7 +7,7 @@ import android.util.Log
 @Suppress("ReplaceNotNullAssertionWithElvisReturn")
 abstract class ConnectivityComponent(
     protected open val tag: String,
-    private val timer: Int = 0
+    private val timerPeriod: Int = 0
 ) {
     protected val handler : Handler = Handler(Looper.getMainLooper())
     private var active = Activable ()
@@ -18,34 +18,36 @@ abstract class ConnectivityComponent(
         return false
     }
 
-    private var runnable: Runnable? = null
-
-    fun start() {
-        if (active.toActive ()) {
-            Log.d(tag, "Start")
-            onStart()
-            if (timer > 0) {
-                runnable?.let {
-                    handler.removeCallbacks(it)
-                    runnable = null
-                }
-                runnable = Runnable {
-                    if (active.isActiveNow)
-                        if (onTimer())
-                            handler.postDelayed(runnable!!, timer*1000L)
-                }
-                handler.postDelayed(runnable!!, timer*1000L)
-            }
+    private var timerRunnable: Runnable? = null
+    private fun timerStart() {
+        timerRunnable = Runnable {
+            if (active.isActiveNow)
+                if (onTimer())
+                    handler.postDelayed(timerRunnable!!, timerPeriod*1000L)
+        }
+        handler.postDelayed(timerRunnable!!, timerPeriod*1000L)
+    }
+    private fun timerStop() {
+        timerRunnable?.let {
+            handler.removeCallbacks(it)
+            timerRunnable = null
         }
     }
 
+    fun start() {
+        if (active.toActive()) {
+            Log.d(tag, "Start")
+            onStart()
+            if (timerPeriod > 0) {
+                timerStop()
+                timerStart()
+            }
+        }
+    }
     fun stop() {
         if (active.toInactive()) {
             Log.d(tag, "Stop")
-            runnable?.let {
-                handler.removeCallbacks(it)
-                runnable = null
-            }
+            timerStop()
             onStop()
         }
     }
