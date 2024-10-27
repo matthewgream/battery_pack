@@ -24,7 +24,7 @@ class WebSocketDeviceHandler(
     //
 
     private var websocketClient: WebSocketClient? = null
-    private fun websocketCreate (uri: URI): WebSocketClient {
+    private fun websocketCreate(uri: URI): WebSocketClient {
         return object : WebSocketClient(uri) {
             override fun onOpen(handshakedata: ServerHandshake?) {
                 Log.d(tag, "onOpen")
@@ -73,7 +73,7 @@ class WebSocketDeviceHandler(
     private fun websocketDisconnect() {
         try {
             websocketClient?.let {
-                it.close ()
+                it.close()
                 websocketClient = null
             }
         } catch (e: Exception) {
@@ -119,7 +119,7 @@ class WebSocketDeviceHandler(
     }
     private fun onWebsocketDisconnected() {
         Log.d(tag, "Device disconnected")
-        setConnectionDoReconnect ()
+        setConnectionDoReconnect()
     }
     private fun onWebsocketReceived(value: String) {
         Log.d(tag, "Device received: $value")

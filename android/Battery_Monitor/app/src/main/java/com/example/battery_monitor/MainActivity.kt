@@ -36,7 +36,7 @@ class MainActivity : PermissionsAwareActivity() {
     private var processingHandler: DataProcessor? = null
     private fun processingSetup() {
         processingHandler = DataProcessor(this,
-            NotificationsManager(this, NotificationsConfig (this)))
+            NotificationsManager(this, NotificationsConfig(this)))
     }
 
     //
@@ -132,8 +132,8 @@ class MainActivity : PermissionsAwareActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        processingSetup ()
-        connectivitySetup ()
+        processingSetup()
+        connectivitySetup()
         powermanageSetup()
     }
     override fun onDestroy() {

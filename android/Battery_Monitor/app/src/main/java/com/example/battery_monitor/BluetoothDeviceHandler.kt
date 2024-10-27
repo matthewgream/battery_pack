@@ -65,7 +65,7 @@ class BluetoothDeviceHandler(
                 }
             }
             override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
-                onBluetoothReceived(characteristic.uuid, String (value))
+                onBluetoothReceived(characteristic.uuid, String(value))
             }
             override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
                 if (status != BluetoothGatt.GATT_SUCCESS) {
@@ -78,7 +78,7 @@ class BluetoothDeviceHandler(
     }
     private fun bluetoothConnect(device: BluetoothDevice) : Boolean {
         try {
-            bluetoothGatt = device.connectGatt(activity, true, bluetoothCreate ())
+            bluetoothGatt = device.connectGatt(activity, true, bluetoothCreate())
             return true
         } catch (e: Exception) {
             Log.e(tag, "GATT connect: exception", e)
@@ -151,7 +151,7 @@ class BluetoothDeviceHandler(
     }
 
     private val bluetoothScanner: BluetoothDeviceScanner = BluetoothDeviceScanner("${tag}Scanner", adapter,
-        BluetoothDeviceScanner.Config (config.deviceName, config.connectionScanDelay, config.connectionScanPeriod,
+        BluetoothDeviceScanner.Config(config.deviceName, config.connectionScanDelay, config.connectionScanPeriod,
             ScanFilter.Builder()
                 .setDeviceName(config.deviceName)
                 .setServiceUuid(ParcelUuid(config.serviceUuid))

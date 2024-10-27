@@ -12,7 +12,7 @@ class NotificationsManager(
     private val activity: Activity,
     private val config: NotificationsConfig
 ) {
-    private val permissions: PermissionsManager = PermissionsManagerFactory (activity).create("Notifications",
+    private val permissions: PermissionsManager = PermissionsManagerFactory(activity).create("Notifications",
         arrayOf(
             android.Manifest.permission.POST_NOTIFICATIONS
         )

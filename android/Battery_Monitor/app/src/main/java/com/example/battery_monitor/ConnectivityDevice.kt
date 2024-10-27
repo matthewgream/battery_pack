@@ -29,7 +29,7 @@ class ConnectivityDeviceState(
             isConnected = false
             start()
         } else
-            Log.w (tag, "connecting: in bad state")
+            Log.w(tag, "connecting: in bad state")
     }
     fun connected() {
         if (isConnecting && !isConnected) {
@@ -37,7 +37,7 @@ class ConnectivityDeviceState(
             isConnected = true
             ping()
         } else
-            Log.w (tag, "connected: in bad state")
+            Log.w(tag, "connected: in bad state")
     }
     fun disconnected() {
         isConnecting = false
@@ -127,7 +127,7 @@ abstract class ConnectivityDeviceHandler(
 
     private val state = ConnectivityDeviceState(tag, activeCheck, activeTimeout,
         onTimeout = { setConnectionDoReconnect() })
-    fun isConnected (): Boolean = state.isConnected
+    fun isConnected(): Boolean = state.isConnected
 }
 
 @Suppress("EmptyMethod")
