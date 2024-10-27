@@ -23,7 +23,7 @@ private:
     const String _mqttTopic;
 
 public:
-    explicit LoggingHandler (const Config& cfg, const String& id, MQTTPublisher *mqttClient = nullptr): Singleton <LoggingHandler> (this), config (cfg), _mqttClient (mqttClient), _mqttTopic (config.mqttTopic + "/" + id + "/logs") { init (); }
+    explicit LoggingHandler (const Config& cfg, const String& id, MQTTPublisher *mqttClient = nullptr): Singleton <LoggingHandler> (this), config (cfg), _mqttClient (mqttClient), _mqttTopic (config.mqttTopic + "/logs/" + id) { init (); }
     ~LoggingHandler () { term (); }
 
 protected:

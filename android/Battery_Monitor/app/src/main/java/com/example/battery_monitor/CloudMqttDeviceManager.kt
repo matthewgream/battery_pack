@@ -1,20 +1,6 @@
 package com.example.battery_monitor
 
 import android.app.Activity
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-
-class CloudMqttDeviceAdapter(
-    context: Context
-) : ConnectivityDeviceAdapter() {
-    private val connectivityManager: ConnectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    override fun isEnabled(): Boolean {
-        val network = connectivityManager.activeNetwork
-        val capabilities = connectivityManager.getNetworkCapabilities(network)
-        return capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-    }
-}
 
 class CloudMqttDeviceManager(
     tag: String,
@@ -23,7 +9,7 @@ class CloudMqttDeviceManager(
     connectivityInfo: ConnectivityInfo,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
-) : ConnectivityDeviceManager<CloudMqttDeviceAdapter, CloudMqttDeviceHandler, CloudMqttDeviceConfig, StateManagerInternet>(
+) : ConnectivityDeviceManager<AdapterInternet, CloudMqttDeviceHandler, CloudMqttDeviceConfig>(
     tag,
     activity,
     arrayOf(
@@ -34,7 +20,10 @@ class CloudMqttDeviceManager(
     dataCallback,
     statusCallback
 ) {
-    override val adapter: CloudMqttDeviceAdapter = CloudMqttDeviceAdapter(activity)
+    override val adapter: AdapterInternet = AdapterInternet(tag, activity,
+        onDisabled = { onDisconnected() },
+        onEnabled = { onPermitted() }
+    )
     override val device: CloudMqttDeviceHandler = CloudMqttDeviceHandler(tag, activity,
         adapter,
         config,
@@ -44,19 +33,17 @@ class CloudMqttDeviceManager(
         isEnabled = { adapter.isEnabled() && connectivityInfo.deviceAddress.isNotEmpty() },
         isPermitted = { permissions.allowed }
     )
-    override val state: StateManagerInternet = StateManagerInternet(tag, activity,
-        onDisabled = { onDisconnected() },
-        onEnabled = { onPermitted() }
-    )
 
     //
 
     @Suppress("unused")
-    fun publish(topic: String, message: String) : Boolean {
-        return device.publish(topic, message)
+    fun publish(type: String, message: String) : Boolean {
+        return device.publish(type, message)
     }
-    @Suppress("unused")
-    fun subscribe(topic: String) : Boolean {
-        return device.subscribe(topic)
+    fun subscribe() : Boolean {
+        return device.subscribe()
+    }
+    fun unsubscribe() : Boolean {
+        return device.unsubscribe()
     }
 }

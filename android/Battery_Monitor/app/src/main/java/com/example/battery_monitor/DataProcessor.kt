@@ -8,17 +8,34 @@ class DataProcessor(
     activity: Activity,
     private val notificationsManager: NotificationsManager
 ) {
+    private val tag = "DataProcessor"
     private val dataProcessorDiagnostic: DataProcessorDiagnostic = DataProcessorDiagnostic(activity)
     private val dataProcessorStatus: DataProcessorStatus = DataProcessorStatus(activity)
 
+    private val timestampLastByType = mutableMapOf<String, String>()
+    private fun timestampEqualOrNewer(type: String, time: String): Boolean {
+        val timeLast = timestampLastByType [type]
+        return if (timeLast == null) { true } else { time >= timeLast }
+    }
+
     fun processDataReceived(json: JSONObject) {
-        when (val type = json.getString("type")) {
+        val type = json.getString("type")
+        val time = json.getString("time")
+        if (!timestampEqualOrNewer(type, time)) {
+            Log.w(tag, "Rejected out of order data: type=$type, time=$time, timeLast=${timestampLastByType[type]}")
+            return
+        }
+        timestampLastByType[type] = time
+        when (type) {
             "data" -> {
                 dataProcessorStatus.render(json)
-                notificationsManager.process(DataManagerAlarm.translateAlarms(json.getString("alm")))
+                if (json.has("alm"))
+                    notificationsManager.process(DataManagerAlarm.translateAlarms(json.getString("alm")))
             }
-            "diag" -> dataProcessorDiagnostic.render(json)
-            else -> Log.w("DataProcessor", "JSON type unknown: type=$type")
+            "diag" -> {
+                dataProcessorDiagnostic.render(json)
+            }
+            else -> Log.w(tag, "JSON type unknown: type=$type")
         }
     }
 }

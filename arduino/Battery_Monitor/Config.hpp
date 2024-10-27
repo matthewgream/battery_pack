@@ -12,6 +12,12 @@
 #if !defined (DEFAULT_WIFI_SSID) || !defined (DEFAULT_WIFI_PASS) || !defined (DEFAULT_MQTT_USER) || !defined (DEFAULT_MQTT_PASS)
 #error "Require all of DEFAULT_WIFI_SSID, DEFAULT_WIFI_PASS, DEFAULT_MQTT_USER, DEFAULT_MQTT_PASS"
 #endif
+#ifndef DEFAULT_MQTT_HOST
+#define DEFAULT_MQTT_HOST "mqtt.local"
+#endif
+#ifndef DEFAULT_MQTT_PORT
+#define DEFAULT_MQTT_PORT 1883
+#endif
 #ifndef DEFAULT_BLUE_PIN
 #define DEFAULT_BLUE_PIN 123456 // Secrets.hpp
 #endif
@@ -95,7 +101,7 @@ struct Config {
     DeviceManager::Config devices = {
         .blue = { .name = DEFAULT_NAME, .serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", .characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", .pin = DEFAULT_BLUE_PIN, .intervalConnectionCheck = 1*60*1000 },
         .mdns = {},
-        .mqtt = { .client = DEFAULT_NAME, .host = "mqtt.local", .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .port = 1883, .bufferSize = 3*1024 },
+        .mqtt = { .client = DEFAULT_NAME, .host = DEFAULT_MQTT_HOST, .port = DEFAULT_MQTT_PORT, .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .bufferSize = 3*1024 },
         .webserver = { .enabled  = true, .port = 80 },
         .websocket = { .enabled  = true, .port = 81, .root = "/" },
         .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME }
@@ -113,6 +119,7 @@ struct Config {
 
     // data managers
     DeliverManager::Config deliver = {
+        .topic = DEFAULT_NAME, // XXX
         .failureLimit = 3
     };
     PublishManager::Config publish = {

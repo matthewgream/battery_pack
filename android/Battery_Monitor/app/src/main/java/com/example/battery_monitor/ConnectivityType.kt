@@ -8,6 +8,5 @@ enum class ConnectivityType {
 data class ConnectivityStatus(
     val permitted: Boolean,
     val available: Boolean,
-    val connected: Boolean,
-    val standby: Boolean
+    val connected: Boolean
 )

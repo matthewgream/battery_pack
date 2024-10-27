@@ -14,7 +14,7 @@ import java.net.URI
 class WebSocketDeviceHandler(
     private val tag: String,
     activity: Activity,
-    @Suppress("unused") private val adapter: WebSocketDeviceAdapter,
+    @Suppress("unused") private val adapter: AdapterWifi,
     private val config: WebSocketDeviceConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,

@@ -181,7 +181,7 @@ class Program: public Component, public Diagnosticable {
         if (dataToDeliver || (dataToCaptureToPublish || dataToCaptureToStorage)) {
             const String data = dataCollect ("data", [&] (JsonVariant& obj) { operational.collect (obj); });
             DEBUG_PRINTF ("Program::process: data, length=%d, content=<<<%s>>>\n", data.length (), data.c_str ());
-            if (dataToDeliver) deliver.deliver (data);
+            if (dataToDeliver) deliver.deliver (data, "data", config.publishData && publish.available ());
             if (dataToCaptureToPublish || dataToCaptureToStorage) dataCapture (data, dataToCaptureToPublish, dataToCaptureToStorage);
         }
 
@@ -189,7 +189,7 @@ class Program: public Component, public Diagnosticable {
             const String diag = dataCollect ("diag", [&] (JsonVariant& obj) { diagnostics.collect (obj); });
             DEBUG_PRINTF ("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
             if (diagToDeliver)
-                deliver.deliver (diag);
+                deliver.deliver (diag, "diag", config.publishData && publish.available ());
             if (diagToPublish)
                 publish.publish (diag, "diag");
         }

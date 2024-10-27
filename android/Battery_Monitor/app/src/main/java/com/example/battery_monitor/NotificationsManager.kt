@@ -34,7 +34,7 @@ class NotificationsManager(
     private var previous: List<Pair<String, String>> = emptyList()
     private fun show(current: List<Pair<String, String>>) {
         if (current != previous) {
-            val title = current.joinToString(", ")
+            val title = current.joinToString(", ") { it.first }
             val text = current.joinToString("\n") { "${it.first}: ${it.second}" }
             manager.notify(identifier,
                 Notification.Builder(activity, channel)
@@ -49,7 +49,7 @@ class NotificationsManager(
             previous = current
         }
     }
-    private fun reshow() {
+    private fun showAgain() {
         if (previous.isNotEmpty()) {
             val current = previous
             previous = emptyList()
@@ -72,7 +72,7 @@ class NotificationsManager(
                 !permissions.requested -> {
                     previous = current
                     permissions.requestPermissions(
-                        onPermissionsAllowed = { reshow() }
+                        onPermissionsAllowed = { showAgain() }
                     )
                 }
                 !permissions.obtained -> previous = current

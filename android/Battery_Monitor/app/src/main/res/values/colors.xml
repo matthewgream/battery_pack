@@ -14,9 +14,8 @@
     <color name="threshold_warn">#FFA500</color> <!-- Orange for 35°C -->
     <color name="threshold_max">#8B0000</color> <!-- Dark Red for 45°C -->
     <color name="ic_launcher_background">#FFFFFF</color>
-
-    <color name="icon_disabled">#757575</color>
-    <color name="icon_disconnected">#E53935</color>
-    <color name="icon_connected_active">#43A047</color>
-    <color name="icon_connected_standby">#FB8C00</color>
+    <color name="icon_disabled">#000000</color>
+    <color name="icon_disconnected">#DC2626</color>
+    <color name="icon_connected_active">#059669</color>
+    <color name="icon_connected_standby">#F59E0B</color>
 </resources>

@@ -4,7 +4,9 @@ import android.app.Activity
 import android.os.Handler
 import android.os.Looper
 
-abstract class ConnectivityDeviceAdapter {
+abstract class ConnectivityDeviceAdapter (
+    tag: String
+): ConnectivityComponent(tag) {
     abstract fun isEnabled(): Boolean
 }
 abstract class ConnectivityDeviceHandler {
@@ -15,7 +17,7 @@ abstract class ConnectivityDeviceHandler {
 }
 
 @Suppress("EmptyMethod")
-abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, TDevice : ConnectivityDeviceHandler, TConfig, TState : ConnectivityComponent>(
+abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, TDevice : ConnectivityDeviceHandler, TConfig>(
     tag: String,
     protected val activity: Activity,
     permissionsRequired: Array<String>,
@@ -28,7 +30,6 @@ abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, T
     protected val permissions: PermissionsManager = PermissionsManagerFactory(activity).create(tag, permissionsRequired)
     protected abstract val adapter: TAdapter
     protected abstract val device: TDevice
-    protected abstract val state: TState
 
     fun onCreate() {
         permissions.requestPermissions(
@@ -41,7 +42,7 @@ abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, T
     }
 
     fun onDestroy() {
-        state.stop()
+        adapter.stop()
         onDisconnected()
     }
 
@@ -53,7 +54,7 @@ abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, T
     protected fun onDisconnected() = device.disconnected()
     fun onDoubleTap() = device.reconnect()
     protected fun onPermitted() {
-        state.start()
+        adapter.start()
         device.permitted()
     }
 

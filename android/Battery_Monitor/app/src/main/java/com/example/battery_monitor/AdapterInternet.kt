@@ -7,32 +7,36 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
 
-class StateManagerWifi(
+class AdapterInternet(
     tag: String,
     context: Context,
     private val onDisabled: () -> Unit,
     private val onEnabled: () -> Unit
-) : ConnectivityComponent(tag) {
+) : ConnectivityDeviceAdapter(tag) {
 
     private val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
             super.onLost(network)
-            Log.d(tag, "Wifi lost")
+            Log.d(tag, "Internet lost")
             onDisabled()
         }
         override fun onAvailable(network: Network) {
             super.onAvailable(network)
-            Log.d(tag, "Wifi available")
+            Log.d(tag, "Internet available")
             onEnabled()
         }
     }
 
+    override fun isEnabled(): Boolean {
+        return manager.getNetworkCapabilities(manager.activeNetwork)
+            ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+    }
     override fun onStart() {
         manager.registerNetworkCallback(
             NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .build(),
             callback)
     }

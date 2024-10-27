@@ -14,7 +14,7 @@ import java.nio.charset.StandardCharsets
 class CloudMqttDeviceHandler(
     private val tag: String,
     @Suppress("unused") private val activity: Activity,
-    @Suppress("unused") private val adapter: CloudMqttDeviceAdapter,
+    @Suppress("unused") private val adapter: AdapterInternet,
     private val config: CloudMqttDeviceConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
@@ -71,7 +71,7 @@ class CloudMqttDeviceHandler(
                 .noLocal(true)
                 .callback { publish: Mqtt5Publish ->
                     val message = String(publish.payloadAsBytes, StandardCharsets.UTF_8)
-                    Log.d(tag, "MQTT broker subscribe topic='${publish.topic}', message='$message', type=${publish.contentType.map { it.toString() }.orElse(null)}, topic=${publish.responseTopic.map { it.toString() }.orElse(null)}")
+                    Log.d(tag, "MQTT broker subscribe topic='${publish.topic}', message='$message'")
                     receive(message)
                 }
                 .send()
@@ -88,6 +88,28 @@ class CloudMqttDeviceHandler(
             return true
         } catch (e: Exception) {
             Log.e(tag, "MQTT broker subscribe topic='$topic' failure: error=${e.message}")
+            return false
+        }
+    }
+    private fun mqttUnsubscribe(topic: String) : Boolean {
+        val client = mqttClient ?: return false
+        try {
+            client.unsubscribeWith()
+                .topicFilter(topic)
+                .send()
+                .whenComplete { unsubAck, throwable ->
+                    if (throwable != null) {
+                        Log.e(tag, "MQTT broker unsubscribe topic='$topic' failure: error=${throwable.message}")
+                        if (throwable.message?.contains("not connected", ignoreCase = true) == true)
+                            disconnected()
+                    } else {
+                        this.topic = ""
+                        Log.d(tag, "MQTT broker unsubscribe topic='$topic' success: ${unsubAck.reasonCodes.joinToString(", ")}")
+                    }
+                }
+            return true
+        } catch (e: Exception) {
+            Log.e(tag, "MQTT broker unsubscribe topic='$topic' failure: error=${e.message}")
             return false
         }
     }
@@ -166,23 +188,37 @@ class CloudMqttDeviceHandler(
             identify()
         }, 1000)
         if (topic.isNotEmpty())
-            subscribe(topic)
+            subscribe()
     }
     private fun identify() {
-        publish("${config.topic}/${connectivityInfo.deviceAddress}/peer", connectivityInfo.toJsonString())
+        val topic = "${config.root}/${connectivityInfo.deviceAddress}/peer"
+        publish(topic, connectivityInfo.toJsonString())
     }
-    fun subscribe(topic: String): Boolean {
+    fun subscribe(): Boolean {
+        val topic = "${config.root}/${connectivityInfo.deviceAddress}/#"
+        Log.d(tag, "Device subscribe '${topic}'")
         if (!isConnected) {
-            Log.e(tag, "Device subscribe '$topic' failure: not connected")
-            return false
+            this.topic = topic
+            return true
         }
         return mqttSubscribe(topic)
     }
-    fun publish(topic: String, message: String): Boolean {
+    fun unsubscribe(): Boolean {
+        val topic = "${config.root}/${connectivityInfo.deviceAddress}/#"
+        Log.d(tag, "Device unsubscribe '${topic}'")
+        if (!isConnected) {
+            if (this.topic == topic) this.topic = ""
+            return true
+        }
+        return mqttUnsubscribe(topic)
+    }
+    fun publish(type: String, message: String): Boolean {
+        val topic = "${config.root}/${connectivityInfo.deviceAddress}/$type"
         if (!isConnected) {
             Log.e(tag, "Device publish '${topic}' failure: not connected")
             return false
         }
+        Log.d(tag, "Device publish '${topic}'")
         return mqttPublish(topic, message)
     }
     private fun receive(value: String) {

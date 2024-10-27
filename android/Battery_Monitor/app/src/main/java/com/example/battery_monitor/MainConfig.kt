@@ -23,7 +23,7 @@ class CloudMqttDeviceConfig (
     val port: Int = SECRET_MQTT_PORT,
     val user: String? = SECRET_MQTT_USER,
     val pass: String? = SECRET_MQTT_PASS,
-    val topic: String = "BatteryMonitor",
+    val root: String = "BatteryMonitor",
     val connectionActiveCheck: Int = 15,
     val connectionActiveTimeout: Int = 30
 )

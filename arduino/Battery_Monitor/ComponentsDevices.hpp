@@ -312,6 +312,9 @@ public:
             _connection_init ();
         _connection_process ();
     }
+    bool available () const {
+        return _connectionActive;
+    }
     //
     // json only
     bool send (const String& data) {
@@ -343,8 +346,10 @@ public:
 class MQTTPublisher: public JsonSerializable {
 public:
     typedef struct {
-        String client, host, user, pass;
+        String client;
+        String host;
         uint16_t port;
+        String user, pass;
         uint16_t bufferSize;
     } Config;
     using __implementation_t = PubSubClient;
@@ -374,7 +379,7 @@ public:
         if (!_mqttClient.connected ())
             connect ();
     }
-    inline bool connected () {
+    inline bool available () {
         return _mqttClient.connected ();
     }
     __implementation_t& __implementation () {

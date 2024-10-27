@@ -44,23 +44,31 @@ class MainActivity : PermissionsAwareActivity() {
     private val connectivityInfo by lazy {
         ConnectivityInfo(this, config.name)
     }
+    private var connectivityManagerSubscribedtoCloud: Boolean = false
     private val connectivityManagerDirect: BluetoothDeviceManager by lazy {
         BluetoothDeviceManager("Bluetooth", this, BluetoothDeviceConfig (), connectivityInfo,
             dataCallback = { data ->
                 val json = JSONObject(data)
                 connectivityManagerAddressBinder(json)
-                processingHandler?.processDataReceived(json)
+                if (!connectivityManagerSubscribedtoCloud)
+                    processingHandler?.processDataReceived(json)
             },
             statusCallback = { connectivityStatusUpdate() })
     }
     private val connectivityManagerLocal: WebSocketDeviceManager by lazy {
         WebSocketDeviceManager("WebSocket", this, WebSocketDeviceConfig (), connectivityInfo,
-            dataCallback = { data -> processingHandler?.processDataReceived(JSONObject(data)) },
+            dataCallback = { data ->
+                if (!connectivityManagerSubscribedtoCloud)
+                    processingHandler?.processDataReceived(JSONObject(data))
+            },
             statusCallback = { connectivityStatusUpdate() })
     }
     private val connectivityManagerCloud: CloudMqttDeviceManager by lazy {
         CloudMqttDeviceManager("CloudMqtt", this, CloudMqttDeviceConfig (), connectivityInfo,
-            dataCallback = { data -> processingHandler?.processDataReceived(JSONObject(data)) },
+            dataCallback = { data ->
+                if (connectivityManagerSubscribedtoCloud)
+                    processingHandler?.processDataReceived(JSONObject(data))
+            },
             statusCallback = { connectivityStatusUpdate() })
     }
     private val connectivityManagers by lazy {
@@ -80,6 +88,15 @@ class MainActivity : PermissionsAwareActivity() {
             Log.e("Main", "Error processing bluetooth address: error=${e.message}")
         }
     }
+    private fun connectivityManagerSubscriberUpdate(directOrLocal: Boolean) {
+        if (!connectivityManagerSubscribedtoCloud && (!directOrLocal && connectivityInfo.deviceAddress.isNotEmpty())) {
+            connectivityManagerSubscribedtoCloud = true
+            connectivityManagerCloud.subscribe()
+        } else if (connectivityManagerSubscribedtoCloud && directOrLocal) {
+            connectivityManagerSubscribedtoCloud = false
+            connectivityManagerCloud.unsubscribe()
+        }
+    }
     private val connectivityStatusView: DataViewConnectivityStatus by lazy {
         findViewById(R.id.connectivityStatusView)
     }
@@ -94,14 +111,14 @@ class MainActivity : PermissionsAwareActivity() {
                 is BluetoothDeviceManager -> ConnectivityType.DIRECT
                 is WebSocketDeviceManager -> ConnectivityType.LOCAL
                 is CloudMqttDeviceManager -> ConnectivityType.CLOUD
-                else -> throw IllegalStateException ("Unknown manager type")
+                else -> throw IllegalStateException("Unknown manager type")
             } to ConnectivityStatus(
                 permitted = manager.isPermitted(),
                 available = manager.isAvailable(),
-                connected = manager.isConnected(),
-                standby = false // for now
+                connected = manager.isConnected()
             )
         }
+        connectivityManagerSubscriberUpdate (statuses[ConnectivityType.DIRECT]?.available!! || statuses[ConnectivityType.LOCAL]?.available!!)
         connectivityStatusView.updateStatus(statuses)
     }
     private fun connectivitySetup () {

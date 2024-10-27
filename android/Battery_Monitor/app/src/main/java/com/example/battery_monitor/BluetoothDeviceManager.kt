@@ -1,18 +1,6 @@
 package com.example.battery_monitor
 
 import android.app.Activity
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
-import android.content.Context
-
-class BluetoothDeviceAdapter(
-    context: Context
-) : ConnectivityDeviceAdapter() {
-    val adapter: BluetoothAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
-    override fun isEnabled(): Boolean {
-        return adapter.isEnabled
-    }
-}
 
 class BluetoothDeviceManager(
     tag: String,
@@ -21,7 +9,7 @@ class BluetoothDeviceManager(
     connectivityInfo: ConnectivityInfo,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
-) : ConnectivityDeviceManager<BluetoothDeviceAdapter, BluetoothDeviceHandler, BluetoothDeviceConfig, StateManagerBluetooth>(
+) : ConnectivityDeviceManager<AdapterBluetooth, BluetoothDeviceHandler, BluetoothDeviceConfig>(
     tag,
     activity,
     arrayOf(
@@ -36,7 +24,10 @@ class BluetoothDeviceManager(
     dataCallback,
     statusCallback
 ) {
-    override val adapter: BluetoothDeviceAdapter = BluetoothDeviceAdapter(activity)
+    override val adapter: AdapterBluetooth = AdapterBluetooth(tag, activity,
+        onDisabled = { onDisconnected() },
+        onEnabled = { onPermitted() }
+    )
     override val device: BluetoothDeviceHandler = BluetoothDeviceHandler(tag, activity,
         adapter,
         config,
@@ -45,9 +36,5 @@ class BluetoothDeviceManager(
         statusCallback,
         isPermitted = { permissions.allowed },
         isEnabled = { adapter.isEnabled() }
-    )
-    override val state: StateManagerBluetooth = StateManagerBluetooth(tag, activity,
-        onDisabled = { onDisconnected() },
-        onEnabled = { onPermitted() }
     )
 }

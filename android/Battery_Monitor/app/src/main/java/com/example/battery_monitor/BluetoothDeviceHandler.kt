@@ -22,7 +22,7 @@ import java.util.UUID
 class BluetoothDeviceHandler(
     private val tag: String,
     private val activity: Activity,
-    adapter: BluetoothDeviceAdapter,
+    adapter: AdapterBluetooth,
     private val config: BluetoothDeviceConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,

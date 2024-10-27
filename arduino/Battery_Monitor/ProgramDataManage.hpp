@@ -93,14 +93,10 @@ protected:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-// XXX wifi, mqtt, blue
-// connect to delivery peer
-// listen for request, switch/use that peer
-// alternate if peer disconnected
-// xxx should make it an interface: DeliverChannel
 class DeliverManager: public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
+        String topic;
         counter_t failureLimit;
     } Config;
 
@@ -121,11 +117,11 @@ public:
         }), config (cfg), _id (id), _blue (blue), _mqtt (mqtt), _webs (webs) {}
 
     bool available () {
-        return _blue.available ();
+        return _blue.available () || _webs.available () || _mqtt.available ();
     }
     //
-    bool deliver (const String& data) {
-        if (_blue.send (data)) {
+    bool deliver (const String& data, const String& type, bool willPublishToMqtt) {
+        if ((_blue.available () && _blue.send (data)) || (_webs.available () && _webs.send (data)) || (willPublishToMqtt || (_mqtt.available () && _mqtt.publish (config.topic + "/" + _id + "/" + type, data)))) {
             _delivers += ArithmeticToString (data.length ());
             _failures = 0;
             return true;
@@ -173,11 +169,11 @@ public:
         }), config (cfg), _id (id), _mqtt (mqtt) {}
 
     bool available () {
-        return _mqtt.connected ();
+        return _mqtt.available ();
     }
     //
-    bool publish (const String& data, const String& subtopic) {
-        if (_mqtt.publish (config.topic + "/" + _id + "/" + subtopic, data)) {
+    bool publish (const String& data, const String& type) {
+        if (_mqtt.publish (config.topic + "/" + _id + "/" + type, data)) {
             _publishes += ArithmeticToString (data.length ());
             _failures = 0;
             return true;

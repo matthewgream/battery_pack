@@ -1,20 +1,6 @@
 package com.example.battery_monitor
 
 import android.app.Activity
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-
-class WebSocketDeviceAdapter(
-    context: Context
-) : ConnectivityDeviceAdapter() {
-    private val connectivityManager: ConnectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    override fun isEnabled(): Boolean {
-        val network = connectivityManager.activeNetwork
-        val capabilities = connectivityManager.getNetworkCapabilities(network)
-        return capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
-    }
-}
 
 class WebSocketDeviceManager(
     tag: String,
@@ -23,7 +9,7 @@ class WebSocketDeviceManager(
     connectivityInfo: ConnectivityInfo,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
-) : ConnectivityDeviceManager<WebSocketDeviceAdapter, WebSocketDeviceHandler, WebSocketDeviceConfig, StateManagerWifi>(
+) : ConnectivityDeviceManager<AdapterWifi, WebSocketDeviceHandler, WebSocketDeviceConfig>(
     tag,
     activity,
     arrayOf(
@@ -34,7 +20,10 @@ class WebSocketDeviceManager(
     dataCallback,
     statusCallback
 ) {
-    override val adapter: WebSocketDeviceAdapter = WebSocketDeviceAdapter(activity)
+    override val adapter: AdapterWifi = AdapterWifi(tag, activity,
+        onDisabled = { onDisconnected() },
+        onEnabled = { onPermitted() }
+    )
     override val device: WebSocketDeviceHandler = WebSocketDeviceHandler(tag, activity,
         adapter,
         config,
@@ -43,9 +32,5 @@ class WebSocketDeviceManager(
         statusCallback,
         isPermitted = { permissions.allowed },
         isEnabled = { adapter.isEnabled() && connectivityInfo.deviceAddress.isNotEmpty() }
-    )
-    override val state: StateManagerWifi = StateManagerWifi(tag, activity,
-        onDisabled = { onDisconnected() },
-        onEnabled = { onPermitted() }
     )
 }

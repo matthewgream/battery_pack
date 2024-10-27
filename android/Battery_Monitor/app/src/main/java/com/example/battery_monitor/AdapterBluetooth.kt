@@ -1,18 +1,21 @@
 package com.example.battery_monitor
 
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
 
-class StateManagerBluetooth(
+class AdapterBluetooth(
     tag: String,
     private val context: Context,
     private val onDisabled: () -> Unit,
     private val onEnabled: () -> Unit
-) : ConnectivityComponent(tag) {
+) : ConnectivityDeviceAdapter(tag) {
+
+    val adapter: BluetoothAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
 
     private val receiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -33,6 +36,9 @@ class StateManagerBluetooth(
         }
     }
 
+    override fun isEnabled(): Boolean {
+        return adapter.isEnabled
+    }
     override fun onStart() {
         context.registerReceiver(receiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
     }

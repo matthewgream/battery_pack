@@ -2,6 +2,8 @@ package com.example.battery_monitor
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -10,6 +12,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.graphics.drawable.LayerDrawable
 
 class DataViewConnectivityStatus @JvmOverloads constructor(
     context: Context,
@@ -28,8 +31,21 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
     private enum class IconState {
         DISABLED, // Grey - No permissions or not available
         DISCONNECTED, // Red - Available but not connected
-        CONNECTED_STANDBY,// Orange - Connected but inactive (for future use)
+        CONNECTED_STANDBY, // Orange - Connected but inactive
         CONNECTED_ACTIVE // Green - Connected and active
+    }
+
+    // Define connection priority order
+    private enum class ConnectivityPriority(val type: ConnectivityType) {
+        DIRECT(ConnectivityType.DIRECT),
+        LOCAL(ConnectivityType.LOCAL),
+        CLOUD(ConnectivityType.CLOUD);
+
+        companion object {
+            fun fromType(type: ConnectivityType): ConnectivityPriority {
+                return values().first { it.type == type }
+            }
+        }
     }
 
     init {
@@ -55,23 +71,34 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
 
     fun updateStatus(statuses: Map<ConnectivityType, ConnectivityStatus>) {
         uiHandler.post {
+            // Find the highest priority connected device
+            val highestPriorityConnected = ConnectivityPriority.values()
+                .firstOrNull { priority ->
+                    statuses[priority.type]?.let { status ->
+                        status.permitted && status.available && status.connected
+                    } ?: false
+                }
+
             val iconMapping = mapOf(
                 ConnectivityType.DIRECT to iconDirect,
                 ConnectivityType.LOCAL to iconLocal,
                 ConnectivityType.CLOUD to iconCloud
             )
+
             statuses.forEach { (type, status) ->
-                updateIconState(iconMapping[type] ?: return@forEach, determineIconState(status))
+                val icon = iconMapping[type] ?: return@forEach
+                val priority = ConnectivityPriority.fromType(type)
+
+                val iconState = when {
+                    !status.permitted || !status.available -> IconState.DISABLED
+                    !status.connected -> IconState.DISCONNECTED
+                    highestPriorityConnected != null && priority != highestPriorityConnected -> IconState.CONNECTED_STANDBY
+                    else -> IconState.CONNECTED_ACTIVE
+                }
+
+                updateIconState(icon, iconState)
             }
         }
-    }
-
-    private fun determineIconState(status: ConnectivityStatus): IconState = when {
-        !status.permitted -> IconState.DISABLED
-        !status.available -> IconState.DISABLED
-        !status.connected -> IconState.DISCONNECTED
-        status.connected && status.standby -> IconState.CONNECTED_STANDBY
-        else -> IconState.CONNECTED_ACTIVE
     }
 
     @SuppressLint("ClickableViewAccessibility")

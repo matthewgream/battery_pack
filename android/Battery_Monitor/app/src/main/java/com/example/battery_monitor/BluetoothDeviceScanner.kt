@@ -99,7 +99,7 @@ class DutyCycleScanner(private val bluetoothAdapter: BluetoothAdapter) {
 @SuppressLint("MissingPermission")
 class BluetoothDeviceScanner(
     tag: String,
-    adapter: BluetoothDeviceAdapter,
+    adapter: AdapterBluetooth,
     private val config: Config,
     private val onFound: (BluetoothDevice) -> Unit
 ) : ConnectivityComponent(tag, config.scanPeriod) {
