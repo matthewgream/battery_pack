@@ -25,12 +25,18 @@ class DataProcessorStatus(
             addrTextView.text = if (addr == SECRET_DEVICE_ADDR) { "$SECRET_DEVICE_NAME ($addr)" } else { addr }
             timeTextView.text = json.getString("time")
 
-            val env = json.getJSONObject("tmp").getDouble("env")
-            envTempTextView.text = "%.1f°C (ext)".format(env)
-            val bat = json.getJSONObject("tmp").getJSONObject("bat")
-            batTempTextView.text = "%.1f°C (avg), %.1f°C (min), %.1f°C (max)".format(bat.getDouble("avg"), bat.getDouble("min"), bat.getDouble("max"))
-            val vat = bat.getJSONArray("val")
-            batTempValuesView.setTemperatureValues((0 until vat.length()).map { vat.getDouble(it).toFloat() })
+            if (!json.getJSONObject("tmp").optDouble("env", Double.NaN).isNaN ()) {
+                val env = json.getJSONObject("tmp").getDouble("env")
+                envTempTextView.text = "%.1f°C (ext)".format(env)
+            } else
+                envTempTextView.text = "--.-°C (ext)"
+            if (!json.getJSONObject("tmp").getJSONObject("bat").optDouble ("avg", Double.NaN).isNaN ()) {
+                val bat = json.getJSONObject("tmp").getJSONObject("bat")
+                batTempTextView.text = "%.1f°C (avg), %.1f°C (min), %.1f°C (max)".format(bat.getDouble("avg"), bat.getDouble("min"), bat.getDouble("max"))
+                val vat = bat.getJSONArray("val")
+                batTempValuesView.setTemperatureValues((0 until vat.length()).map { vat.getDouble(it).toFloat() })
+            } else
+                batTempTextView.text = "--.-°C (avg), --.-°C (min), --.-°C (max)"
 
             val fan = floor(100 * json.getInt("fan").toDouble() / 255).toInt()
             fanSpeedTextView.text = "$fan % (fan multiMap)"
