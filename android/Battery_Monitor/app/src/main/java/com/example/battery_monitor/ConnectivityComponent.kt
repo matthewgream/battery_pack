@@ -10,7 +10,7 @@ abstract class ConnectivityComponent(
     private val timer: Int = 0
 ) {
     protected val handler = Handler(Looper.getMainLooper())
-    private var active: Boolean = false
+    private var active = Activable ()
 
     protected open fun onStart() {}
     protected open fun onStop() {}
@@ -21,37 +21,32 @@ abstract class ConnectivityComponent(
     private var runnable: Runnable? = null
 
     fun start() {
-        if (!active) {
+        if (active.toActive ()) {
             Log.d(tag, "Start")
             onStart()
-            active = true
             if (timer > 0) {
                 runnable?.let {
                     handler.removeCallbacks(it)
                     runnable = null
                 }
                 runnable = Runnable {
-                    if (active) {
+                    if (active.isActiveNow)
                         if (onTimer())
                             handler.postDelayed(runnable!!, timer*1000L)
-                    }
                 }
                 handler.postDelayed(runnable!!, timer*1000L)
             }
-            //Log.d(tag, "Started")
         }
     }
 
     fun stop() {
-        if (active) {
+        if (active.toInactive()) {
             Log.d(tag, "Stop")
-            active = false
             runnable?.let {
                 handler.removeCallbacks(it)
                 runnable = null
             }
             onStop()
-            //Log.d(tag, "Stopped")
         }
     }
 }

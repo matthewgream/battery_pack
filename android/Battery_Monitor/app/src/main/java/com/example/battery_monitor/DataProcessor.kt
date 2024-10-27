@@ -28,7 +28,8 @@ class DataProcessor(
         timestampLastByType[type] = time
         when (type) {
             "data" -> {
-                dataProcessorStatus.render(json)
+                if (!json.getJSONObject("tmp").optDouble("env", Double.NaN).isNaN ())
+                    dataProcessorStatus.render(json)
                 if (json.has("alm"))
                     notificationsManager.process(DataManagerAlarm.translateAlarms(json.getString("alm")))
             }

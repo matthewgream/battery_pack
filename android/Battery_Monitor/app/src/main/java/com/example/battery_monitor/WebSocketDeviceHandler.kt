@@ -68,7 +68,7 @@ class WebSocketDeviceHandler(
             websocketClient?.connect()
             return true
         } catch (e: Exception) {
-            Log.e(tag, "Device connect failed: error=${e.message}")
+            Log.e(tag, "Device connect failed: exception", e)
             return false
         }
     }
@@ -76,14 +76,14 @@ class WebSocketDeviceHandler(
         try {
             websocketClient?.send(value)
         } catch (e: Exception) {
-            Log.e(tag, "Device send failed: error=${e.message}")
+            Log.e(tag, "Device send failed: exception", e)
         }
     }
     private fun websocketDisconnect () {
         try {
             websocketClient?.close()
         } catch (e: Exception) {
-            Log.e(tag, "Device close failed: error=${e.message}")
+            Log.e(tag, "Device close failed: exception", e)
         }
         websocketClient = null
     }

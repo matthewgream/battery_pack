@@ -116,7 +116,7 @@ class BluetoothDeviceHandler(
             gatt.discoverServices()
             return true
         } catch (e: Exception) {
-            Log.e(tag, "GATT request priority/MTU or discover services: error=${e.message}")
+            Log.e(tag, "GATT request priority/MTU or discover services: exception", e)
             return false
         }
     }
@@ -136,7 +136,7 @@ class BluetoothDeviceHandler(
             }
             return true
         } catch (e: Exception) {
-            Log.e(tag, "GATT notifications: error=${e.message}")
+            Log.e(tag, "GATT notifications: exception", e)
             return false
         }
     }
@@ -168,7 +168,7 @@ class BluetoothDeviceHandler(
         try {
             gatt.close()
         } catch (e: Exception) {
-            Log.e(tag, "GATT close: error=${e.message}")
+            Log.e(tag, "GATT close: exception", e)
         }
         bluetoothGatt = null
     }

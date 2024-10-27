@@ -85,7 +85,7 @@ class MainActivity : PermissionsAwareActivity() {
                 }
             }
         } catch (e: Exception) {
-            Log.e("Main", "Error processing bluetooth address: error=${e.message}")
+            Log.e("Main", "Error processing bluetooth address: exception", e)
         }
     }
     private fun connectivityManagerSubscriberUpdate(directOrLocal: Boolean) {
