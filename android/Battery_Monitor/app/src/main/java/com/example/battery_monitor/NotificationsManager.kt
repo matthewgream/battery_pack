@@ -38,7 +38,7 @@ class NotificationsManager(
             val text = current.joinToString("\n") { "${it.first}: ${it.second}" }
             manager.notify(identifier,
                 Notification.Builder(activity, channel)
-                    .setSmallIcon(R.drawable.ic_launcher)
+                    .setSmallIcon(R.drawable.ic_notification)
                     .setContentTitle(title)
                     .setContentText(text)
                     .setStyle(Notification.BigTextStyle().bigText(text))

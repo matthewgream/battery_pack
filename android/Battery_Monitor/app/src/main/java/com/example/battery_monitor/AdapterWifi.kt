@@ -19,12 +19,12 @@ class AdapterWifi(
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
             super.onLost(network)
-            Log.d(tag, "Wifi lost")
+            Log.d(tag, "Wifi network not available")
             onDisabled()
         }
         override fun onAvailable(network: Network) {
             super.onAvailable(network)
-            Log.d(tag, "Wifi available")
+            Log.d(tag, "Wifi network available")
             onEnabled()
         }
     }

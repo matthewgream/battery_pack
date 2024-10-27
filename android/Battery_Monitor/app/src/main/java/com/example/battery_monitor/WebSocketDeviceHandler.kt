@@ -2,8 +2,6 @@ package com.example.battery_monitor
 
 import android.app.Activity
 import android.net.nsd.NsdServiceInfo
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import org.java_websocket.WebSocket
 import org.java_websocket.client.WebSocketClient
@@ -12,25 +10,16 @@ import org.java_websocket.handshake.ServerHandshake
 import java.net.URI
 
 class WebSocketDeviceHandler(
-    private val tag: String,
+    tag: String,
     activity: Activity,
     @Suppress("unused") private val adapter: AdapterWifi,
     private val config: WebSocketDeviceConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
-    private val statusCallback: () -> Unit,
-    private val isPermitted: () -> Boolean,
-    private val isEnabled: () -> Boolean
-) : ConnectivityDeviceHandler() {
-
-    private val handler = Handler(Looper.getMainLooper())
-
-    private val scanner: WebSocketDeviceScanner = WebSocketDeviceScanner(tag, activity,
-        WebSocketDeviceScanner.Config (config.serviceType, config.serviceName, config.connectionScanDelay, config.connectionScanPeriod), connectivityInfo,
-        onFound = { serviceInfo -> located(serviceInfo) })
-    private val checker: ConnectivityChecker = ConnectivityChecker(tag, config.connectionActiveCheck, config.connectionActiveTimeout,
-        isConnected = { isConnected() },
-        onTimeout = { reconnect() })
+    statusCallback: () -> Unit,
+    isPermitted: () -> Boolean,
+    isEnabled: () -> Boolean
+) : ConnectivityDeviceHandler(tag, statusCallback, config.connectionActiveCheck, config.connectionActiveTimeout, isPermitted, isEnabled) {
 
     //
 
@@ -39,24 +28,24 @@ class WebSocketDeviceHandler(
         return object : WebSocketClient(uri) {
             override fun onOpen(handshakedata: ServerHandshake?) {
                 Log.d(tag, "onOpen")
-                connected()
+                onWebsocketConnected()
             }
             override fun onMessage(message: String) {
                 Log.d(tag, "onMessage: message=$message")
-                receive(message)
+                onWebsocketReceived(message)
             }
             override fun onClose(code: Int, reason: String, remote: Boolean) {
                 Log.d(tag, "onClose: remote=$remote, code=$code, reason='$reason'")
                 if (remote)
-                    disconnected()
+                    onWebsocketDisconnected()
             }
             override fun onError(ex: Exception?) {
                 Log.e(tag, "onError: error=${ex?.message}")
-                disconnected()
+                onWebsocketError()
             }
             override fun onWebsocketPong(conn: WebSocket?, f: Framedata?) {
                 Log.d(tag, "onWebSocketPong")
-                keepalive()
+                onWebsocketKeepalive()
             }
         }
     }
@@ -69,15 +58,17 @@ class WebSocketDeviceHandler(
             return true
         } catch (e: Exception) {
             Log.e(tag, "Device connect failed: exception", e)
-            return false
         }
+        return false
     }
-    private fun websocketWrite (value: String) {
+    private fun websocketWrite (value: String) : Boolean {
         try {
             websocketClient?.send(value)
+            return true
         } catch (e: Exception) {
             Log.e(tag, "Device send failed: exception", e)
         }
+        return false
     }
     private fun websocketDisconnect () {
         try {
@@ -88,93 +79,55 @@ class WebSocketDeviceHandler(
         websocketClient = null
     }
 
+    private val websocketScanner: WebSocketDeviceScanner = WebSocketDeviceScanner("${tag}Scanner", activity,
+        WebSocketDeviceScanner.Config (config.serviceType, config.serviceName, config.connectionScanDelay, config.connectionScanPeriod), connectivityInfo,
+        onFound = { serviceInfo -> onWebsocketLocated(serviceInfo) })
+
     //
 
-    private var isConnecting = false
-    private var isConnected = false
-
-    override fun permitted() {
-        statusCallback()
-        if (!isConnecting && !isConnected)
-            locate()
+    override fun doConnectionStart () : Boolean {
+        Log.d(tag, "Device locate")
+        websocketScanner.start()
+        return true
     }
-    private fun locate() {
-        Log.d(tag, "Device locate initiated")
-        statusCallback()
-        when {
-            !isEnabled() -> Log.e(tag, "Device not enabled or available")
-            !isPermitted() -> Log.e(tag, "Device access not permitted")
-            isConnecting -> Log.d(tag, "Device connection already in progress")
-            isConnected -> Log.d(tag, "Device connection already active, will not locate")
-            else -> {
-                isConnecting = true
-                scanner.start()
-            }
-        }
-    }
-    @Suppress("DEPRECATION")
-    private fun located(serviceInfo: NsdServiceInfo) {
-        val name = serviceInfo.serviceName
-        val host = serviceInfo.host.hostAddress
-        val port = serviceInfo.port
-        Log.d(tag, "Device located '$name'/$host:$port")
-        connect("ws://$host:$port/")
-    }
-    private fun connect(url: String) {
-        Log.d(tag, "Device connect to $url")
-        statusCallback()
-        checker.start()
-        if (!websocketConnect (url))
-            disconnected()
-    }
-    private fun connected() {
-        Log.d(tag, "Device connected")
-        checker.ping()
-        isConnecting = false
-        isConnected = true
-        statusCallback()
-        handler.postDelayed({
-            identify()
-        }, 1000)
-    }
-    private fun identify() {
-        websocketWrite(connectivityInfo.toJsonString())
-    }
-    private fun keepalive() {
-        checker.ping()
-    }
-    private fun receive(value: String) {
-        Log.d(tag, "Device received: $value")
-        checker.ping()
-        dataCallback(value)
-    }
-    private fun disconnect() {
+    override fun doConnectionStop() {
         Log.d(tag, "Device disconnect")
         websocketDisconnect()
-        scanner.stop()
-        checker.stop()
-        isConnected = false
-        isConnecting = false
-        statusCallback()
+        websocketScanner.stop()
     }
-    override fun disconnected() {
+    override fun doConnectionIdentify(): Boolean {
+        return websocketWrite(connectivityInfo.toJsonString())
+    }
+
+    //
+
+    @Suppress("DEPRECATION")
+    private fun onWebsocketLocated(serviceInfo: NsdServiceInfo) {
+        Log.d(tag, "Device located '${serviceInfo.serviceName}'/${serviceInfo.host.hostAddress}:${serviceInfo.port}")
+        val url = "ws://${serviceInfo.host.hostAddress}:${serviceInfo.port}/"
+        Log.d(tag, "Device connecting to $url")
+        setConnectionIsActive()
+        if (!websocketConnect (url))
+            setConnectionDoReconnect()
+    }
+    private fun onWebsocketConnected() {
+        Log.d(tag, "Device connected")
+        setConnectionIsConnected()
+    }
+    private fun onWebsocketDisconnected () {
         Log.d(tag, "Device disconnected")
-        websocketDisconnect()
-        scanner.stop()
-        checker.stop()
-        isConnected = false
-        isConnecting = false
-        statusCallback()
-        handler.postDelayed({
-            locate()
-        }, 1000)
+        setConnectionDoReconnect ()
     }
-    override fun reconnect() {
-        Log.d(tag, "Device reconnect")
-        disconnect()
-        handler.postDelayed({
-            locate()
-        }, 1000)
+    private fun onWebsocketReceived(value: String) {
+        Log.d(tag, "Device received: $value")
+        setConnectionIsActive()
+        dataCallback(value)
     }
-    override fun isConnected(): Boolean = isConnected
+    private fun onWebsocketError() {
+        Log.d(tag, "Device error")
+        setConnectionDoReconnect()
+    }
+    private fun onWebsocketKeepalive () {
+        setConnectionIsActive ()
+    }
 }

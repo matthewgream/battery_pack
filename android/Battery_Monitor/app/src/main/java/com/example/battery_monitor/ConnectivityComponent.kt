@@ -9,7 +9,7 @@ abstract class ConnectivityComponent(
     protected open val tag: String,
     private val timer: Int = 0
 ) {
-    protected val handler = Handler(Looper.getMainLooper())
+    protected val handler : Handler = Handler(Looper.getMainLooper())
     private var active = Activable ()
 
     protected open fun onStart() {}

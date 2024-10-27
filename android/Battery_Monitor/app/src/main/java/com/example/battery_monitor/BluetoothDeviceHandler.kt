@@ -11,8 +11,6 @@ import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanSettings
-import android.os.Handler
-import android.os.Looper
 import android.os.ParcelUuid
 import android.util.Log
 import java.nio.charset.StandardCharsets
@@ -20,39 +18,16 @@ import java.util.UUID
 
 @SuppressLint("MissingPermission")
 class BluetoothDeviceHandler(
-    private val tag: String,
+    tag: String,
     private val activity: Activity,
     adapter: AdapterBluetooth,
     private val config: BluetoothDeviceConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
-    private val statusCallback: () -> Unit,
-    private val isPermitted: () -> Boolean,
-    private val isEnabled: () -> Boolean
-) : ConnectivityDeviceHandler() {
-
-    private val handler = Handler(Looper.getMainLooper())
-
-    private val scanner: BluetoothDeviceScanner = BluetoothDeviceScanner(tag, adapter,
-        BluetoothDeviceScanner.Config (config.deviceName, config.connectionScanDelay, config.connectionScanPeriod,
-            ScanFilter.Builder()
-                .setDeviceName(config.deviceName)
-                .setServiceUuid(ParcelUuid(config.serviceUuid))
-                .build(),
-            ScanSettings.Builder()
-                .setLegacy(false)
-                .setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
-                .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
-                .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
-                .setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
-                .setReportDelay(0L)
-                .build()
-        ),
-        onFound = { device -> located(device) })
-    private val checker: ConnectivityChecker = ConnectivityChecker(tag, config.connectionActiveCheck, config.connectionActiveTimeout,
-        isConnected = { isConnected() }, onTimeout = { reconnect() })
+    statusCallback: () -> Unit,
+    isPermitted: () -> Boolean,
+    isEnabled: () -> Boolean
+) : ConnectivityDeviceHandler(tag, statusCallback, config.connectionActiveCheck, config.connectionActiveTimeout, isPermitted, isEnabled) {
 
     //
 
@@ -63,8 +38,8 @@ class BluetoothDeviceHandler(
                 when (status) {
                     BluetoothGatt.GATT_SUCCESS -> {
                         when (newState) {
-                            BluetoothProfile.STATE_CONNECTED -> connected()
-                            BluetoothProfile.STATE_DISCONNECTED -> disconnected()
+                            BluetoothProfile.STATE_CONNECTED -> onBluetoothConnected()
+                            BluetoothProfile.STATE_DISCONNECTED -> onBluetoothDisconnected()
                         }
                         return
                     }
@@ -73,40 +48,42 @@ class BluetoothDeviceHandler(
                     0x85 -> Log.e(tag, "onConnectionStateChange: timed out")
                     else -> Log.e(tag, "onConnectionStateChange: error=$status")
                 }
-                reconnect()
+                onBluetoothError()
             }
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     Log.e(tag, "onServicesDiscovered: error=$status")
-                    reconnect()
+                    onBluetoothError()
                 } else
-                    discovered()
+                    onBluetoothDiscovered()
             }
             override fun onCharacteristicWrite(gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int) {
                 super.onCharacteristicWrite(gatt, characteristic, status)
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     Log.e(tag, "onCharacteristicWrite: error=$status")
-                    reconnect()
+                    onBluetoothError()
                 }
             }
             override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
-                received(characteristic.uuid, String (value))
+                onBluetoothReceived(characteristic.uuid, String (value))
             }
             override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     Log.e(tag, "onMtuChanged: error=$status")
-                    reconnect()
+                    onBluetoothError()
                 } else
                     Log.d(tag, "onMtuChanged: mtu=$mtu")
             }
         }
     }
-    private fun bluetoothConnect (device: BluetoothDevice) {
+    private fun bluetoothConnect (device: BluetoothDevice) : Boolean {
         try {
             bluetoothGatt = device.connectGatt(activity, true, bluetoothCreate ())
+            return true
         } catch (e: Exception) {
             Log.e(tag, "GATT connect: error=${e.message}")
         }
+        return false
     }
     private fun bluetoothDiscover () : Boolean {
         val gatt = bluetoothGatt ?: return false
@@ -117,8 +94,8 @@ class BluetoothDeviceHandler(
             return true
         } catch (e: Exception) {
             Log.e(tag, "GATT request priority/MTU or discover services: exception", e)
-            return false
         }
+        return false
     }
     private fun bluetoothNotificationsEnable (): Boolean {
         val gatt = bluetoothGatt ?: return false
@@ -137,8 +114,8 @@ class BluetoothDeviceHandler(
             return true
         } catch (e: Exception) {
             Log.e(tag, "GATT notifications: exception", e)
-            return false
         }
+        return false
     }
     private fun bluetoothWrite (value: String): Boolean {
         val gatt = bluetoothGatt ?: return false
@@ -160,8 +137,8 @@ class BluetoothDeviceHandler(
             return true
         } catch (e: Exception) {
             Log.e(tag, "GATT set characteristic: error=${e.message}")
-            return false
         }
+        return false
     }
     private fun bluetoothDisconnect () {
         val gatt = bluetoothGatt ?: return
@@ -173,96 +150,77 @@ class BluetoothDeviceHandler(
         bluetoothGatt = null
     }
 
+    private val bluetoothScanner: BluetoothDeviceScanner = BluetoothDeviceScanner("${tag}Scanner", adapter,
+        BluetoothDeviceScanner.Config (config.deviceName, config.connectionScanDelay, config.connectionScanPeriod,
+            ScanFilter.Builder()
+                .setDeviceName(config.deviceName)
+                .setServiceUuid(ParcelUuid(config.serviceUuid))
+                .build(),
+            ScanSettings.Builder()
+                .setLegacy(false)
+                .setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+                .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
+                .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
+                .setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
+                .setReportDelay(0L)
+                .build()
+        ),
+        onFound = { device -> onBluetoothLocated(device) })
+
     //
 
-    private var isConnecting = false
-    private var isConnected = false
-
-    override fun permitted() {
-        statusCallback()
-        if (!isConnecting && !isConnected)
-            locate()
+    override fun doConnectionStart () : Boolean {
+        Log.d(tag, "Device locate")
+        bluetoothScanner.start()
+        return true
     }
-    private fun locate() {
-        Log.d(tag, "Device locate initiated")
-        statusCallback()
-        when {
-            !isEnabled() -> Log.e(tag, "Device not enabled or available")
-            !isPermitted() -> Log.e(tag, "Device access not permitted")
-            isConnecting -> Log.d(tag, "Device connection already in progress")
-            isConnected -> Log.d(tag, "Device connection already active, will not locate")
-            else -> {
-                isConnecting = true
-                scanner.start()
-            }
-        }
-    }
-    private fun located(device: BluetoothDevice) {
-        Log.d(tag, "Device located '${device.name}'/${device.address}")
-        connect(device)
-    }
-    private fun connect(device: BluetoothDevice) {
-        Log.d(tag, "Device connect to '${device.name}'/${device.address}")
-        statusCallback()
-        checker.start()
-        bluetoothConnect(device)
-    }
-    private fun connected() {
-        Log.d(tag, "Device connected")
-        checker.ping()
-        bluetoothDiscover()
-    }
-    private fun discovered() {
-        Log.d(tag, "Device discovered")
-        checker.ping()
-        isConnected = true
-        isConnecting = false
-        statusCallback()
-        if (bluetoothNotificationsEnable ()) {
-            Log.d(tag, "Device notifications enabled on ${config.characteristicUuid}")
-            handler.postDelayed({
-                identify()
-            }, 1000)
-        } else {
-            Log.e(tag, "Device service ${config.serviceUuid} or characteristic ${config.characteristicUuid} not found")
-            disconnected()
-        }
-    }
-    private fun identify() {
-        bluetoothWrite (connectivityInfo.toJsonString())
-    }
-    private fun received(uuid: UUID, value: String) {
-        Log.d(tag, "Device received ($uuid): $value")
-        checker.ping()
-        dataCallback(value)
-    }
-    private fun disconnect() {
+    override fun doConnectionStop() {
         Log.d(tag, "Device disconnect")
         bluetoothDisconnect()
-        scanner.stop()
-        checker.stop()
-        isConnected = false
-        isConnecting = false
-        statusCallback()
+        bluetoothScanner.stop()
     }
-    override fun disconnected() {
+    override fun doConnectionIdentify() : Boolean  {
+        return bluetoothWrite (connectivityInfo.toJsonString())
+    }
+
+    //
+
+    private fun onBluetoothLocated(device: BluetoothDevice) {
+        Log.d(tag, "Device located '${device.name}'/${device.address}")
+        Log.d(tag, "Device connecting: '${device.name}'/${device.address}")
+        setConnectionIsActive ()
+        if (!bluetoothConnect(device))
+            setConnectionDoReconnect()
+    }
+    private fun onBluetoothConnected() {
+        Log.d(tag, "Device connected")
+        setConnectionIsActive ()
+        if (!bluetoothDiscover())
+            setConnectionDoReconnect()
+    }
+    private fun onBluetoothDisconnected() {
         Log.d(tag, "Device disconnected")
-        bluetoothDisconnect()
-        scanner.stop()
-        checker.stop()
-        isConnected = false
-        isConnecting = false
-        statusCallback()
-        handler.postDelayed({
-            locate()
-        }, 1000)
+        setConnectionDoReconnect()
     }
-    override fun reconnect() {
-        Log.d(tag, "Device reconnect")
-        disconnect()
-        handler.postDelayed({
-            locate()
-        }, 1000)
+    private fun onBluetoothDiscovered() {
+        Log.d(tag, "Device discovered")
+        if (bluetoothNotificationsEnable ()) {
+            Log.d(tag, "Device notifications enabled on ${config.characteristicUuid}")
+            setConnectionIsConnected ()
+        } else {
+            Log.e(tag, "Device service ${config.serviceUuid} or characteristic ${config.characteristicUuid} not found")
+            setConnectionDoReconnect()
+        }
     }
-    override fun isConnected(): Boolean = isConnected
+    private fun onBluetoothError() {
+        Log.d(tag, "Device error")
+        setConnectionDoReconnect()
+    }
+    private fun onBluetoothReceived(uuid: UUID, value: String) {
+        Log.d(tag, "Device received ($uuid): $value")
+        setConnectionIsActive ()
+        dataCallback(value)
+    }
 }

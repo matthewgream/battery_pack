@@ -21,7 +21,9 @@ class WebSocketDeviceScanner(
     )
 
     private val nsdManager: NsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
-    private var isDiscoveryActive = false
+
+    private var isDiscovering = Activable()
+    private var isResolving = Activable()
 
     private val retryRunnable = Runnable {
         start()
@@ -43,12 +45,11 @@ class WebSocketDeviceScanner(
         }
         override fun onServiceLost(serviceInfo: NsdServiceInfo) {
             Log.d(tag, "discoveryListener::onServiceLost: name=${serviceInfo.serviceName}")
-            restartAfterDelay()
         }
         override fun onServiceFound(serviceInfo: NsdServiceInfo) {
             Log.d(tag, "discoveryListener::onServiceFound: name=${serviceInfo.serviceName}")
             if (serviceInfo.serviceName == config.name)
-                resolve(serviceInfo)
+                resolveStart(serviceInfo)
         }
     }
     private val serviceInfoCallback = object : NsdManager.ServiceInfoCallback {
@@ -79,49 +80,47 @@ class WebSocketDeviceScanner(
         }
     }
 
-    private fun resolve(serviceInfo: NsdServiceInfo) {
-        nsdManager.registerServiceInfoCallback(serviceInfo, context.mainExecutor, serviceInfoCallback)
+    private fun discoverStart() {
+        try {
+            nsdManager.discoverServices(config.type, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+        } catch (e: Exception) {
+            Log.d(tag, "Service discovery start: exception", e)
+            discoverStop()
+            handler.postDelayed({
+                discoverStart()
+            }, 100)
+        }
     }
+    private fun discoverStop() {
+        try {
+            nsdManager.stopServiceDiscovery(discoveryListener)
+        } catch (e: Exception) {
+            Log.d(tag, "Service discovery stop: exception", e)
+        }
+    }
+    private fun resolveStart(serviceInfo: NsdServiceInfo) {
+        if (isResolving.toActive ())
+            nsdManager.registerServiceInfoCallback(serviceInfo, context.mainExecutor, serviceInfoCallback)
+    }
+    private fun resolveStop() {
+        if (isResolving.toInactive ())
+            nsdManager.unregisterServiceInfoCallback(serviceInfoCallback)
+    }
+
+    //
 
     private fun restartAfterDelay() {
         stop()
         handler.postDelayed(retryRunnable, config.scanDelay*1000L)
     }
-
     override fun onStart() {
-        if (!isDiscoveryActive) {
-            try {
-                nsdManager.discoverServices(config.type, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
-            } catch (e: IllegalArgumentException) {
-                Log.e(tag, "Service discovery start: error=${e.message}")
-                try {
-                    nsdManager.stopServiceDiscovery(discoveryListener)
-                } catch (e: IllegalArgumentException) {
-                    Log.e(tag, "Service discovery stop: error=${e.message}")
-                }
-                handler.postDelayed({
-                    nsdManager.discoverServices(config.type, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
-                }, 100)
-            }
-            isDiscoveryActive = true
-        } else {
-            Log.d(tag, "Service discovery already active")
-        }
+        if (isDiscovering.toActive ())
+            discoverStart()
     }
-
     override fun onStop() {
-        if (isDiscoveryActive) {
-            try {
-                nsdManager.unregisterServiceInfoCallback(serviceInfoCallback)
-            } catch (e: IllegalArgumentException) {
-                Log.e(tag, "Service discovery unregister: error=${e.message}")
-            }
-            try {
-                nsdManager.stopServiceDiscovery(discoveryListener)
-            } catch (e: IllegalArgumentException) {
-                Log.e(tag, "Service discovery stop: error=${e.message}")
-            }
-            isDiscoveryActive = false
+        if (isDiscovering.toInactive ()) {
+            resolveStop()
+            discoverStop()
         }
         handler.removeCallbacks(retryRunnable)
     }

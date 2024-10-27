@@ -118,7 +118,7 @@ class MainActivity : PermissionsAwareActivity() {
                 connected = manager.isConnected()
             )
         }
-        connectivityManagerSubscriberUpdate (statuses[ConnectivityType.DIRECT]?.available!! || statuses[ConnectivityType.LOCAL]?.available!!)
+        connectivityManagerSubscriberUpdate (statuses[ConnectivityType.DIRECT]?.connected!! || statuses[ConnectivityType.LOCAL]?.connected!!)
         connectivityStatusView.updateStatus(statuses)
     }
     private fun connectivitySetup () {

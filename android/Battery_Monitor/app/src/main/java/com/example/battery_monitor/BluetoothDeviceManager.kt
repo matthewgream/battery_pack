@@ -10,7 +10,7 @@ class BluetoothDeviceManager(
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
 ) : ConnectivityDeviceManager<AdapterBluetooth, BluetoothDeviceHandler, BluetoothDeviceConfig>(
-    tag,
+    "${tag}Manager",
     activity,
     arrayOf(
         android.Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -24,11 +24,11 @@ class BluetoothDeviceManager(
     dataCallback,
     statusCallback
 ) {
-    override val adapter: AdapterBluetooth = AdapterBluetooth(tag, activity,
+    override val adapter: AdapterBluetooth = AdapterBluetooth("${tag}Adapter", activity,
         onDisabled = { onDisconnected() },
         onEnabled = { onPermitted() }
     )
-    override val device: BluetoothDeviceHandler = BluetoothDeviceHandler(tag, activity,
+    override val device: BluetoothDeviceHandler = BluetoothDeviceHandler("${tag}Device", activity,
         adapter,
         config,
         connectivityInfo,

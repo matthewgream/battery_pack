@@ -10,7 +10,7 @@ class WebSocketDeviceManager(
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
 ) : ConnectivityDeviceManager<AdapterWifi, WebSocketDeviceHandler, WebSocketDeviceConfig>(
-    tag,
+    "${tag}Manager",
     activity,
     arrayOf(
         android.Manifest.permission.INTERNET,
@@ -20,11 +20,11 @@ class WebSocketDeviceManager(
     dataCallback,
     statusCallback
 ) {
-    override val adapter: AdapterWifi = AdapterWifi(tag, activity,
+    override val adapter: AdapterWifi = AdapterWifi("${tag}Adapter", activity,
         onDisabled = { onDisconnected() },
         onEnabled = { onPermitted() }
     )
-    override val device: WebSocketDeviceHandler = WebSocketDeviceHandler(tag, activity,
+    override val device: WebSocketDeviceHandler = WebSocketDeviceHandler("${tag}Device", activity,
         adapter,
         config,
         connectivityInfo,

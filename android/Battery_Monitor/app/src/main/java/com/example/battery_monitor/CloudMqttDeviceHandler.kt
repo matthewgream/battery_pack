@@ -1,8 +1,6 @@
 package com.example.battery_monitor
 
 import android.app.Activity
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import com.hivemq.client.mqtt.MqttClient
 import com.hivemq.client.mqtt.mqtt5.Mqtt5AsyncClient
@@ -12,27 +10,21 @@ import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAck
 import java.nio.charset.StandardCharsets
 
 class CloudMqttDeviceHandler(
-    private val tag: String,
+    tag: String,
     @Suppress("unused") private val activity: Activity,
     @Suppress("unused") private val adapter: AdapterInternet,
     private val config: CloudMqttDeviceConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
-    private val statusCallback: () -> Unit,
-    private val isEnabled: () -> Boolean,
-    private val isPermitted: () -> Boolean
-) : ConnectivityDeviceHandler() {
-
-    private val handler = Handler (Looper.getMainLooper ())
-
-//    private val checker: ConnectivityChecker = ConnectivityChecker(tag, config.connectionActiveCheck, config.connectionActiveTimeout,
-//        isConnected = { isConnected() },
-//        onTimeout = { reconnect() })
+    statusCallback: () -> Unit,
+    isEnabled: () -> Boolean,
+    isPermitted: () -> Boolean
+) : ConnectivityDeviceHandler(tag, statusCallback, 0, 0, isEnabled, isPermitted) {
 
     //
 
     private var mqttClient: Mqtt5AsyncClient? = null
-    private fun mqttConnect() {
+    private fun mqttConnect() : Boolean {
         try {
             mqttClient = MqttClient.builder()
                 .useMqttVersion5()
@@ -40,9 +32,9 @@ class CloudMqttDeviceHandler(
                 .serverHost(config.host)
                 .serverPort(config.port)
                 .automaticReconnectWithDefaultConfig()
-                .addConnectedListener { context ->
-                    Log.d(tag, "Keep-alive event received")
-                    keepalive()
+                .addConnectedListener { _ ->
+                    Log.d(tag, "MQTT broker Keep-alive received")
+                    onMqttKeepalive()
                 }
                 .build()
                 .toAsync()
@@ -59,16 +51,17 @@ class CloudMqttDeviceHandler(
                 ?.whenComplete { connAck: Mqtt5ConnAck, throwable ->
                     if (throwable != null) {
                         Log.e(tag, "MQTT broker connection failure: exception", throwable)
-                        disconnected()
+                        onMqttError()
                     } else {
                         Log.d(tag, "MQTT broker connection success: ${connAck.reasonString.map { it.toString() }.orElse("Success")}")
-                        connected()
+                        onMqttConnected()
                     }
                 }
+            return true
         } catch (e: Exception) {
             Log.e(tag, "MQTT client configuration failure: exception", e)
-            disconnected()
         }
+        return false
     }
     private fun mqttSubscribe(topic: String) : Boolean {
         val client = mqttClient ?: return false
@@ -80,14 +73,16 @@ class CloudMqttDeviceHandler(
                 .callback { publish: Mqtt5Publish ->
                     val message = String(publish.payloadAsBytes, StandardCharsets.UTF_8)
                     Log.d(tag, "MQTT broker subscribe topic='${publish.topic}', message='$message'")
-                    receive(message)
+                    onMqttReceived(message)
                 }
                 .send()
                 .whenComplete { subAck: Mqtt5SubAck, throwable ->
                     if (throwable != null) {
                         Log.e(tag, "MQTT broker subscribe topic='$topic' failure: error=${throwable.message}")
                         if (throwable.message?.contains("not connected", ignoreCase = true) == true)
-                            disconnected()
+                            onMqttDisconnected()
+                        else
+                            onMqttError()
                     } else {
                         this.topic = topic
                         Log.d(tag,"MQTT broker subscribe topic='$topic' success: ${subAck.reasonCodes.joinToString(", ")}")
@@ -96,8 +91,8 @@ class CloudMqttDeviceHandler(
             return true
         } catch (e: Exception) {
             Log.e(tag, "MQTT broker subscribe topic='$topic' failure: exception", e)
-            return false
         }
+        return false
     }
     private fun mqttUnsubscribe(topic: String) : Boolean {
         val client = mqttClient ?: return false
@@ -109,7 +104,9 @@ class CloudMqttDeviceHandler(
                     if (throwable != null) {
                         Log.e(tag, "MQTT broker unsubscribe topic='$topic' failure: exception", throwable)
                         if (throwable.message?.contains("not connected", ignoreCase = true) == true)
-                            disconnected()
+                            onMqttDisconnected()
+                        else
+                            onMqttError()
                     } else {
                         this.topic = ""
                         Log.d(tag, "MQTT broker unsubscribe topic='$topic' success: ${unsubAck.reasonCodes.joinToString(", ")}")
@@ -118,8 +115,8 @@ class CloudMqttDeviceHandler(
             return true
         } catch (e: Exception) {
             Log.e(tag, "MQTT broker unsubscribe topic='$topic' failure: exception", e)
-            return false
         }
+        return false
     }
     private fun mqttPublish(topic: String, message: String) : Boolean {
         val client = mqttClient ?: return false
@@ -134,15 +131,17 @@ class CloudMqttDeviceHandler(
                     if (throwable != null) {
                         Log.e(tag, "MQTT broker publish topic='$topic' failure: exception", throwable)
                         if (throwable.message?.contains("not connected", ignoreCase = true) == true)
-                            disconnected()
+                            onMqttDisconnected()
+                        else
+                            onMqttError()
                     } else
                         Log.d(tag, "MQTT broker publish topic='$topic', message='$message'")
                 }
             return true
         } catch (e: Exception) {
             Log.e(tag, "MQTT broker publish topic='$topic' failure: exception", e)
-            return false
         }
+        return false
     }
     private fun mqttDisconnect() {
         val client = mqttClient ?: return
@@ -161,109 +160,73 @@ class CloudMqttDeviceHandler(
         }
         mqttClient = null
     }
+
     //
 
-    private var isConnecting = false
-    private var isConnected = false
-
+    private var root = "${config.root}/${connectivityInfo.deviceAddress}"
     private var topic = ""
 
-    override fun permitted() {
-        statusCallback()
-        if (!isConnecting && !isConnected)
-            connect()
+    override fun doConnectionStart() : Boolean  {
+        Log.d(tag, "Device connect")
+        return mqttConnect()
     }
-    private fun connect() {
-        Log.d(tag, "Device connect initiate")
-        statusCallback()
-//        checker.start()
-        when {
-            !isEnabled() -> Log.e(tag, "Device not enabled or available")
-            !isPermitted() -> Log.e(tag, "Device access not permitted")
-            isConnecting -> Log.d(tag, "Device connection already in progress")
-            isConnected -> Log.d(tag, "Device connection already active, will not connect")
-            else -> {
-                isConnecting = true
-                mqttConnect()
-            }
-        }
+    override fun doConnectionStop() {
+        Log.d(tag, "Device disconnect")
+        mqttDisconnect()
     }
-    private fun connected() {
+    override fun doConnectionIdentify() : Boolean {
+        return mqttPublish("${root}/peer", connectivityInfo.toJsonString())
+    }
+
+    //
+
+    private fun onMqttConnected() {
         Log.d(tag, "Device connected")
-//        checker.ping()
-        isConnected = true
-        isConnecting = false
-        statusCallback()
-        handler.postDelayed({
-            identify()
-        }, 1000)
+        setConnectionIsConnected()
         if (topic.isNotEmpty())
             subscribe()
     }
-    private fun identify() {
-        val topic = "${config.root}/${connectivityInfo.deviceAddress}/peer"
-        publish(topic, connectivityInfo.toJsonString())
+    private fun onMqttDisconnected() {
+        Log.d(tag, "Device disconnected")
+        setConnectionDoReconnect()
     }
-    private fun keepalive() {
-//        checker.ping()
+    private fun onMqttReceived(value: String) {
+        Log.d(tag, "Device received: $value")
+        setConnectionIsActive()
+        dataCallback(value)
     }
+    private fun onMqttError() {
+        Log.d(tag, "Device error")
+        setConnectionDoReconnect()
+    }
+    private fun onMqttKeepalive() {
+        setConnectionIsActive()
+    }
+
+    //
+
     fun subscribe(): Boolean {
-        val topic = "${config.root}/${connectivityInfo.deviceAddress}/#"
-        Log.d(tag, "Device subscribe '${topic}'")
-        if (!isConnected) {
-            this.topic = topic
+        Log.d(tag, "Device subscribe")
+        if (!isConnected ()) {
+            this.topic = "${root}/#"
             return true
         }
         return mqttSubscribe(topic)
     }
     fun unsubscribe(): Boolean {
-        val topic = "${config.root}/${connectivityInfo.deviceAddress}/#"
-        Log.d(tag, "Device unsubscribe '${topic}'")
-        if (!isConnected) {
-            if (this.topic == topic) this.topic = ""
+        Log.d(tag, "Device unsubscribe")
+        if (!isConnected ()) {
+            if (this.topic == "${root}/#") this.topic = ""
             return true
         }
         return mqttUnsubscribe(topic)
     }
     fun publish(type: String, message: String): Boolean {
-        val topic = "${config.root}/${connectivityInfo.deviceAddress}/$type"
-        if (!isConnected) {
-            Log.e(tag, "Device publish '${topic}' failure: not connected")
+        if (!isConnected ()) {
+            Log.e(tag, "Device publish failure: not connected")
             return false
         }
-        Log.d(tag, "Device publish '${topic}'")
-        return mqttPublish(topic, message)
+        Log.d(tag, "Device publish")
+        return mqttPublish("${root}/$type", message)
     }
-    private fun receive(value: String) {
-        Log.d(tag, "Device received: $value")
-//        checker.ping()
-        dataCallback(value)
-    }
-    private fun disconnect() {
-        Log.d(tag, "Device disconnect")
-        mqttDisconnect()
-//        checker.stop()
-        isConnected = false
-        isConnecting = false
-        statusCallback()
-    }
-    override fun disconnected() {
-        Log.d(tag, "Device disconnected")
-        mqttDisconnect()
-//        checker.stop()
-        isConnected = false
-        isConnecting = false
-        statusCallback()
-        handler.postDelayed({
-            connect()
-        }, 1000)
-    }
-    override fun reconnect() {
-        Log.d(tag, "Device reconnect")
-        disconnect()
-        handler.postDelayed({
-            connect()
-        }, 1000)
-    }
-    override fun isConnected(): Boolean = isConnected
 }

@@ -19,12 +19,12 @@ class AdapterInternet(
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
             super.onLost(network)
-            Log.d(tag, "Internet lost")
+            Log.d(tag, "Internet access not available")
             onDisabled()
         }
         override fun onAvailable(network: Network) {
             super.onAvailable(network)
-            Log.d(tag, "Internet available")
+            Log.d(tag, "Internet access available")
             onEnabled()
         }
     }

@@ -23,11 +23,11 @@ class AdapterBluetooth(
                 BluetoothAdapter.ACTION_STATE_CHANGED -> {
                     when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
                         BluetoothAdapter.STATE_OFF -> {
-                            Log.d(tag, "Adapter disabled")
+                            Log.d(tag, "Bluetooth adapter not available")
                             onDisabled()
                         }
                         BluetoothAdapter.STATE_ON -> {
-                            Log.d(tag, "Adapter enabled")
+                            Log.d(tag, "Bluetooth adapter available")
                             onEnabled()
                         }
                     }
