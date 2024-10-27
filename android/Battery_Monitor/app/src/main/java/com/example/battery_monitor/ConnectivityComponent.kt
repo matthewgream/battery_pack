@@ -10,7 +10,7 @@ abstract class ConnectivityComponent(
     private val timerPeriod: Int = 0
 ) {
     protected val handler : Handler = Handler(Looper.getMainLooper())
-    private var active = Activable ()
+    private var active = Activable()
 
     protected open fun onStart() {}
     protected open fun onStop() {}

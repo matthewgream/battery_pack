@@ -5,7 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 
-abstract class ConnectivityDeviceAdapter (
+abstract class ConnectivityDeviceAdapter(
     tag: String
 ) : ConnectivityComponent(tag) {
     abstract fun isEnabled(): Boolean
@@ -62,7 +62,7 @@ class ConnectivityDeviceState(
     }
 }
 
-abstract class ConnectivityDeviceHandler (
+abstract class ConnectivityDeviceHandler(
     val tag: String,
     private val statusCallback: () -> Unit,
     activeCheck: Int,
@@ -88,7 +88,7 @@ abstract class ConnectivityDeviceHandler (
             state.isConnecting -> Log.d(tag, "Device connection already in progress")
             state.isConnected -> Log.d(tag, "Device connection already active, will not locate")
             else -> {
-                state.connecting ()
+                state.connecting()
                 statusCallback()
                 if (!doConnectionStart())
                     handler.postDelayed({
@@ -107,7 +107,7 @@ abstract class ConnectivityDeviceHandler (
                 setConnectionDoReconnect()
         }, 1000)
     }
-    fun setConnectionIsActive () {
+    fun setConnectionIsActive() {
         state.ping()
     }
     fun setConnectionIsDisconnected() {

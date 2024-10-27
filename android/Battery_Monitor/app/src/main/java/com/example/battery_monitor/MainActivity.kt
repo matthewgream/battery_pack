@@ -34,7 +34,7 @@ class MainActivity : PermissionsAwareActivity() {
     //
 
     private var processingHandler: DataProcessor? = null
-    private fun processingSetup () {
+    private fun processingSetup() {
         processingHandler = DataProcessor(this,
             NotificationsManager(this, NotificationsConfig (this)))
     }
@@ -46,7 +46,7 @@ class MainActivity : PermissionsAwareActivity() {
     }
     private var connectivityManagerSubscribedtoCloud: Boolean = false
     private val connectivityManagerDirect: BluetoothDeviceManager by lazy {
-        BluetoothDeviceManager("Bluetooth", this, BluetoothDeviceConfig (), connectivityInfo,
+        BluetoothDeviceManager("Bluetooth", this, BluetoothDeviceConfig(), connectivityInfo,
             dataCallback = { data ->
                 val json = JSONObject(data)
                 connectivityManagerAddressBinder(json)
@@ -56,7 +56,7 @@ class MainActivity : PermissionsAwareActivity() {
             statusCallback = { connectivityStatusUpdate() })
     }
     private val connectivityManagerLocal: WebSocketDeviceManager by lazy {
-        WebSocketDeviceManager("WebSocket", this, WebSocketDeviceConfig (), connectivityInfo,
+        WebSocketDeviceManager("WebSocket", this, WebSocketDeviceConfig(), connectivityInfo,
             dataCallback = { data ->
                 if (!connectivityManagerSubscribedtoCloud)
                     processingHandler?.processDataReceived(JSONObject(data))
@@ -64,7 +64,7 @@ class MainActivity : PermissionsAwareActivity() {
             statusCallback = { connectivityStatusUpdate() })
     }
     private val connectivityManagerCloud: CloudMqttDeviceManager by lazy {
-        CloudMqttDeviceManager("CloudMqtt", this, CloudMqttDeviceConfig (), connectivityInfo,
+        CloudMqttDeviceManager("CloudMqtt", this, CloudMqttDeviceConfig(), connectivityInfo,
             dataCallback = { data ->
                 if (connectivityManagerSubscribedtoCloud)
                     processingHandler?.processDataReceived(JSONObject(data))
@@ -122,7 +122,7 @@ class MainActivity : PermissionsAwareActivity() {
         connectivityManagerSubscriberUpdate(directOrLocal)
         connectivityStatusView.updateStatus(statuses)
     }
-    private fun connectivitySetup () {
+    private fun connectivitySetup() {
         connectivityManagers.forEach { it.onCreate() }
         connectivityStatusListenerDoubleTap()
     }

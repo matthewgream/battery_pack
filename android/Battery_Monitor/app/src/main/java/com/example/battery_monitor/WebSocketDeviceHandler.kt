@@ -82,7 +82,7 @@ class WebSocketDeviceHandler(
     }
 
     private val websocketScanner = WebSocketDeviceScanner("${tag}Scanner", activity,
-        WebSocketDeviceScanner.Config (config.serviceType, config.serviceName, config.connectionScanDelay, config.connectionScanPeriod), connectivityInfo,
+        WebSocketDeviceScanner.Config(config.serviceType, config.serviceName, config.connectionScanDelay, config.connectionScanPeriod), connectivityInfo,
         onFound = { serviceInfo -> onWebsocketLocated(serviceInfo)
     })
 

@@ -107,7 +107,7 @@ class BluetoothDeviceHandler(
                 Log.e(tag, "GATT notifications failed to set")
                 return false
             }
-            if (gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) !=  BluetoothStatusCodes.SUCCESS) {
+            if (gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) != BluetoothStatusCodes.SUCCESS) {
                 Log.e(tag, "GATT descriptor failed to write")
                 return false
             }
@@ -182,7 +182,7 @@ class BluetoothDeviceHandler(
         bluetoothScanner.stop()
     }
     override fun doConnectionIdentify() : Boolean  {
-        return bluetoothWrite (connectivityInfo.toJsonString())
+        return bluetoothWrite(connectivityInfo.toJsonString())
     }
 
     //
