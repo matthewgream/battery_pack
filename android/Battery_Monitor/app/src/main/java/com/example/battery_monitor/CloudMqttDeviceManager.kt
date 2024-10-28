@@ -9,7 +9,7 @@ class CloudMqttDeviceManager(
     connectivityInfo: ConnectivityInfo,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
-) : ConnectivityDeviceManager<AdapterInternet, CloudMqttDeviceHandler, CloudMqttDeviceConfig>(
+) : ConnectivityDeviceManager<AdapterNetworkInternet, CloudMqttDeviceHandler, CloudMqttDeviceConfig>(
     "${tag}Manager",
     activity,
     arrayOf(
@@ -20,9 +20,9 @@ class CloudMqttDeviceManager(
     dataCallback,
     statusCallback
 ) {
-    override val adapter: AdapterInternet = AdapterInternet("${tag}Adapter", activity,
-        onDisabled = { onDisconnected() },
-        onEnabled = { onPermitted() }
+    override val adapter: AdapterNetworkInternet = AdapterNetworkInternet("${tag}Adapter", activity,
+        onDisabled = { onDisabled() },
+        onEnabled = { onEnabled() }
     )
     override val device: CloudMqttDeviceHandler = CloudMqttDeviceHandler("${tag}Device", activity,
         adapter,
@@ -30,7 +30,7 @@ class CloudMqttDeviceManager(
         connectivityInfo,
         dataCallback,
         statusCallback,
-        isEnabled = { adapter.isEnabled() && connectivityInfo.deviceAddress.isNotEmpty() },
+        isAvailable = { adapter.isEnabled() && connectivityInfo.deviceAddress.isNotEmpty() },
         isPermitted = { permissions.allowed }
     )
 

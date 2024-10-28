@@ -25,8 +25,8 @@ class BluetoothDeviceManager(
     statusCallback
 ) {
     override val adapter: AdapterBluetooth = AdapterBluetooth("${tag}Adapter", activity,
-        onDisabled = { onDisconnected() },
-        onEnabled = { onPermitted() }
+        onDisabled = { onDisabled() },
+        onEnabled = { onEnabled() }
     )
     override val device: BluetoothDeviceHandler = BluetoothDeviceHandler("${tag}Device", activity,
         adapter,
@@ -34,7 +34,7 @@ class BluetoothDeviceManager(
         connectivityInfo,
         dataCallback,
         statusCallback,
+        isAvailable = { adapter.isEnabled() },
         isPermitted = { permissions.allowed },
-        isEnabled = { adapter.isEnabled() }
     )
 }

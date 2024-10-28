@@ -9,7 +9,7 @@ class WebSocketDeviceManager(
     connectivityInfo: ConnectivityInfo,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
-) : ConnectivityDeviceManager<AdapterWifi, WebSocketDeviceHandler, WebSocketDeviceConfig>(
+) : ConnectivityDeviceManager<AdapterNetworkWifi, WebSocketDeviceHandler, WebSocketDeviceConfig>(
     "${tag}Manager",
     activity,
     arrayOf(
@@ -20,9 +20,9 @@ class WebSocketDeviceManager(
     dataCallback,
     statusCallback
 ) {
-    override val adapter: AdapterWifi = AdapterWifi("${tag}Adapter", activity,
-        onDisabled = { onDisconnected() },
-        onEnabled = { onPermitted() }
+    override val adapter: AdapterNetworkWifi = AdapterNetworkWifi("${tag}Adapter", activity,
+        onDisabled = { onDisabled() },
+        onEnabled = { onEnabled() }
     )
     override val device: WebSocketDeviceHandler = WebSocketDeviceHandler("${tag}Device", activity,
         adapter,
@@ -30,7 +30,7 @@ class WebSocketDeviceManager(
         connectivityInfo,
         dataCallback,
         statusCallback,
-        isPermitted = { permissions.allowed },
-        isEnabled = { adapter.isEnabled() && connectivityInfo.deviceAddress.isNotEmpty() }
+        isAvailable = { adapter.isEnabled() && connectivityInfo.deviceAddress.isNotEmpty() },
+        isPermitted = { permissions.allowed }
     )
 }

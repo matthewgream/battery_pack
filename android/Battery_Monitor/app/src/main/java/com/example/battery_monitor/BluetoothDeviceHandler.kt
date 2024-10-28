@@ -25,9 +25,9 @@ class BluetoothDeviceHandler(
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     statusCallback: () -> Unit,
-    isPermitted: () -> Boolean,
-    isEnabled: () -> Boolean
-) : ConnectivityDeviceHandler(tag, statusCallback, config.connectionActiveCheck, config.connectionActiveTimeout, isPermitted, isEnabled) {
+    isAvailable: () -> Boolean,
+    isPermitted: () -> Boolean
+) : ConnectivityDeviceHandler(tag, statusCallback, config.connectionActiveCheck, config.connectionActiveTimeout, isAvailable, isPermitted) {
 
     //
 

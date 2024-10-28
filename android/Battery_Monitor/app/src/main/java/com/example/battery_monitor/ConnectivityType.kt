@@ -6,7 +6,7 @@ enum class ConnectivityType {
     CLOUD
 }
 data class ConnectivityStatus(
-    val permitted: Boolean,
     val available: Boolean,
+    val permitted: Boolean,
     val connected: Boolean
 )

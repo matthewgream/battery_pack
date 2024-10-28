@@ -12,14 +12,14 @@ import java.nio.charset.StandardCharsets
 class CloudMqttDeviceHandler(
     tag: String,
     @Suppress("unused") private val activity: Activity,
-    @Suppress("unused") private val adapter: AdapterInternet,
+    @Suppress("unused") private val adapter: AdapterNetworkInternet,
     private val config: CloudMqttDeviceConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     statusCallback: () -> Unit,
-    isEnabled: () -> Boolean,
+    isAvailable: () -> Boolean,
     isPermitted: () -> Boolean
-) : ConnectivityDeviceHandler(tag, statusCallback, 0, 0, isEnabled, isPermitted) {
+) : ConnectivityDeviceHandler(tag, statusCallback, 0, 0, isAvailable, isPermitted) {
 
     //
 
@@ -184,7 +184,8 @@ class CloudMqttDeviceHandler(
         Log.d(tag, "Device connected")
         setConnectionIsConnected()
         if (topic.isNotEmpty())
-            subscribe()
+            if (!mqttSubscribe(topic))
+                setConnectionDoReconnect()
     }
     private fun onMqttDisconnected() {
         Log.d(tag, "Device disconnected")
@@ -206,20 +207,31 @@ class CloudMqttDeviceHandler(
     //
 
     fun subscribe(): Boolean {
-        Log.d(tag, "Device subscribe")
+        if (topic.isNotEmpty()) {
+            Log.e(tag, "Device subscribe: failure, already subscribed")
+            return false
+        }
+        topic = "${root}/#"
         if (!isConnected()) {
-            this.topic = "${root}/#"
+            Log.d(tag, "Device subscribe: pending, upon connection")
             return true
         }
+        Log.d(tag, "Device subscribe")
         return mqttSubscribe(topic)
     }
     fun unsubscribe(): Boolean {
-        Log.d(tag, "Device unsubscribe")
+        if (topic.isEmpty()) {
+            Log.e(tag, "Device unsubscribe: failure, not subscribed")
+            return false
+        }
+        val topicOld = topic
+        topic = ""
         if (!isConnected()) {
-            if (this.topic == "${root}/#") this.topic = ""
+            Log.d(tag, "Device unsubscribe: cleared, not connected")
             return true
         }
-        return mqttUnsubscribe(topic)
+        Log.d(tag, "Device unsubscribe")
+        return mqttUnsubscribe(topicOld)
     }
     fun publish(type: String, message: String): Boolean {
         if (!isConnected()) {

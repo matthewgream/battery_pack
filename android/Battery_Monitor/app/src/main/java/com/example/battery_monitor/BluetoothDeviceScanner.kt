@@ -99,7 +99,7 @@ class DutyCycleScanner(private val bluetoothAdapter: BluetoothAdapter) {
 @SuppressLint("MissingPermission")
 class BluetoothDeviceScanner(
     tag: String,
-    adapter: AdapterBluetooth,
+    private val adapter: AdapterBluetooth,
     private val config: Config,
     private val onFound: (BluetoothDevice) -> Unit
 ) : ConnectivityComponent(tag, config.scanPeriod) {
@@ -111,8 +111,6 @@ class BluetoothDeviceScanner(
         val filter: ScanFilter,
         val settings: ScanSettings
     )
-
-    private val scanner = adapter.adapter.bluetoothLeScanner
 
     private val retryRunnable = Runnable {
         start()
@@ -154,11 +152,11 @@ class BluetoothDeviceScanner(
     }
 
     override fun onStart() {
-        scanner.startScan(listOf(config.filter), config.settings, callback)
+        adapter.scanner().startScan(listOf(config.filter), config.settings, callback)
     }
     override fun onStop() {
         handler.removeCallbacks(retryRunnable)
-        scanner.stopScan(callback)
+        adapter.scanner().stopScan(callback)
     }
     override fun onTimer(): Boolean {
         restartAfterDelay()

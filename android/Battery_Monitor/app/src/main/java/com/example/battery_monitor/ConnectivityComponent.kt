@@ -21,7 +21,7 @@ abstract class ConnectivityComponent(
     private var timerRunnable: Runnable? = null
     private fun timerStart() {
         timerRunnable = Runnable {
-            if (active.isActiveNow)
+            if (active.isActive)
                 if (onTimer())
                     handler.postDelayed(timerRunnable!!, timerPeriod*1000L)
         }

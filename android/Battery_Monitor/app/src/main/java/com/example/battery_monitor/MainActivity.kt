@@ -113,8 +113,8 @@ class MainActivity : PermissionsAwareActivity() {
                 is CloudMqttDeviceManager -> ConnectivityType.CLOUD
                 else -> throw IllegalStateException("Unknown manager type")
             } to ConnectivityStatus(
-                permitted = manager.isPermitted(),
                 available = manager.isAvailable(),
+                permitted = manager.isPermitted(),
                 connected = manager.isConnected()
             )
         }

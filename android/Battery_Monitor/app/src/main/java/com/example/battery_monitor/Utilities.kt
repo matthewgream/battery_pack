@@ -1,22 +1,25 @@
 package com.example.battery_monitor
 
-class Activable {
-    private var isActive = false
+class Activable(
+    initial: Boolean = false
+) {
+    private var _isActive = initial
     fun toActive(): Boolean {
-        if (!isActive) {
-            isActive = true
+        if (!_isActive) {
+            _isActive = true
             return true
         }
         return false
     }
     fun toInactive(): Boolean {
-        if (isActive) {
-            isActive = false
+        if (_isActive) {
+            _isActive = false
             return true
         }
         return false
     }
-    val isActiveNow: Boolean
-        get() = isActive
+    var isActive: Boolean
+        get() = _isActive
+        set(value) { _isActive = value }
 }
 

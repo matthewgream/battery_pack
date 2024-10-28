@@ -68,7 +68,7 @@ abstract class ConnectivityDeviceHandler(
     activeCheck: Int,
     activeTimeout: Int,
     private val isPermitted: () -> Boolean,
-    private val isEnabled: () -> Boolean
+    private val isAvailable: () -> Boolean
 ) {
     private val handler = Handler(Looper.getMainLooper())
 
@@ -83,10 +83,10 @@ abstract class ConnectivityDeviceHandler(
     }
     private fun initiate() {
         when {
-            !isEnabled() -> Log.e(tag, "Device not enabled or available")
+            !isAvailable() -> Log.e(tag, "Device not enabled or available")
             !isPermitted() -> Log.e(tag, "Device access not permitted")
             state.isConnecting -> Log.d(tag, "Device connection already in progress")
-            state.isConnected -> Log.d(tag, "Device connection already active, will not locate")
+            state.isConnected -> Log.d(tag, "Device connection already active, will not initiate")
             else -> {
                 state.connecting()
                 statusCallback()
@@ -130,7 +130,7 @@ abstract class ConnectivityDeviceHandler(
     fun isConnected(): Boolean = state.isConnected
 }
 
-@Suppress("EmptyMethod")
+@Suppress("EmptyMethod", "PublicApiImplicitType")
 abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, TDevice : ConnectivityDeviceHandler, TConfig>(
     tag: String,
     protected val activity: Activity,
@@ -163,14 +163,14 @@ abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, T
     fun onPowerSave() {}
     fun onPowerBack() {}
 
-    @Suppress("PublicApiImplicitType")
-    protected fun onDisconnected() = device.setConnectionIsDisconnected()
-    @Suppress("PublicApiImplicitType")
     fun onDoubleTap() = device.setConnectionDoReconnect()
-    protected fun onPermitted() {
+    private fun onPermitted() {
         adapter.start()
         device.permitted()
     }
+    private fun onDisconnected() = device.setConnectionIsDisconnected()
+    protected fun onEnabled() = device.permitted()
+    protected fun onDisabled() = device.setConnectionIsDisconnected()
 
     fun isAvailable(): Boolean = adapter.isEnabled()
     fun isPermitted(): Boolean = permissions.allowed

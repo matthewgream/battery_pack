@@ -12,14 +12,14 @@ import java.net.URI
 class WebSocketDeviceHandler(
     tag: String,
     activity: Activity,
-    @Suppress("unused") private val adapter: AdapterWifi,
+    @Suppress("unused") private val adapter: AdapterNetworkWifi,
     private val config: WebSocketDeviceConfig,
     private val connectivityInfo: ConnectivityInfo,
     private val dataCallback: (String) -> Unit,
     statusCallback: () -> Unit,
-    isPermitted: () -> Boolean,
-    isEnabled: () -> Boolean
-) : ConnectivityDeviceHandler(tag, statusCallback, config.connectionActiveCheck, config.connectionActiveTimeout, isPermitted, isEnabled) {
+    isAvailable: () -> Boolean,
+    isPermitted: () -> Boolean
+) : ConnectivityDeviceHandler(tag, statusCallback, config.connectionActiveCheck, config.connectionActiveTimeout,  isAvailable, isPermitted) {
 
     //
 
