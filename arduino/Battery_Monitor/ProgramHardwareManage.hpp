@@ -22,6 +22,7 @@ private:
     AggregateValue _value; // change to compute something more sophisticated
     //std::array <Stats <float>, PROBE_COUNT> _statsValues;
     Stats <float> _statsValueAvg, _statsValueMin, _statsValueMax;
+    ActivationTracker _valueBad;
 
 public:
     TemperatureManagerBatterypackTemplate (const Config& cfg, TemperatureInterface& interface): Alarmable ({
@@ -38,10 +39,16 @@ public:
         int cnt = 0;
         DEBUG_PRINTF ("TemperatureManagerBatterypack::process: temps=[");
         for (const auto channel : config.channels) {
-              const float tmp = _interface.getTemperature (channel), val = (_values [cnt] = tmp);
-              //_statsValues [cnt] += val;
-              _value += val;
-              DEBUG_PRINTF ("%s%.2f<%.2f", (cnt > 0) ? ", " : "", val, tmp);
+              float tmp;
+              if (_interface.getTemperature (channel, &tmp)) {
+                  float val = (_values [cnt] = tmp);
+                  //_statsValues [cnt] += val;
+                  _value += val;
+                  DEBUG_PRINTF ("%s%.2f<%.2f", (cnt > 0) ? ", " : "", val, tmp);
+              } else {
+                  DEBUG_PRINTF ("BAD<BAD", (cnt > 0) ? ", " : "");
+                  _valueBad ++;
+              }
               cnt ++;
         }
         const float _avg = round2places (_value.avg ()), _min = _value.min (), _max = _value.max ();
@@ -72,6 +79,8 @@ protected:
                 // JsonArray val = tmp ["val"].to <JsonArray> ();
                 // for (const auto& stats : _statsValues)
                 //     val.add (ArithmeticToString (stats.avg ()) + "," + ArithmeticToString (stats.min ()) + "," + ArithmeticToString (stats.max ()));
+            if (_valueBad)
+                sub ["bad"] = _valueBad;
     }
 };
 
@@ -93,15 +102,21 @@ private:
 
     MovingAverage <float, 16> _value;
     Stats <float> _statsValue;
+    ActivationTracker _valueBad;
 
 public:
     TemperatureManagerEnvironmentTemplate (const Config& cfg, TemperatureInterface& interface): Alarmable ({
             AlarmCondition (ALARM_TEMPERATURE_FAILURE, [this] () { return _value <= config.FAILURE; })
         }), config (cfg), _interface (interface), _value (round2places) {};
     void process () override {
-        _value = _interface.getTemperature (config.channel);
-        _statsValue += _value;
-        DEBUG_PRINTF ("TemperatureManagerEnvironment::process: temp=%.2f\n", static_cast <float> (_value));
+        float tmp;
+        if (_interface.getTemperature (config.channel, &tmp)) {
+            _statsValue += (_value = tmp);
+            DEBUG_PRINTF ("TemperatureManagerEnvironment::process: temp=%.2f\n", static_cast <float> (_value));
+        } else {
+            DEBUG_PRINTF ("TemperatureManagerEnvironment::process: BAD READ\n");
+            _valueBad ++;
+        }
     }
     inline float getTemperature () const { return _value; }
 
@@ -109,6 +124,8 @@ protected:
     void collectDiagnostics (JsonVariant &obj) const override {
         JsonObject sub = obj ["env"].to <JsonObject> ();
             sub ["tmp"] = _statsValue;
+            if (_valueBad)
+                sub ["bad"] = _valueBad;
     }
 };
 

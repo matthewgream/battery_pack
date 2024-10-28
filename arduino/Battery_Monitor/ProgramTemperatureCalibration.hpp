@@ -163,8 +163,8 @@ public:
 private:
     double A, B, C, D;
 
-    inline bool isResistanceReasonable (const uint16_t resistance) const { return resistance > 0 && resistance < 100*1000; }
-    inline bool isTemperatureReasonable (const float temperature) const { return temperature > -273.15f && temperature < 200.0f; }
+    inline bool isResistanceReasonable (const uint16_t resistance) const { return resistance > 0 && resistance < 10*1000; }
+    inline bool isTemperatureReasonable (const float temperature) const { return temperature > -100.0f && temperature < 150.0f; }
 
 public:
     explicit TemperatureCalibrationAdjustmentStrategy_Steinhart (const double a = 0.0, const double b = 0.0, const double c = 0.0, const double d = 0.0): A (a), B (b), C (c), D (d) {}

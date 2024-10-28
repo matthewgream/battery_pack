@@ -55,8 +55,13 @@ public:
 
             DEBUG_PRINTF ("+++ TEMPERATURE: channels=%d\n", TemperatureInterface::CHANNELS);
             //DEBUG_PRINTF ("ds18b20[ref]: %.2f\n", ds18b20.getTemperature ());
-            for (int channel = 0; channel < TemperatureInterface::CHANNELS; channel ++)
-                DEBUG_PRINTF ("channel [%2d]: %.2f\n", channel, temperatureInterface.getTemperature (channel));
+            for (int channel = 0; channel < TemperatureInterface::CHANNELS; channel ++) {
+                float temperature;
+                if (temperatureInterface.getTemperature (channel, &temperature))
+                    DEBUG_PRINTF ("channel [%2d]: %.2f\n", channel, temperature);
+                else
+                    DEBUG_PRINTF ("channel [%2d]: BAD\n", channel);
+            }
             DEBUG_PRINTF ("\n");
 
             return true;

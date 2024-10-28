@@ -37,16 +37,22 @@ public:
         analogReadResolution (AdcResolution);
         _hardware.enable ();
     }
-    float getTemperature (const int channel) const {
+    inline bool isResistanceReasonable (const uint16_t resistance) const { return resistance > 0 && resistance < 10*1000; }
+    inline bool isTemperatureReasonable (const float temperature) const { return temperature > -100.0f && temperature < 150.0f; }
+    bool getTemperature (const int channel, float *temperature) const {
         assert (channel >= 0 && channel < AdcHardware::CHANNELS && "Channel out of range");
-        AdcValueType value = _hardware.get (channel);
+        AdcValueType resistance = _hardware.get (channel);
+        if (!isResistanceReasonable (resistance))
+            return false;
 #ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION
-        const float temperature = steinharthart_calculator (value, AdcValueMax, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
+        *temperature = steinharthart_calculator (resistance, AdcValueMax, config.thermister.REFERENCE_RESISTANCE, config.thermister.NOMINAL_RESISTANCE, config.thermister.NOMINAL_TEMPERATURE);
 #else
-        const float temperature = _calculator (channel, value);
+        *temperature = _calculator (channel, resistance);
 #endif
-        const_cast <TemperatureInterface*> (this)->updateStats (channel, temperature);
-        return temperature;
+        if (!isTemperatureReasonable (*temperature))
+            return false;
+        const_cast <TemperatureInterface*> (this)->updateStats (channel, *temperature);
+        return true;
     }
 
 protected:
