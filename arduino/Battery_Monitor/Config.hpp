@@ -85,12 +85,12 @@ struct Config {
     };
     // hardware managers
     TemperatureManagerBatterypack::Config temperatureManagerBatterypack = {
-        .channels = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
+        .channels = { 0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15 },
         .SETPOINT = 25.0,
         .FAILURE = -100.0, .MINIMAL = -20.0, .WARNING = 35.0, .MAXIMAL = 45.0
     };
     TemperatureManagerEnvironment::Config temperatureManagerEnvironment = {
-        .channel = 0,
+        .channel = 7,
         .FAILURE = -100.0
     };
     double FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
