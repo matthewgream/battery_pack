@@ -10,7 +10,7 @@
 #endif
 
 #define DEFAULT_NAME "BatteryMonitor"
-#define DEFAULT_VERS "1.2.1"
+#define DEFAULT_VERS "1.3.0"
 #define DEFAULT_TYPE "batterymonitor-custom-esp32c3"
 #define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 
