@@ -42,17 +42,9 @@ class AdapterBluetooth(
         }
     }
 
-    fun scanner(): BluetoothLeScanner {
-        return adapter.bluetoothLeScanner
-    }
+    fun scanner(): BluetoothLeScanner { return adapter.bluetoothLeScanner }
 
-    override fun isEnabled(): Boolean {
-        return adapter.isEnabled
-    }
-    override fun onStart() {
-        context.registerReceiver(receiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
-    }
-    override fun onStop() {
-        context.unregisterReceiver(receiver)
-    }
+    override fun isEnabled(): Boolean { return adapter.isEnabled }
+    override fun onStart() { context.registerReceiver(receiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)) }
+    override fun onStop() { context.unregisterReceiver(receiver) }
 }

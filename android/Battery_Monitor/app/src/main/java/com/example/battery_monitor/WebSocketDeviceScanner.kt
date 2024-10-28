@@ -7,10 +7,10 @@ import android.util.Log
 
 class WebSocketDeviceScanner(
     tag: String,
-    private val context: Context,
+    context: Context,
     private val config: Config,
-    private val connectionInfo: ConnectivityInfo,
-    private val onFound: (NsdServiceInfo) -> Unit
+    connectionInfo: ConnectivityInfo,
+    onFound: (NsdServiceInfo) -> Unit
 ) : ConnectivityComponent(tag, config.scanPeriod) {
 
     class Config(
@@ -20,112 +20,140 @@ class WebSocketDeviceScanner(
         val scanPeriod: Int
     )
 
-    private val nsdManager: NsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
-
-    private var isDiscovering = Activable()
-    private var isResolving = Activable()
-
-    private val retryRunnable = Runnable { start() }
-    private fun retrySchedule() { handler.postDelayed(retryRunnable, config.scanDelay*1000L) }
-    private fun retryCancel() { handler.removeCallbacks(retryRunnable) }
-
-    private val discoveryListener = object : NsdManager.DiscoveryListener {
-        override fun onDiscoveryStarted(serviceType: String) {
-            Log.d(tag, "discoveryListener::onDiscoveryStarted: type=$serviceType")
-        }
-        override fun onDiscoveryStopped(serviceType: String) {
-            Log.d(tag, "discoveryListener::onDiscoveryStopped: type=$serviceType")
-        }
-        override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-            Log.e(tag, "discoveryListener::onStartDiscoveryFailed: error=$errorCode")
-            restartAfterDelay()
-        }
-        override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
-            Log.e(tag, "discoveryListener::onStopDiscoveryFailed: error=$errorCode")
-        }
-        override fun onServiceLost(serviceInfo: NsdServiceInfo) {
-            Log.d(tag, "discoveryListener::onServiceLost: name=${serviceInfo.serviceName}")
-        }
-        override fun onServiceFound(serviceInfo: NsdServiceInfo) {
-            Log.d(tag, "discoveryListener::onServiceFound: name=${serviceInfo.serviceName}")
-            if (serviceInfo.serviceName == config.name)
-                resolveStart(serviceInfo)
-        }
-    }
-    private val serviceInfoCallback = object : NsdManager.ServiceInfoCallback {
-        override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) {
-            Log.e(tag, "serviceInfo::onServiceInfoCallbackRegistrationFailed: error=$errorCode")
-        }
-        override fun onServiceInfoCallbackUnregistered() {
-            Log.d(tag, "serviceInfo::onServiceInfoCallbackUnregistered")
-        }
-        override fun onServiceLost() {
-            Log.d(tag, "serviceInfo::onServiceLost")
-            restartAfterDelay()
-        }
-        override fun onServiceUpdated(updatedServiceInfo: NsdServiceInfo) {
-            val txtRecords = updatedServiceInfo.attributes.map { "${it.key}=${String(it.value)}" }
-            val serviceAddr = txtRecords.firstOrNull { it.startsWith("addr=") }?.split("=")?.getOrNull(1)
-            if (connectionInfo.deviceAddress.isEmpty()) {
-                Log.d(tag, "serviceInfo::onServiceUpdated, address unspecified, but found $serviceAddr, with TXT records: $txtRecords")
-                restartAfterDelay()
-            } else if (serviceAddr == connectionInfo.deviceAddress) {
-                Log.d(tag, "serviceInfo::onServiceUpdated, address matched $serviceAddr, with TXT records $txtRecords")
-                stop()
-                onFound(updatedServiceInfo)
-            } else {
-                Log.d(tag, "serviceInfo::onServiceUpdated, address unmatched, expected ${connectionInfo.deviceAddress}, but found $serviceAddr, with TXT records: $txtRecords")
-                restartAfterDelay()
+    private class NsdDiscoverer(
+        private val tag: String,
+        private val context: Context,
+        private val config: Config,
+        private val connectionInfo: ConnectivityInfo,
+        private val onFound: (NsdDiscoverer, NsdServiceInfo) -> Unit,
+        private val onNeedsRestart: (NsdDiscoverer) -> Unit
+    ) {
+        private val discoveryListener = object : NsdManager.DiscoveryListener {
+            override fun onDiscoveryStarted(serviceType: String) {
+                Log.d(tag, "discoveryListener::onDiscoveryStarted: type=$serviceType")
+            }
+            override fun onDiscoveryStopped(serviceType: String) {
+                Log.d(tag, "discoveryListener::onDiscoveryStopped: type=$serviceType")
+            }
+            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
+                Log.e(tag, "discoveryListener::onStartDiscoveryFailed: error=$errorCode")
+                onNeedsRestart(this@NsdDiscoverer)
+            }
+            override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
+                Log.e(tag, "discoveryListener::onStopDiscoveryFailed: error=$errorCode")
+            }
+            override fun onServiceLost(serviceInfo: NsdServiceInfo) {
+                Log.d(tag, "discoveryListener::onServiceLost: name=${serviceInfo.serviceName}")
+            }
+            override fun onServiceFound(serviceInfo: NsdServiceInfo) {
+                Log.d(tag, "discoveryListener::onServiceFound: name=${serviceInfo.serviceName}")
+                if (serviceInfo.serviceName == config.name)
+                    resolveStart(serviceInfo)
             }
         }
-    }
-
-    private fun discoverStart() {
-        try {
-            nsdManager.discoverServices(config.type, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
-        } catch (e: Exception) {
-            Log.d(tag, "Service discovery start: exception", e)
-            discoverStop()
-            handler.postDelayed({
-                discoverStart()
-            }, 100)
+        private val serviceInfoCallback = object : NsdManager.ServiceInfoCallback {
+            override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) {
+                Log.e(tag, "serviceInfo::onServiceInfoCallbackRegistrationFailed: error=$errorCode")
+            }
+            override fun onServiceInfoCallbackUnregistered() {
+                Log.d(tag, "serviceInfo::onServiceInfoCallbackUnregistered")
+            }
+            override fun onServiceLost() {
+                Log.d(tag, "serviceInfo::onServiceLost")
+                onNeedsRestart(this@NsdDiscoverer)
+            }
+            override fun onServiceUpdated(updatedServiceInfo: NsdServiceInfo) {
+                val txtRecords = updatedServiceInfo.attributes.map { "${it.key}=${String(it.value)}" }
+                val serviceAddr = txtRecords.firstOrNull { it.startsWith("addr=") }?.split("=")?.getOrNull(1)
+                when {
+                    connectionInfo.deviceAddress.isEmpty() -> {
+                        Log.d(tag, "serviceInfo::onServiceUpdated, address unspecified, but found $serviceAddr, with TXT records: $txtRecords")
+                        onNeedsRestart(this@NsdDiscoverer)
+                    }
+                    serviceAddr == connectionInfo.deviceAddress -> {
+                        Log.d(tag, "serviceInfo::onServiceUpdated, address matched $serviceAddr, with TXT records $txtRecords")
+                        onFound(this@NsdDiscoverer, updatedServiceInfo)
+                    }
+                    else -> {
+                        Log.d(tag, "serviceInfo::onServiceUpdated, address unmatched, expected ${connectionInfo.deviceAddress}, but found $serviceAddr, with TXT records: $txtRecords")
+                        onNeedsRestart(this@NsdDiscoverer)
+                    }
+                }
+            }
         }
-    }
-    private fun discoverStop() {
-        try {
-            nsdManager.stopServiceDiscovery(discoveryListener)
-        } catch (e: Exception) {
-            Log.d(tag, "Service discovery stop: exception", e)
+        private inline fun <T> nsdOperation(operation: String, block: () -> T?) {
+            try {
+                block()
+            } catch (e: Exception) {
+                Log.e(tag, "NSD $operation: exception", e)
+            }
         }
-    }
-    private fun resolveStart(serviceInfo: NsdServiceInfo) {
-        if (isResolving.toActive ())
-            nsdManager.registerServiceInfoCallback(serviceInfo, context.mainExecutor, serviceInfoCallback)
-    }
-    private fun resolveStop() {
-        if (isResolving.toInactive())
-            nsdManager.unregisterServiceInfoCallback(serviceInfoCallback)
+        private val nsdManager: NsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
+        private var isDiscovering = Activable()
+        private var isResolving = Activable()
+        fun discovertyStart() {
+            if (isDiscovering.toActive())
+                nsdOperation("discoveryStart") {
+                    nsdManager.discoverServices(config.type, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+                }
+        }
+        fun discoveryStop() {
+            resolveStop()
+            if (isDiscovering.toInactive())
+                nsdOperation("stopDiscovery") {
+                    nsdManager.stopServiceDiscovery(discoveryListener)
+                }
+        }
+        private fun resolveStart(serviceInfo: NsdServiceInfo) {
+            if (isResolving.toActive())
+                nsdOperation("startResolving") {
+                    nsdManager.registerServiceInfoCallback(serviceInfo, context.mainExecutor, serviceInfoCallback)
+                }
+        }
+        private fun resolveStop() {
+            if (isResolving.toInactive())
+                nsdOperation("stopResolving") {
+                    nsdManager.unregisterServiceInfoCallback(serviceInfoCallback)
+                }
+        }
     }
 
     //
 
-    private fun restartAfterDelay() {
+    private val discoverer = NsdDiscoverer(tag, context,
+        config,
+        connectionInfo,
+        onFound = { _, serviceInfo ->
+            stop()
+            onFound(serviceInfo)
+        },
+        onNeedsRestart = {
+            doRestartDelayed()
+        }
+    )
+
+    //
+
+    private val doRestartRunnable = Runnable { start() }
+    private fun doRestartDelayed() {
         stop()
-        retrySchedule()
+        handler.postDelayed(doRestartRunnable, config.scanDelay * 1000L)
     }
+    private fun cancelRestartDelayed() {
+        handler.removeCallbacks(doRestartRunnable)
+    }
+
+    //
+
     override fun onStart() {
-        if (isDiscovering.toActive())
-            discoverStart()
+        discoverer.discovertyStart()
     }
     override fun onStop() {
-        retryCancel()
-        if (isDiscovering.toInactive()) {
-            resolveStop()
-            discoverStop()
-        }
+        cancelRestartDelayed()
+        discoverer.discoveryStop()
     }
     override fun onTimer(): Boolean {
-        restartAfterDelay()
+        doRestartDelayed()
         return false
     }
 }

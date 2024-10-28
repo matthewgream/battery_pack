@@ -10,23 +10,19 @@ class MainActivity : PermissionsAwareActivity() {
 
     private val config: MainConfig = MainConfig()
 
-    private var powermanageState: Boolean = false
+    private var powermanageState = Activable()
     private fun powermanageSetup() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        powermanageState = powerManager.isPowerSaveMode
+        powermanageState.isActive = powerManager.isPowerSaveMode
         powerManager.addThermalStatusListener { status ->
             when (status) {
                 PowerManager.THERMAL_STATUS_SEVERE,
                 PowerManager.THERMAL_STATUS_CRITICAL ->
-                    if (!powermanageState) {
-                        powermanageState = true
+                    if (powermanageState.toActive())
                         onPowerSave()
-                    }
                 else ->
-                    if (powermanageState) {
-                        powermanageState = false
+                    if (powermanageState.toInactive())
                         onPowerBack()
-                    }
             }
         }
     }
@@ -44,13 +40,13 @@ class MainActivity : PermissionsAwareActivity() {
     private val connectivityInfo by lazy {
         ConnectivityInfo(this, config.name)
     }
-    private var connectivityManagerSubscribedtoCloud: Boolean = false
+    private var connectivityManagerSubscribedtoCloud = Activable()
     private val connectivityManagerDirect: BluetoothDeviceManager by lazy {
         BluetoothDeviceManager("Bluetooth", this, BluetoothDeviceConfig(), connectivityInfo,
             dataCallback = { data ->
                 val json = JSONObject(data)
                 connectivityManagerAddressBinder(json)
-                if (!connectivityManagerSubscribedtoCloud)
+                if (!connectivityManagerSubscribedtoCloud.isActive)
                     processingHandler?.processDataReceived(json)
             },
             statusCallback = { connectivityStatusUpdate() })
@@ -58,7 +54,7 @@ class MainActivity : PermissionsAwareActivity() {
     private val connectivityManagerLocal: WebSocketDeviceManager by lazy {
         WebSocketDeviceManager("WebSocket", this, WebSocketDeviceConfig(), connectivityInfo,
             dataCallback = { data ->
-                if (!connectivityManagerSubscribedtoCloud)
+                if (!connectivityManagerSubscribedtoCloud.isActive)
                     processingHandler?.processDataReceived(JSONObject(data))
             },
             statusCallback = { connectivityStatusUpdate() })
@@ -66,7 +62,7 @@ class MainActivity : PermissionsAwareActivity() {
     private val connectivityManagerCloud: CloudMqttDeviceManager by lazy {
         CloudMqttDeviceManager("CloudMqtt", this, CloudMqttDeviceConfig(), connectivityInfo,
             dataCallback = { data ->
-                if (connectivityManagerSubscribedtoCloud)
+                if (connectivityManagerSubscribedtoCloud.isActive)
                     processingHandler?.processDataReceived(JSONObject(data))
             },
             statusCallback = { connectivityStatusUpdate() })
@@ -89,13 +85,10 @@ class MainActivity : PermissionsAwareActivity() {
         }
     }
     private fun connectivityManagerSubscriberUpdate(directOrLocal: Boolean) {
-        if (!connectivityManagerSubscribedtoCloud && (!directOrLocal && connectivityInfo.deviceAddress.isNotEmpty())) {
-            connectivityManagerSubscribedtoCloud = true
+        if ((!directOrLocal && connectivityInfo.deviceAddress.isNotEmpty()) && connectivityManagerSubscribedtoCloud.toActive())
             connectivityManagerCloud.subscribe()
-        } else if (connectivityManagerSubscribedtoCloud && directOrLocal) {
-            connectivityManagerSubscribedtoCloud = false
+        else if (directOrLocal && connectivityManagerSubscribedtoCloud.toInactive())
             connectivityManagerCloud.unsubscribe()
-        }
     }
     private val connectivityStatusView: DataViewConnectivityStatus by lazy {
         findViewById(R.id.connectivityStatusView)

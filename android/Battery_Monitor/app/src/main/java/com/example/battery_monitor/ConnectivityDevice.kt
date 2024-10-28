@@ -18,31 +18,33 @@ class ConnectivityDeviceState(
     private val onTimeout: () -> Unit
 ) : ConnectivityComponent(tag, periodCheck) {
 
-    var isConnecting: Boolean = false
-        private set
-    var isConnected: Boolean = false
-        private set
+    private var state = ConnectivityState.Disconnected
+    val isConnecting: Boolean
+        get() = (state == ConnectivityState.Connecting)
+    val isConnected: Boolean
+        get() = (state == ConnectivityState.Connected)
+    val isDisconnected: Boolean
+        get() = (state == ConnectivityState.Disconnected)
 
     fun connecting() {
-        if (!isConnecting && !isConnected) {
-            isConnecting = true
-            isConnected = false
+        if (state == ConnectivityState.Disconnected) {
+            state = ConnectivityState.Connecting
             start()
         } else
-            Log.w(tag, "connecting: in bad state")
+            Log.w(tag, "ConnectivityDeviceState::connecting while !Disconnected")
     }
     fun connected() {
-        if (isConnecting && !isConnected) {
-            isConnecting = false
-            isConnected = true
+        if (state == ConnectivityState.Connecting) {
+            state = ConnectivityState.Connected
             ping()
         } else
-            Log.w(tag, "connected: in bad state")
+            Log.w(tag, "ConnectivityDeviceState::connected while !Connecting")
     }
     fun disconnected() {
-        isConnecting = false
-        isConnected = false
-        stop()
+        if (state != ConnectivityState.Disconnected) {
+            state = ConnectivityState.Disconnected
+            stop()
+        }
     }
 
     private var checked: Long = 0
@@ -50,7 +52,7 @@ class ConnectivityDeviceState(
         checked = System.currentTimeMillis()
     }
     override fun onTimer(): Boolean {
-        if ((isConnecting || isConnected) && System.currentTimeMillis() - checked > (periodTimeout*1000L)) {
+        if (state != ConnectivityState.Disconnected && (System.currentTimeMillis() - checked) > (periodTimeout*1000L)) {
             Log.d(tag, "Connection state timeout")
             onTimeout()
             return false
@@ -72,13 +74,13 @@ abstract class ConnectivityDeviceHandler(
 ) {
     private val handler = Handler(Looper.getMainLooper())
 
-    abstract fun doConnectionStart() : Boolean
-    abstract fun doConnectionIdentify() : Boolean
+    abstract fun doConnectionStart(): Boolean
+    abstract fun doConnectionIdentify(): Boolean
     abstract fun doConnectionStop()
 
     fun permitted() {
         statusCallback()
-        if (!state.isConnecting && !state.isConnected)
+        if (state.isDisconnected)
             initiate()
     }
     private fun initiate() {

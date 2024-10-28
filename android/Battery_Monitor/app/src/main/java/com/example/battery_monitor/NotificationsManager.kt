@@ -30,7 +30,7 @@ class NotificationsManager(
     //
 
     private val identifier = 1
-    private var active: Int? = null
+    private var active = Activable()
     private var previous: List<Pair<String, String>> = emptyList()
     private fun show(current: List<Pair<String, String>>) {
         if (current != previous) {
@@ -45,7 +45,7 @@ class NotificationsManager(
                     .setOngoing(true)
                     .build()
             )
-            active = identifier
+            active.isActive = true
             previous = current
         }
     }
@@ -57,10 +57,8 @@ class NotificationsManager(
         }
     }
     private fun clear() {
-        active?.let {
-            manager.cancel(it)
-            active = null
-        }
+        if (active.toInactive())
+            manager.cancel(identifier)
         previous = emptyList()
     }
 

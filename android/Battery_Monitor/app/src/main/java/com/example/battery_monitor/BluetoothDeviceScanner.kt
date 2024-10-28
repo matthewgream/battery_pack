@@ -94,6 +94,16 @@ class DutyCycleScanner(private val bluetoothAdapter: BluetoothAdapter) {
     }
 }
 
+    private val SCAN_PERIOD = 10000L // 10 seconds
+    private val SCAN_INTERVAL = 60000L // 1 minute
+    fun dutyCycleScan() {
+        start ()
+        handler.postDelayed ({
+            stop()
+            handler.postDelayed ({ dutyCycleScan() }, SCAN_INTERVAL - SCAN_PERIOD)
+        }, SCAN_PERIOD)
+    }
+
 */
 
 @SuppressLint("MissingPermission")
@@ -112,10 +122,6 @@ class BluetoothDeviceScanner(
         val settings: ScanSettings
     )
 
-    private val retryRunnable = Runnable {
-        start()
-    }
-
     private val callback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             if (result.scanRecord?.deviceName == config.name) {
@@ -132,34 +138,31 @@ class BluetoothDeviceScanner(
                 SCAN_FAILED_INTERNAL_ERROR -> Log.e(tag, "Device scan failed: internal error")
                 else -> Log.e(tag, "Device scan failed: error=$errorCode")
             }
-            restartAfterDelay()
+            doRestartDelayed()
         }
     }
 
-//    private val SCAN_PERIOD = 10000L // 10 seconds
-//    private val SCAN_INTERVAL = 60000L // 1 minute
-//    fun dutyCycleScan () {
-//        start ()
-//        handler.postDelayed ({
-//            stop ()
-//            handler.postDelayed ({ dutyCycleScan () }, SCAN_INTERVAL - SCAN_PERIOD)
-//        }, SCAN_PERIOD)
-//    }
+    //
 
-    private fun restartAfterDelay() {
+    private val doRestartRunnable = Runnable { start() }
+    private fun doRestartDelayed() {
         stop()
-        handler.postDelayed(retryRunnable, config.scanDelay*1000L)
+        handler.postDelayed(doRestartRunnable, config.scanDelay*1000L)
     }
+    private fun cancelRestartDelayed() {
+        handler.removeCallbacks(doRestartRunnable)
+    }
+    //
 
     override fun onStart() {
         adapter.scanner().startScan(listOf(config.filter), config.settings, callback)
     }
     override fun onStop() {
-        handler.removeCallbacks(retryRunnable)
+        cancelRestartDelayed()
         adapter.scanner().stopScan(callback)
     }
     override fun onTimer(): Boolean {
-        restartAfterDelay()
+        doRestartDelayed()
         return false
     }
 }

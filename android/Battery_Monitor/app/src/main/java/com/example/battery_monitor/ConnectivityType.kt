@@ -5,6 +5,11 @@ enum class ConnectivityType {
     LOCAL,
     CLOUD
 }
+enum class ConnectivityState {
+    Connecting,
+    Connected,
+    Disconnected
+}
 data class ConnectivityStatus(
     val available: Boolean,
     val permitted: Boolean,
