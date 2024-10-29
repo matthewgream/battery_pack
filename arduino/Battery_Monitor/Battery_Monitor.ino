@@ -104,8 +104,8 @@ void setup () {
 void loop () {
     DEBUG_PRINTF ("***\n");
     exception_catcher ([&] () {
+        program->gate ();
         program->loop ();
-        program->sleep ();
     });
     watchdog.reset ();
 }

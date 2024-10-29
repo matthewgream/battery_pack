@@ -382,6 +382,28 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
+#include <Arduino.h>
+
+class Gate {
+    const interval_t _interval;
+    interval_t _boundaryLast = 0;
+    counter_t _misses = 0;
+public:
+    Gate (const interval_t interval): _interval (interval) {}
+    void waitforThreshold () {
+        const interval_t interval = millis () - _boundaryLast;
+        if (_interval > interval)
+            delay (_interval - interval);
+        else if (_boundaryLast > 0) _misses ++;
+        _boundaryLast = millis ();
+    }
+    const counter_t misses () const {
+        return _misses;
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+
 #include <array>
 #include <cstdlib>
 

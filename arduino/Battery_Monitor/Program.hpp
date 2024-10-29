@@ -216,6 +216,8 @@ class Program: public Component, public Diagnosticable {
         cycles ++;
     }
 
+    Gate processGate;
+
 public:
     Program () :
         address (getMacAddressBase ("")),
@@ -233,6 +235,7 @@ public:
         diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
         operational (this),
         intervalDeliver (config.intervalDeliver), intervalCapture (config.intervalCapture), intervalDiagnose (config.intervalDiagnose),
+        processGate (config.intervalProcess),
         components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
         DEBUG_PRINTF ("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
@@ -240,7 +243,8 @@ public:
     Component::List components;
     void setup () { for (const auto& component : components) component->begin (); }
     void loop () { for (const auto& component : components) component->process (); }
-    void sleep () { delay (config.intervalProcess); }
+    void gate () { processGate.waitforThreshold (); }
+
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
@@ -249,6 +253,8 @@ protected:
         program ["build"] = build;
         program ["uptime"] = uptime;
         program ["cycles"] = cycles;
+        if (processGate.misses () > 0)
+            program ["misses"] = processGate.misses ();
     }
 };
 

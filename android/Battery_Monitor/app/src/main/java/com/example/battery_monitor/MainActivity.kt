@@ -81,7 +81,7 @@ class MainActivity : PermissionsAwareActivity() {
                     connectedActive = R.color.ic_connect_connected_active
                 )
             ),
-            onReceiveData = { json ->
+            onReceiveData = { json -> 
                 processor.processDataReceived(json)
             },
             addressExtractor = { json ->
