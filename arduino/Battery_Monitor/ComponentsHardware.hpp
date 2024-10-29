@@ -83,7 +83,6 @@ public:
 #include <Arduino.h>
 #include <array>
 
-// https://deepbluembedded.com/arduino-cd74hc4067-analog-multiplexer-library-code/
 template <typename ADC_VALUE_TYPE>
 class MuxInterface_CD74HC4067 { // technically this is ADC as well due to PIN_SIG
 public:
@@ -129,8 +128,6 @@ public:
 #include <Wire.h>
 #include <array>
 
-// https://www.aliexpress.com/item/1005002430639515.html
-// max frequency 5kHz
 class OpenSmart_QuadMotorDriver {
 public:
     static inline constexpr int MotorCount = 4;

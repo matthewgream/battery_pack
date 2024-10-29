@@ -2,6 +2,20 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+
+#define HARDWARE_ESP32_C3_ZERO
+//#define HARDWARE_ESP32_S3_SUPERMINI_UPSIDEDOWN
+
+// as matches build tools (not so great)
+#if defined (HARDWARE_ESP32_C3_ZERO)
+#define HARDWARE_VARIANT_PLATFORM       "esp32c3dev-esp32"
+#elif defined (HARDWARE_ESP32_S3_SUPERMINI_UPSIDEDOWN)
+#define HARDWARE_VARIANT_PLATFORM       "esp32s3dev-esp32"
+#endif
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
 #define DEFAULT_WATCHDOG_SECS (60)
 #define DEFAULT_INITIAL_DELAY (5*1000L)
 #ifdef DEBUG
@@ -10,8 +24,8 @@
 #endif
 
 #define DEFAULT_NAME "BatteryMonitor"
-#define DEFAULT_VERS "1.2.1"
-#define DEFAULT_TYPE "batterymonitor-custom-esp32c3"
+#define DEFAULT_VERS "1.3.4"
+#define DEFAULT_TYPE "batterymonitor-" HARDWARE_VARIANT_PLATFORM
 #define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 
 // -----------------------------------------------------------------------------------------------

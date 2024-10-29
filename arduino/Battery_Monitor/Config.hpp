@@ -25,14 +25,23 @@
 // -----------------------------------------------------------------------------------------------
 
 /*
-    C3-ZERO
-        https://www.waveshare.com/esp32-c3-zero.htm, https://www.waveshare.com/wiki/ESP32-C3-Zero
-
     OPENSMART
         https://www.aliexpress.com/item/1005003356486895.html
-
+        https://www.tinytronics.nl/product_files/005376_Open-Smart_Quad_Motor_Driver_schematic.pdf
+        https://www.tinytronics.nl/product_files/005376_QuadMotorDriver.zip
     CD74HC4067
+        https://www.ti.com/lit/ds/symlink/cd74hc4067.pdf
         https://deepbluembedded.com/arduino-cd74hc4067-analog-multiplexer-library-code/
+        https://github.com/mikedotalmond/Arduino-Mux-CD74HC4067
+    DS18B20
+        https://www.analog.com/media/en/technical-documentation/data-sheets/DS18B20.pdf
+        https://github.com/milesburton/Arduino-Temperature-Control-Library
+*/
+
+/*
+    C3-ZERO
+        https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf
+        https://www.waveshare.com/esp32-c3-zero.htm, https://www.waveshare.com/wiki/ESP32-C3-Zero
 
     +-----+---------------+-----------+------------+----------+
     | DIR | C3-ZERO       | OPENSMART | CD74HC4067 | DS18B20  |
@@ -57,19 +66,73 @@
     | N/C | 18 GP21 (TTL) |           |            | 1 DATA   | input/output (digital, one-wire)
     +-----+---------------+-----------+------------+----------+
 
+    4MB flash
+    - partitions_esp32c3fn4.csv
+    -      x0009K
+    - NVS, x0007K (28Kb)
+    - APP, x0270K (~2.4Mb)
+    - FFS, x0180K (1.5Mb) -- calibration data & offline data storage
+
 */
+
+/*
+    S3-SUPER-MINI
+        TBC
+        https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
+        https://www.aliexpress.com/item/1005006365700692.html
+
+    8MB flash
+    - partitions_esp32s3fn8.csv
+    -      x0009K    
+    - NVS, x000DK (52Kb)
+    - OTA, x0002K (8Kb) (OTADATA)
+    - APP, x0300K (3Mb) (OTA0)
+    - APP, x0300K (3Mb) (OTA1)
+    - FFS, x0180K (1.5Mb) -- calibration data & offline data storage
+
+*/
+
+#if defined (HARDWARE_ESP32_C3_ZERO)
+#define PIN_DS18B0_DAT          21
+#define PIN_CD74HC4067_EN       20
+#define PIN_CD74HC4067_SIG      0
+#define PIN_CD74HC4067_ADDR_S0  10
+#define PIN_CD74HC4067_ADDR_S1  9
+#define PIN_CD74HC4067_ADDR_S2  8
+#define PIN_CD74HC4067_ADDR_S3  7
+#define PIN_OSQM_I2CSDA         1
+#define PIN_OSQM_I2CSCL         2
+#define PIN_OSQM_PWM_0          3
+#define PIN_OSQM_PWM_1          4
+#define PIN_OSQM_PWM_2          5
+#define PIN_OSQM_PWM_3          6
+#elif defined (HARDWARE_ESP32_S3_SUPERMINI_UPSIDEDOWN)
+#define PIN_DS18B0_DAT          1   // MOVE
+#define PIN_CD74HC4067_EN       2   // MOVE
+#define PIN_CD74HC4067_SIG      13  // AS IS
+#define PIN_CD74HC4067_ADDR_S0  3   // AS IS
+#define PIN_CD74HC4067_ADDR_S1  4   // AS IS
+#define PIN_CD74HC4067_ADDR_S2  5   // AS IS
+#define PIN_CD74HC4067_ADDR_S3  6   // AS IS
+#define PIN_OSQM_I2CSDA         12  // AS IS
+#define PIN_OSQM_I2CSCL         11  // AS IS
+#define PIN_OSQM_PWM_0          10  // AS IS
+#define PIN_OSQM_PWM_1          9   // AS IS
+#define PIN_OSQM_PWM_2          8   // AS IS
+#define PIN_OSQM_PWM_3          7   // AS IS
+#endif
 
 // -----------------------------------------------------------------------------------------------
 
 struct Config {
 
     TemperatureSensor_DS18B20::Config ds18b20 = {
-        .PIN_DAT = 21, .INDEX = 0
+        .PIN_DAT = PIN_DS18B0_DAT, .INDEX = 0
     };
 
     // hardware interfaces
     TemperatureInterface::Config temperatureInterface = {
-        .hardware = { .PIN_EN = 20, .PIN_SIG = 0, .PIN_ADDR = { 10, 9, 8, 7 } },
+        .hardware = { .PIN_EN = PIN_CD74HC4067_EN, .PIN_SIG = PIN_CD74HC4067_SIG, .PIN_ADDR = { PIN_CD74HC4067_ADDR_S0, PIN_CD74HC4067_ADDR_S1, PIN_CD74HC4067_ADDR_S2, PIN_CD74HC4067_ADDR_S3 } },
 #ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION
         .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
 #endif
@@ -79,7 +142,7 @@ struct Config {
         .strategyDefault = { .A = -0.012400427786, .B = 0.006860769298, .C = -0.001057743719, .D = 0.000056166727 } // XXX populate from calibration data
     };
     FanInterface::Config fanInterface = {
-        .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = 1, .PIN_I2C_SCL = 2, .PIN_PWMS = { 3, 4, 5, 6 }, .frequency = 5000, .invertedPWM = true },
+        .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = PIN_OSQM_I2CSDA, .PIN_I2C_SCL = PIN_OSQM_I2CSCL, .PIN_PWMS = { PIN_OSQM_PWM_0, PIN_OSQM_PWM_1, PIN_OSQM_PWM_2, PIN_OSQM_PWM_3 }, .frequency = 5000, .invertedPWM = true },
         .DIRECTION = OpenSmart_QuadMotorDriver::MOTOR_CLOCKWISE, .MIN_SPEED = 96, .MAX_SPEED = 255, // duplicated, not ideal
         .MOTOR_ORDER = { 0, 1, 2, 3 }, .MOTOR_ROTATE = 5*60*1000
     };

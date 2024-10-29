@@ -5,6 +5,8 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$path_build,
     [Parameter(Mandatory=$true)]
+    [string]$platform,
+    [Parameter(Mandatory=$true)]
     [string]$image,
     [Parameter(Mandatory=$true)]
     [string]$server
@@ -53,7 +55,7 @@ function Upload-Image {
 }
 
 $patterns = @{
-    'type' = '#define\s+DEFAULT_TYPE\s+"([^"]+)"'
+    'name' = '#define\s+DEFAULT_NAME\s+"([^"]+)"'
     'vers' = '#define\s+DEFAULT_VERS\s+"(\d+\.\d+\.\d+)"'
 }
 Write-Verbose "Using $file_info"
@@ -62,27 +64,33 @@ if (-not $matches -or ($matches.Values -contains $null)) {
     Write-Error "Could not extract type or vers from '$file_info'"
     exit 1
 }
-$name = "$($matches['type'])_v$($matches['vers']).bin"
-$path = Join-Path $path_build $name
 
-Write-Verbose "Image type: $($matches['type'])"
-Write-Verbose "Image vers: $($matches['vers'])"
+$name = $matches['name'].ToLower()
+$vers = $matches['vers'].ToLower()
+$plat = $platform.ToLower() -replace '_', ''
+$file = "$($name)-$($plat)_v$($vers).bin"
+$path = Join-Path $path_build $file
+
 Write-Verbose "Image name: $name"
+Write-Verbose "Image vers: $vers"
+Write-Verbose "Image type: $plat"
+Write-Verbose "Image name: $file"
 Write-Verbose "Image path: $path"
+Write-Verbose "Image host: $server"
 
 if (Test-Path $path) {
-    Write-Output "Image $name already exists in build directory. No action taken."
+    Write-Output "Image $file already exists in build directory. No action taken."
     exit 0
 }
-Write-Verbose "Image server: $server"
+
 try {
-    Write-Verbose "Image upload: $image as $name"
-    Upload-Image -binPath $image -url $server -newFileName $name
-    Write-Output  "Image upload succeeded: $name"
+    Write-Verbose "Image upload: $image as $file"
+    Upload-Image -binPath $image -url $server -newFileName $file
+    Write-Output  "Image upload succeeded: $file"
     Copy-Item -Path $image -Destination $path -Force
     Write-Output  "Image copied to build directory: $path"
 }
 catch {
-    Write-Error "An error occurred: $_"
+    Write-Error "Image transfer error: $_"
     exit 1
 }
