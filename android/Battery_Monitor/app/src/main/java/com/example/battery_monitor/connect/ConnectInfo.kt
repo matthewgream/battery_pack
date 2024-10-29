@@ -1,4 +1,4 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.app.Activity
 import android.content.Context
@@ -9,7 +9,7 @@ import org.json.JSONObject
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
-class ConnectivityInfo(
+class ConnectInfo(
     activity: Activity,
     val name: String
 ) {

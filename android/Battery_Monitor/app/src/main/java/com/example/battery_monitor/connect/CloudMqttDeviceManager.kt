@@ -1,25 +1,36 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.app.Activity
 
 class CloudMqttDeviceManager(
     tag: String,
     activity: Activity,
-    config: CloudMqttDeviceConfig,
-    connectivityInfo: ConnectivityInfo,
+    config: Config,
+    connectInfo: ConnectInfo,
     dataCallback: (String) -> Unit,
     statusCallback: () -> Unit
-) : ConnectivityDeviceManager<AdapterNetworkInternet, CloudMqttDeviceHandler, CloudMqttDeviceConfig>(
+) : ConnectDeviceManager<AdapterNetworkInternet, CloudMqttDeviceHandler>(
     "${tag}Manager",
     activity,
     arrayOf(
         android.Manifest.permission.INTERNET,
         android.Manifest.permission.ACCESS_NETWORK_STATE
     ),
-    connectivityInfo,
+    connectInfo,
     dataCallback,
     statusCallback
 ) {
+
+    open class Config(
+        val host: String = "mqtt.local",
+        val port: Int = 1883,
+        val user: String?,
+        val pass: String?,
+        val root: String = "",
+        val connectionActiveCheck: Int = 15,
+        val connectionActiveTimeout: Int = 30
+    )
+
     override val adapter: AdapterNetworkInternet = AdapterNetworkInternet("${tag}Adapter", activity,
         onDisabled = { onDisabled() },
         onEnabled = { onEnabled() }
@@ -27,10 +38,10 @@ class CloudMqttDeviceManager(
     override val device: CloudMqttDeviceHandler = CloudMqttDeviceHandler("${tag}Device", activity,
         adapter,
         config,
-        connectivityInfo,
+        connectInfo,
         dataCallback,
         statusCallback,
-        isAvailable = { adapter.isEnabled() && connectivityInfo.deviceAddress.isNotEmpty() },
+        isAvailable = { adapter.isEnabled() && connectInfo.deviceAddress.isNotEmpty() },
         isPermitted = { permissions.allowed }
     )
 

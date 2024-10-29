@@ -1,9 +1,20 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.process
 
-object DataManagerAlarm {
+import android.app.Activity
+import android.widget.TextView
+import com.example.battery_monitor.R
+import com.example.battery_monitor.utility.NotificationsManager
+import org.json.JSONObject
+
+class ProcessDataAlarm(
+    private val activity: Activity,
+    private val notificationsManager: NotificationsManager
+) {
+
+    private val view: TextView = activity.findViewById(R.id.processAlarmTextView)
+
     data class Alarm(val code: String, val name: String, val description: String)
-
-    private val alarmMap = mapOf(
+    private val alarms = mapOf(
         "TIME_SYNC" to Alarm("TIME_SYNC", "Time sync", "Device time failed network sync"),
         "TIME_DRIFT" to Alarm("TIME_DRIFT", "Time drift", "Device time drifting significantly"),
         "TEMP_FAIL" to Alarm("TEMP_FAIL", "Temp fail", "Temperature sensor failed"),
@@ -21,8 +32,15 @@ object DataManagerAlarm {
         "SYSTEM_MEMLOW" to Alarm("SYSTEM_MEMLOW", "Device memory", "Device memory low"),
         "SYSTEM_BADRESET" to Alarm("SYSTEM_BADRESET", "Device fault", "Device reset unexpectedly")
     )
+    private fun translate(alarmCodes: String): List<Pair<String, String>> {
+        return alarmCodes.split(",").mapNotNull { alarms[it.trim()] }.map { Pair(it.name, it.description) }
+    }
 
-    fun translateAlarms(alarmCodes: String): List<Pair<String, String>> {
-        return alarmCodes.split(",").mapNotNull { alarmMap[it.trim()] }.map { Pair(it.name, it.description) }
+    fun render (json: JSONObject) {
+        if (json.has("alm"))
+            notificationsManager.process(translate(json.getString("alm")))
+        val alarmPairs = translate(json.getString("alm"))
+        view.text = if (alarmPairs.isNotEmpty()) { alarmPairs.joinToString(", ") { it.first } } else { "No alarms" }
+        view.setTextColor(activity.getColor(if (alarmPairs.isNotEmpty()) R.color.process_alarm_active_color else R.color.process_alarm_inactive_color))
     }
 }

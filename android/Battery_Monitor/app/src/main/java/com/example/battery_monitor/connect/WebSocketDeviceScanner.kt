@@ -1,17 +1,18 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
+import com.example.battery_monitor.utility.Activable
 
 class WebSocketDeviceScanner(
     tag: String,
     context: Context,
     private val config: Config,
-    connectionInfo: ConnectivityInfo,
+    connectionInfo: ConnectInfo,
     onFound: (NsdServiceInfo) -> Unit
-) : ConnectivityComponent(tag, config.scanPeriod) {
+) : ConnectComponent(tag, config.scanPeriod) {
 
     class Config(
         val type: String,
@@ -24,7 +25,7 @@ class WebSocketDeviceScanner(
         private val tag: String,
         private val context: Context,
         private val config: Config,
-        private val connectionInfo: ConnectivityInfo,
+        private val connectionInfo: ConnectInfo,
         private val onFound: (NsdDiscoverer, NsdServiceInfo) -> Unit,
         private val onNeedsRestart: (NsdDiscoverer) -> Unit
     ) {
@@ -81,38 +82,31 @@ class WebSocketDeviceScanner(
                 }
             }
         }
-        private inline fun <T> nsdOperation(operation: String, block: () -> T?) {
-            try {
-                block()
-            } catch (e: Exception) {
-                Log.e(tag, "NSD $operation: exception", e)
-            }
-        }
         private val nsdManager: NsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
         private var isDiscovering = Activable()
         private var isResolving = Activable()
         fun discovertyStart() {
             if (isDiscovering.toActive())
-                nsdOperation("discoveryStart") {
+                tag.withOperation("NSD","discoveryStart") {
                     nsdManager.discoverServices(config.type, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
                 }
         }
         fun discoveryStop() {
             resolveStop()
             if (isDiscovering.toInactive())
-                nsdOperation("stopDiscovery") {
+                tag.withOperation("NSD","stopDiscovery") {
                     nsdManager.stopServiceDiscovery(discoveryListener)
                 }
         }
         private fun resolveStart(serviceInfo: NsdServiceInfo) {
             if (isResolving.toActive())
-                nsdOperation("startResolving") {
+                tag.withOperation("NSD","startResolving") {
                     nsdManager.registerServiceInfoCallback(serviceInfo, context.mainExecutor, serviceInfoCallback)
                 }
         }
         private fun resolveStop() {
             if (isResolving.toInactive())
-                nsdOperation("stopResolving") {
+                tag.withOperation("NSD","stopResolving") {
                     nsdManager.unregisterServiceInfoCallback(serviceInfoCallback)
                 }
         }

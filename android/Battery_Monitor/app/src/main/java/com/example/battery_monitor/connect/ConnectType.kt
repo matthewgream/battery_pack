@@ -1,16 +1,16 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
-enum class ConnectivityType {
+enum class ConnectType {
     DIRECT,
     LOCAL,
     CLOUD
 }
-enum class ConnectivityState {
+enum class ConnectState {
     Connecting,
     Connected,
     Disconnected
 }
-data class ConnectivityStatus(
+data class ConnectStatus(
     val available: Boolean,
     val permitted: Boolean,
     val connected: Boolean

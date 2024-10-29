@@ -2,9 +2,9 @@
     <string name="app_name">Battery Monitor</string>
     <string name="notifications_name">Battery Monitor Alarms</string>
     <string name="notifications_description">Battery Monitor Alarms</string>
-    <string name="textview_alarm_information">Alarm information</string>
-    <string name="textview_diagnostic_information">Diagnostic information</string>
-    <string name="textview_direct_connection_status">Direct (Bluetooth) connection status</string>
-    <string name="textview_local_connection_status">Local (WiFi) connection status</string>
-    <string name="textview_cloud_connection_status">Cloud (MQTT) connection status</string>
+    <string name="textview_process_alarm">Alarm information</string>
+    <string name="textview_process_diagnostic">Diagnostic information</string>
+    <string name="textview_connect_direct_status">Direct (Bluetooth) connection status</string>
+    <string name="textview_connect_local_status">Local (WiFi) connection status</string>
+    <string name="textview_connect_cloud_status">Cloud (MQTT) connection status</string>
 </resources>

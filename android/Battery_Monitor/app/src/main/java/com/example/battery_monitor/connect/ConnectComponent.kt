@@ -1,11 +1,12 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.example.battery_monitor.utility.Activable
 
 @Suppress("ReplaceNotNullAssertionWithElvisReturn")
-abstract class ConnectivityComponent(
+abstract class ConnectComponent(
     protected open val tag: String,
     private val timerPeriod: Int = 0
 ) {

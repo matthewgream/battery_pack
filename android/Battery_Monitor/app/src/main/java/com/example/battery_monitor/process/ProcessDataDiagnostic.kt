@@ -1,4 +1,4 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.process
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -7,24 +7,29 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.widget.ScrollView
 import android.widget.TextView
+import com.example.battery_monitor.R
+import com.example.battery_monitor.utility.mainThreadInit
 import org.json.JSONObject
 
 @SuppressLint("ClickableViewAccessibility")
-class DataProcessorDiagnostic(
+class ProcessDataDiagnostic(
     private val activity: Activity
 ) {
 
     private val scrollView: ScrollView = activity.findViewById(R.id.diagnosticScrollView)
-    private val textView: TextView = activity.findViewById(R.id.diagDataTextView)
+    private val textView: TextView = activity.findViewById(R.id.diagnosticTextView)
     private var isScrolledToBottom = true
 
-    init {
-        val detector = GestureDetector(activity, object : GestureDetector.SimpleOnGestureListener() {
+    private val detector by mainThreadInit {
+        GestureDetector(activity, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDoubleTap(e: MotionEvent): Boolean {
                 clear()
                 return true
             }
         })
+    }
+
+    init {
         textView.setOnTouchListener { v, event ->
             if (!detector.onTouchEvent(event))
                 v.performClick()

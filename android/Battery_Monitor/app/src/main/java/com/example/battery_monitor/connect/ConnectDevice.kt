@@ -1,48 +1,50 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.app.Activity
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.example.battery_monitor.utility.PermissionsManager
+import com.example.battery_monitor.utility.PermissionsManagerFactory
 
-abstract class ConnectivityDeviceAdapter(
+abstract class ConnectDeviceAdapter(
     tag: String
-) : ConnectivityComponent(tag) {
+) : ConnectComponent(tag) {
     abstract fun isEnabled(): Boolean
 }
 
-class ConnectivityDeviceState(
+class ConnectDeviceState(
     override val tag: String,
     periodCheck: Int,
     private val periodTimeout: Int,
     private val onTimeout: () -> Unit
-) : ConnectivityComponent(tag, periodCheck) {
+) : ConnectComponent(tag, periodCheck) {
 
-    private var state = ConnectivityState.Disconnected
+    private var state = ConnectState.Disconnected
     val isConnecting: Boolean
-        get() = (state == ConnectivityState.Connecting)
+        get() = (state == ConnectState.Connecting)
     val isConnected: Boolean
-        get() = (state == ConnectivityState.Connected)
+        get() = (state == ConnectState.Connected)
     val isDisconnected: Boolean
-        get() = (state == ConnectivityState.Disconnected)
+        get() = (state == ConnectState.Disconnected)
 
     fun connecting() {
-        if (state == ConnectivityState.Disconnected) {
-            state = ConnectivityState.Connecting
+        if (state == ConnectState.Disconnected) {
+            state = ConnectState.Connecting
             start()
         } else
             Log.w(tag, "ConnectivityDeviceState::connecting while !Disconnected")
     }
     fun connected() {
-        if (state == ConnectivityState.Connecting) {
-            state = ConnectivityState.Connected
+        if (state == ConnectState.Connecting) {
+            state = ConnectState.Connected
             ping()
         } else
             Log.w(tag, "ConnectivityDeviceState::connected while !Connecting")
     }
     fun disconnected() {
-        if (state != ConnectivityState.Disconnected) {
-            state = ConnectivityState.Disconnected
+        if (state != ConnectState.Disconnected) {
+            state = ConnectState.Disconnected
             stop()
         }
     }
@@ -52,7 +54,7 @@ class ConnectivityDeviceState(
         checked = System.currentTimeMillis()
     }
     override fun onTimer(): Boolean {
-        if (state != ConnectivityState.Disconnected && (System.currentTimeMillis() - checked) > (periodTimeout*1000L)) {
+        if (state != ConnectState.Disconnected && (System.currentTimeMillis() - checked) > (periodTimeout*1000L)) {
             Log.d(tag, "Connection state timeout")
             onTimeout()
             return false
@@ -64,7 +66,7 @@ class ConnectivityDeviceState(
     }
 }
 
-abstract class ConnectivityDeviceHandler(
+abstract class ConnectDeviceHandler(
     val tag: String,
     private val statusCallback: () -> Unit,
     activeCheck: Int,
@@ -127,17 +129,17 @@ abstract class ConnectivityDeviceHandler(
         }, 1000)
     }
 
-    private val state = ConnectivityDeviceState(tag, activeCheck, activeTimeout,
+    private val state = ConnectDeviceState(tag, activeCheck, activeTimeout,
         onTimeout = { setConnectionDoReconnect() })
     fun isConnected(): Boolean = state.isConnected
 }
 
 @Suppress("EmptyMethod", "PublicApiImplicitType")
-abstract class ConnectivityDeviceManager<TAdapter : ConnectivityDeviceAdapter, TDevice : ConnectivityDeviceHandler, TConfig>(
+abstract class ConnectDeviceManager<TAdapter : ConnectDeviceAdapter, TDevice : ConnectDeviceHandler>(
     tag: String,
     protected val activity: Activity,
     permissionsRequired: Array<String>,
-    protected val connectivityInfo: ConnectivityInfo,
+    protected val connectInfo: ConnectInfo,
     protected val dataCallback: (String) -> Unit,
     protected val statusCallback: () -> Unit
 ) {

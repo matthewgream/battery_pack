@@ -1,10 +1,11 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import com.example.battery_monitor.utility.Activable
 
 object NetworkRegistry {
     private val networks = mutableMapOf<Network, NetworkCapabilities>()
@@ -64,11 +65,13 @@ abstract class AdapterNetwork(
     context: Context,
     private val onDisabled: () -> Unit,
     private val onEnabled: () -> Unit
-) : ConnectivityDeviceAdapter(tag) {
+) : ConnectDeviceAdapter(tag) {
 
     private val enabled = Activable()
 
-    init { NetworkRegistry.initialize(context) }
+    init {
+        NetworkRegistry.initialize(context)
+    }
 
     protected abstract fun matchesCapability(capabilities: NetworkCapabilities): Boolean
     protected abstract fun createNetworkRequest(): NetworkRequest
@@ -79,8 +82,12 @@ abstract class AdapterNetwork(
     }
 
     override fun isEnabled(): Boolean = enabled.isActive
-    override fun onStart() { NetworkRegistry.addListener(::matchesCapability, networkCallback) }
-    override fun onStop() { NetworkRegistry.removeListener(::matchesCapability, networkCallback) }
+    override fun onStart() {
+        NetworkRegistry.addListener(::matchesCapability, networkCallback)
+    }
+    override fun onStop() {
+        NetworkRegistry.removeListener(::matchesCapability, networkCallback)
+    }
 }
 
 class AdapterNetworkInternet(

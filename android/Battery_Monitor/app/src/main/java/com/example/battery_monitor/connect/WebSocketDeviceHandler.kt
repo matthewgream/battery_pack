@@ -1,4 +1,4 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.app.Activity
 import android.util.Log
@@ -12,19 +12,19 @@ class WebSocketDeviceHandler(
     tag: String,
     activity: Activity,
     @Suppress("unused") private val adapter: AdapterNetworkWifi,
-    config: WebSocketDeviceConfig,
-    private val connectivityInfo: ConnectivityInfo,
+    config: WebSocketDeviceManager.Config,
+    private val connectInfo: ConnectInfo,
     private val dataCallback: (String) -> Unit,
     statusCallback: () -> Unit,
     isAvailable: () -> Boolean,
     isPermitted: () -> Boolean
-) : ConnectivityDeviceHandler(tag, statusCallback, config.connectionActiveCheck, config.connectionActiveTimeout,  isAvailable, isPermitted) {
+) : ConnectDeviceHandler(tag, statusCallback, config.connectionActiveCheck, config.connectionActiveTimeout,  isAvailable, isPermitted) {
 
     //
 
     private class WebSocketDeviceConnection(
         private val tag: String,
-        private val config: WebSocketDeviceConfig,
+        private val config: WebSocketDeviceManager.Config,
         private val onKeepalive: (WebSocketDeviceConnection) -> Unit,
         private val onConnected: (WebSocketDeviceConnection) -> Unit,
         private val onDisconnected: (WebSocketDeviceConnection) -> Unit,
@@ -32,16 +32,6 @@ class WebSocketDeviceHandler(
         private val onReceived: (WebSocketDeviceConnection, String) -> Unit
     ) {
         private var client: WebSocketClient? = null
-        private inline fun <T> wsOperation(operation: String, block: () -> T?): T? {
-            return try {
-                block()?.also {
-                    Log.d(tag, "WebSocket $operation: success")
-                }
-            } catch (e: Exception) {
-                Log.e(tag, "WebSocket $operation: exception", e)
-                null
-            }
-        }
         private fun createClient(uri: URI): WebSocketClient =
             object : WebSocketClient(uri) {
                 override fun onOpen(handshake: ServerHandshake?) {
@@ -66,7 +56,7 @@ class WebSocketDeviceHandler(
                 }
             }
 
-        fun connect(url: String): Boolean = wsOperation("connect") {
+        fun connect(url: String): Boolean = tag.withOperation("WebSocket","connect") {
             createClient(URI(url)).also {
                 client = it
                 it.connectionLostTimeout = config.connectionActiveCheck
@@ -74,12 +64,12 @@ class WebSocketDeviceHandler(
             }
             true
         } ?: false
-        fun send(message: String): Boolean = wsOperation("send") {
+        fun send(message: String): Boolean = tag.withOperation("WebSocket","send") {
             client?.send(message)
             true
         } ?: false
         fun disconnect() {
-            wsOperation("disconnect") {
+            tag.withOperation("WebSocket","disconnect") {
                 client?.close()
             }
             client = null
@@ -115,7 +105,7 @@ class WebSocketDeviceHandler(
     @Suppress("DEPRECATION")
     private val scanner = WebSocketDeviceScanner("${tag}Scanner", activity,
         WebSocketDeviceScanner.Config(config.serviceType, config.serviceName, config.connectionScanDelay, config.connectionScanPeriod),
-        connectivityInfo,
+        connectInfo,
         onFound = { serviceInfo ->
             Log.d(tag, "Device located '${serviceInfo.serviceName}'/${serviceInfo.host.hostAddress}:${serviceInfo.port}")
             val url = "ws://${serviceInfo.host.hostAddress}:${serviceInfo.port}/"
@@ -138,6 +128,6 @@ class WebSocketDeviceHandler(
         scanner.stop()
     }
     override fun doConnectionIdentify(): Boolean {
-        return connection.send(connectivityInfo.toJsonString())
+        return connection.send(connectInfo.toJsonString())
     }
 }

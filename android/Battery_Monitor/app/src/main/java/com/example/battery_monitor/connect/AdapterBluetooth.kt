@@ -1,4 +1,4 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
@@ -8,13 +8,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
+import com.example.battery_monitor.utility.Activable
 
 class AdapterBluetooth(
     tag: String,
     private val context: Context,
     private val onDisabled: () -> Unit,
     private val onEnabled: () -> Unit
-) : ConnectivityDeviceAdapter(tag) {
+) : ConnectDeviceAdapter(tag) {
 
     private val adapter: BluetoothAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
     private val enabled = Activable(isEnabled())

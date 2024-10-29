@@ -1,4 +1,4 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -21,20 +21,20 @@ class BluetoothDeviceHandler(
     tag: String,
     activity: Activity,
     adapter: AdapterBluetooth,
-    private val config: BluetoothDeviceConfig,
-    private val connectivityInfo: ConnectivityInfo,
+    private val config: BluetoothDeviceManager.Config,
+    private val connectInfo: ConnectInfo,
     private val dataCallback: (String) -> Unit,
     statusCallback: () -> Unit,
     isAvailable: () -> Boolean,
     isPermitted: () -> Boolean
-) : ConnectivityDeviceHandler(tag, statusCallback, config.connectionActiveCheck, config.connectionActiveTimeout, isAvailable, isPermitted) {
+) : ConnectDeviceHandler(tag, statusCallback, config.connectionActiveCheck, config.connectionActiveTimeout, isAvailable, isPermitted) {
 
     //
 
     private class BluetoothDeviceConnection(
         private val tag: String,
         private val activity: Activity,
-        private val config: BluetoothDeviceConfig,
+        private val config: BluetoothDeviceManager.Config,
         @Suppress("unused") private val onKeepalive: (BluetoothDeviceConnection) -> Unit,
         private val onConnected: (BluetoothDeviceConnection) -> Unit,
         private val onDisconnected: (BluetoothDeviceConnection) -> Unit,
@@ -43,16 +43,6 @@ class BluetoothDeviceHandler(
         private val onReceived: (BluetoothDeviceConnection, UUID, String) -> Unit
     ) {
         private var gatt: BluetoothGatt? = null
-        private inline fun <T> gattOperation(operation: String, block: () -> T?): T? {
-            return try {
-                block()?.also {
-                    Log.d(tag, "GATT $operation: success")
-                }
-            } catch (e: Exception) {
-                Log.e(tag, "GATT $operation: exception", e)
-                null
-            }
-        }
         private val callback = object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
                 when (status) {
@@ -90,17 +80,17 @@ class BluetoothDeviceHandler(
                 } else Log.d(tag, "onMtuChanged: mtu=$mtu")
             }
         }
-        fun connect(device: BluetoothDevice): Boolean = gattOperation("connect") {
+        fun connect(device: BluetoothDevice): Boolean = tag.withOperation("GATT", "connect") {
             device.connectGatt(activity, true, callback).also { gatt = it }
         } != null
-        fun discover(): Boolean = gattOperation("discover") {
+        fun discover(): Boolean = tag.withOperation("GATT", "discover") {
             gatt?.apply {
                 requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER)
                 requestMtu(config.connectionMtu)
                 discoverServices()
             }
         } != null
-        fun enableNotifications(): Boolean = gattOperation("notifications") {
+        fun enableNotifications(): Boolean = tag.withOperation("GATT", "enableNotifications") {
             gatt?.let { gatt ->
                 gatt.getService(config.serviceUuid)
                     ?.getCharacteristic(config.characteristicUuid)
@@ -120,7 +110,7 @@ class BluetoothDeviceHandler(
                     }
             }
         } ?: false
-        fun write(value: String): Boolean = gattOperation("write") {
+        fun write(value: String): Boolean = tag.withOperation("GATT", "write") {
             gatt?.let { gatt ->
                 gatt.getService(config.serviceUuid)
                     ?.getCharacteristic(config.characteristicUuid)
@@ -136,7 +126,7 @@ class BluetoothDeviceHandler(
             }
         } ?: false
         fun disconnect() {
-            gattOperation("disconnect") {
+            tag.withOperation("GATT", "disconnect") {
                 gatt?.close()
             }
             gatt = null
@@ -224,6 +214,6 @@ class BluetoothDeviceHandler(
         scanner.stop()
     }
     override fun doConnectionIdentify(): Boolean {
-        return connection.write(connectivityInfo.toJsonString())
+        return connection.write(connectInfo.toJsonString())
     }
 }

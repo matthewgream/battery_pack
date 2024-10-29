@@ -6,16 +6,16 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="alarm_active_color">#F44336</color>
-    <color name="alarm_inactive_color">#4CAF50</color>
-    <color name="graph_line_color">#FF5722</color>
-    <color name="graph_text_color">#333333</color>
-    <color name="threshold_min">#FF0000</color> <!-- Red for 25°C -->
-    <color name="threshold_warn">#FFA500</color> <!-- Orange for 35°C -->
-    <color name="threshold_max">#8B0000</color> <!-- Dark Red for 45°C -->
+    <color name="process_alarm_active_color">#F44336</color>
+    <color name="process_alarm_inactive_color">#4CAF50</color>
+    <color name="process_temperature_graph_line_color">#FF5722</color>
+    <color name="process_temperature_graph_text_color">#333333</color>
+    <color name="process_temperature_threshold_min">#FF0000</color> <!-- Red for 25°C -->
+    <color name="process_temperature_threshold_warn">#FFA500</color> <!-- Orange for 35°C -->
+    <color name="process_temperature_threshold_max">#8B0000</color> <!-- Dark Red for 45°C -->
+    <color name="ic_connect_disabled">#000000</color>
+    <color name="ic_connect_disconnected">#DC2626</color>
+    <color name="ic_connect_connected_active">#059669</color>
+    <color name="ic_connect_connected_standby">#F59E0B</color>
     <color name="ic_launcher_background">#FFFFFF</color>
-    <color name="icon_disabled">#000000</color>
-    <color name="icon_disconnected">#DC2626</color>
-    <color name="icon_connected_active">#059669</color>
-    <color name="icon_connected_standby">#F59E0B</color>
 </resources>

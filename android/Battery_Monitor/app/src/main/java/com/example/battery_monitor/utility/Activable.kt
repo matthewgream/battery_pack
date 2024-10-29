@@ -1,4 +1,4 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.utility
 
 class Activable(
     initial: Boolean = false

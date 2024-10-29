@@ -1,159 +1,129 @@
 package com.example.battery_monitor
 
-import android.content.Context
 import android.os.Bundle
-import android.os.PowerManager
 import android.util.Log
-import org.json.JSONObject
+import com.example.battery_monitor.connect.BluetoothDeviceManager
+import com.example.battery_monitor.connect.CloudMqttDeviceManager
+import com.example.battery_monitor.connect.ConnectManager
+import com.example.battery_monitor.connect.ConnectStatusView
+import com.example.battery_monitor.connect.WebSocketDeviceManager
+import com.example.battery_monitor.process.ProcessManager
+import com.example.battery_monitor.utility.NotificationsManager
+import com.example.battery_monitor.utility.PermissionsAwareActivity
+import com.example.battery_monitor.utility.PowerstateManager
 
 class MainActivity : PermissionsAwareActivity() {
 
-    private val config: MainConfig = MainConfig()
+    class Config (
+        val name: String
+    )
 
-    private var powermanageState = Activable()
-    private fun powermanageSetup() {
-        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        powermanageState.isActive = powerManager.isPowerSaveMode
-        powerManager.addThermalStatusListener { status ->
-            when (status) {
-                PowerManager.THERMAL_STATUS_SEVERE,
-                PowerManager.THERMAL_STATUS_CRITICAL ->
-                    if (powermanageState.toActive())
-                        onPowerSave()
-                else ->
-                    if (powermanageState.toInactive())
-                        onPowerBack()
+    private val secrets = Secrets ()
+    private val config = Config(
+        name = "batterymonitor"
+    )
+
+    //
+
+    private val power by lazy {
+        PowerstateManager(this,
+            onPowerSave = { onPowerSave() },
+            onPowerBack = { onPowerBack() }
+        )
+    }
+    private val notifier by lazy {
+        NotificationsManager(this,
+            NotificationsManager.Config (
+                name = this.getString(R.string.notifications_name),
+                description = this.getString(R.string.notifications_description)
+            ), R.drawable.ic_notification)
+    }
+    private val processor by lazy {
+        ProcessManager("Process", this, notifier,
+            addressMapper = { addr ->
+            when (addr) {
+                secrets.DEVICE_ADDR -> "${secrets.DEVICE_NAME} ($addr)"
+                else -> addr
             }
-        }
+        })
     }
-
-    //
-
-    private var processingHandler: DataProcessor? = null
-    private fun processingSetup() {
-        processingHandler = DataProcessor(this,
-            NotificationsManager(this, NotificationsConfig(this)))
-    }
-
-    //
-
-    private val connectivityInfo by lazy {
-        ConnectivityInfo(this, config.name)
-    }
-    private var connectivityManagerSubscribedtoCloud = Activable()
-    private val connectivityManagerDirect: BluetoothDeviceManager by lazy {
-        BluetoothDeviceManager("Bluetooth", this, BluetoothDeviceConfig(), connectivityInfo,
-            dataCallback = { data ->
-                val json = JSONObject(data)
-                connectivityManagerAddressBinder(json)
-                if (!connectivityManagerSubscribedtoCloud.isActive)
-                    processingHandler?.processDataReceived(json)
+    private val connector by lazy {
+        ConnectManager ("Connnect", this,
+            config.name,
+            ConnectManager.Config (
+                BluetoothDeviceManager.Config(
+                    deviceName ="BatteryMonitor",
+                ),
+                WebSocketDeviceManager.Config(
+                    serviceName = "BatteryMonitor",
+                    serviceType = "_ws._tcp.",
+                ),
+                CloudMqttDeviceManager.Config(
+                    host = secrets.MQTT_HOST,
+                    port = secrets.MQTT_PORT,
+                    user = secrets.MQTT_USER,
+                    pass = secrets.MQTT_PASS,
+                    root = "BatteryMonitor"
+                ),
+            ),
+            findViewById(R.id.connectStatusView),
+            ConnectStatusView.Config(
+                layout = R.layout.connect_status,
+                views = ConnectStatusView.Config.Views(
+                    direct = R.id.iconDirect,
+                    local = R.id.iconLocal,
+                    cloud = R.id.iconCloud
+                ),
+                colors = ConnectStatusView.Config.Colors(
+                    disabled = R.color.ic_connect_disabled,
+                    disconnected = R.color.ic_connect_disconnected,
+                    connectedStandby = R.color.ic_connect_connected_standby,
+                    connectedActive = R.color.ic_connect_connected_active
+                )
+            ),
+            onReceiveData = { json ->
+                processor.processDataReceived(json)
             },
-            statusCallback = { connectivityStatusUpdate() })
-    }
-    private val connectivityManagerLocal: WebSocketDeviceManager by lazy {
-        WebSocketDeviceManager("WebSocket", this, WebSocketDeviceConfig(), connectivityInfo,
-            dataCallback = { data ->
-                if (!connectivityManagerSubscribedtoCloud.isActive)
-                    processingHandler?.processDataReceived(JSONObject(data))
-            },
-            statusCallback = { connectivityStatusUpdate() })
-    }
-    private val connectivityManagerCloud: CloudMqttDeviceManager by lazy {
-        CloudMqttDeviceManager("CloudMqtt", this, CloudMqttDeviceConfig(), connectivityInfo,
-            dataCallback = { data ->
-                if (connectivityManagerSubscribedtoCloud.isActive)
-                    processingHandler?.processDataReceived(JSONObject(data))
-            },
-            statusCallback = { connectivityStatusUpdate() })
-    }
-    private val connectivityManagers by lazy {
-        listOf(connectivityManagerDirect, connectivityManagerLocal, connectivityManagerCloud)
-    }
-    private fun connectivityManagerAddressBinder(json: JSONObject) {
-        try {
-            if (json.getString("type") == "data" && json.has("addr")) {
-                val deviceAddress = json.getString("addr")
-                if (deviceAddress != connectivityInfo.deviceAddress) {
-                    connectivityInfo.updateDeviceAddress(deviceAddress)
-                    Log.d("Main", "Device address changed, triggering network and cloud connection attempts")
-                    listOf(connectivityManagerLocal, connectivityManagerCloud).forEach { it.onDoubleTap() }
+            addressExtractor = { json ->
+                if (json.getString("type") == "data" && json.has("addr")) {
+                    json.getString("addr")
+                } else {
+                    null
                 }
             }
-        } catch (e: Exception) {
-            Log.e("Main", "Error processing bluetooth address: exception", e)
-        }
-    }
-    private fun connectivityManagerSubscriberUpdate(directOrLocal: Boolean) {
-        if ((!directOrLocal && connectivityInfo.deviceAddress.isNotEmpty()) && connectivityManagerSubscribedtoCloud.toActive())
-            connectivityManagerCloud.subscribe()
-        else if (directOrLocal && connectivityManagerSubscribedtoCloud.toInactive())
-            connectivityManagerCloud.unsubscribe()
-    }
-    private val connectivityStatusView: DataViewConnectivityStatus by lazy {
-        findViewById(R.id.connectivityStatusView)
-    }
-    private fun connectivityStatusListenerDoubleTap() {
-        connectivityStatusView.setOnDoubleTapListener {
-            onDoubleTap()
-        }
-    }
-    private fun connectivityStatusUpdate() {
-        val statuses = connectivityManagers.associate { manager ->
-            when (manager) {
-                is BluetoothDeviceManager -> ConnectivityType.DIRECT
-                is WebSocketDeviceManager -> ConnectivityType.LOCAL
-                is CloudMqttDeviceManager -> ConnectivityType.CLOUD
-                else -> throw IllegalStateException("Unknown manager type")
-            } to ConnectivityStatus(
-                available = manager.isAvailable(),
-                permitted = manager.isPermitted(),
-                connected = manager.isConnected()
-            )
-        }
-        val directOrLocal = statuses[ConnectivityType.DIRECT]?.connected!! || statuses[ConnectivityType.LOCAL]?.connected!!
-        connectivityManagerSubscriberUpdate(directOrLocal)
-        connectivityStatusView.updateStatus(statuses)
-    }
-    private fun connectivitySetup() {
-        connectivityManagers.forEach { it.onCreate() }
-        connectivityStatusListenerDoubleTap()
+        )
     }
 
     //
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.d("Main", "onCreate")
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        processingSetup()
-        connectivitySetup()
-        powermanageSetup()
+        connector.onCreate()
+        power.onCreate()
     }
     override fun onDestroy() {
         Log.d("Main", "onDestroy")
         super.onDestroy()
-        connectivityManagers.forEach { it.onDestroy() }
+        connector.onDestroy()
     }
     override fun onPause() {
         Log.d("Main", "onPause")
         super.onPause()
-        connectivityManagers.forEach { it.onPause() }
+        connector.onPause()
     }
     override fun onResume() {
         Log.d("Main", "onResume")
         super.onResume()
-        connectivityManagers.forEach { it.onResume() }
+        connector.onResume()
     }
     private fun onPowerSave() {
         Log.d("Main", "onPowerSave")
-        connectivityManagers.forEach { it.onPowerSave() }
+        connector.onPowerSave()
     }
     private fun onPowerBack() {
         Log.d("Main", "onPowerBack")
-        connectivityManagers.forEach { it.onPowerBack() }
-    }
-    private fun onDoubleTap() {
-        Log.d("Main", "onDoubleTap")
-        connectivityManagers.forEach { it.onDoubleTap() }
+        connector.onPowerBack()
     }
 }

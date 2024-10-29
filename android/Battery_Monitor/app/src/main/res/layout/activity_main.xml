@@ -7,8 +7,8 @@
     android:padding="4dp">
 
         <!-- Connection Status -->
-        <com.example.battery_monitor.DataViewConnectivityStatus
-            android:id="@+id/connectivityStatusView"
+        <com.example.battery_monitor.connect.ConnectStatusView
+            android:id="@+id/connectStatusView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
@@ -17,7 +17,7 @@
 
         <!-- Operational Information -->
         <FrameLayout
-            android:id="@+id/operationalDataFrame"
+            android:id="@+id/processStatusDataFrame"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@android:color/white"
@@ -31,7 +31,7 @@
                 tools:ignore="UselessParent">
 
                 <TextView
-                    android:id="@+id/addrTextView"
+                    android:id="@+id/statusAddrTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textStyle="bold"
@@ -40,7 +40,7 @@
                     android:layout_marginTop="8dp" />
 
                 <TextView
-                    android:id="@+id/timeTextView"
+                    android:id="@+id/statusTimeTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textStyle="bold"
@@ -49,7 +49,7 @@
                     android:layout_marginTop="2dp" />
 
                 <TextView
-                    android:id="@+id/envTempTextView"
+                    android:id="@+id/statusEnvTempTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textStyle="bold"
@@ -58,7 +58,7 @@
                     android:layout_marginTop="2dp" />
 
                 <TextView
-                    android:id="@+id/batTempTextView"
+                    android:id="@+id/statusBatTempTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textStyle="bold"
@@ -66,14 +66,14 @@
                     android:textIsSelectable="true"
                     android:layout_marginTop="2dp" />
 
-                <com.example.battery_monitor.DataViewBatteryTemperature
-                    android:id="@+id/batTempValuesView"
+                <com.example.battery_monitor.process.ProcessViewBatteryTemperature
+                    android:id="@+id/statusBatTempValuesView"
                     android:layout_width="match_parent"
                     android:layout_height="320dp"
                     android:layout_marginTop="8dp" />
 
                 <TextView
-                    android:id="@+id/fanSpeedTextView"
+                    android:id="@+id/statusFanSpeedTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textSize="16sp"
@@ -88,7 +88,7 @@
 
         <!-- Alarm Information  -->
         <TextView
-            android:id="@+id/alarmsTextView"
+            android:id="@+id/processAlarmTextView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="16sp"
@@ -100,14 +100,14 @@
             android:layout_marginRight="4dp"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="8dp"
-            android:contentDescription="@string/textview_alarm_information"
+            android:contentDescription="@string/textview_process_alarm"
             android:clickable="true"
             android:focusable="true"
             android:elevation="4dp"/>
 
         <!-- Diagnostic Information -->
         <FrameLayout
-            android:id="@+id/diagnosticDataFrame"
+            android:id="@+id/processDiagnosticDataFrame"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
@@ -121,11 +121,11 @@
                 tools:ignore="UselessParent">
 
                 <TextView
-                    android:id="@+id/diagDataTextView"
+                    android:id="@+id/diagnosticTextView"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textIsSelectable="true"
-                    android:contentDescription="@string/textview_diagnostic_information"
+                    android:contentDescription="@string/textview_process_diagnostic"
                     android:fontFamily="monospace" />
 
             </ScrollView>

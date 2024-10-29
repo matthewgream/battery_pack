@@ -1,9 +1,7 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -12,21 +10,44 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.graphics.drawable.LayerDrawable
+import androidx.annotation.ColorRes
+import androidx.annotation.IdRes
+import androidx.annotation.LayoutRes
 
-class DataViewConnectivityStatus @JvmOverloads constructor(
+class ConnectStatusView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
+    data class Config(
+        @LayoutRes val layout: Int,
+        val views: Views,
+        val colors: Colors,
+        val elevation: Float = 4f
+    ) {
+        data class Views(
+            @IdRes val direct: Int,
+            @IdRes val local: Int,
+            @IdRes val cloud: Int
+        )
+        data class Colors(
+            @ColorRes val disabled: Int,
+            @ColorRes val disconnected: Int,
+            @ColorRes val connectedStandby: Int,
+            @ColorRes val connectedActive: Int
+        )
+    }
+
     private val uiHandler = Handler(Looper.getMainLooper())
     private lateinit var doubleTapListener: () -> Unit
     private lateinit var gestureDetector: GestureDetector
 
-    private val iconDirect: ImageView
-    private val iconLocal: ImageView
-    private val iconCloud: ImageView
+    private lateinit var config: Config
+
+    private lateinit var iconDirect: ImageView
+    private lateinit var iconLocal: ImageView
+    private lateinit var iconCloud: ImageView
 
     private enum class IconState {
         DISABLED, // Grey - No permissions or not available
@@ -35,14 +56,13 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
         CONNECTED_ACTIVE // Green - Connected and active
     }
 
-    // Define connection priority order
-    private enum class ConnectivityPriority(val type: ConnectivityType) {
-        DIRECT(ConnectivityType.DIRECT),
-        LOCAL(ConnectivityType.LOCAL),
-        CLOUD(ConnectivityType.CLOUD);
+    private enum class ConnectivityPriority(val type: ConnectType) {
+        DIRECT(ConnectType.DIRECT),
+        LOCAL(ConnectType.LOCAL),
+        CLOUD(ConnectType.CLOUD);
 
         companion object {
-            fun fromType(type: ConnectivityType): ConnectivityPriority {
+            fun fromType(type: ConnectType): ConnectivityPriority {
                 return values().first { it.type == type }
             }
         }
@@ -50,26 +70,30 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
 
     init {
         orientation = VERTICAL
-        LayoutInflater.from(context).inflate(R.layout.view_connectivity_status, this, true)
+    }
 
-        iconDirect = findViewById(R.id.iconDirect)
-        iconLocal = findViewById(R.id.iconLocal)
-        iconCloud = findViewById(R.id.iconCloud)
+    fun initialize(config: Config) {
+        LayoutInflater.from(context).inflate(config.layout, this, true)
 
-        elevation = 4f
+        this.config = config
+        iconDirect = findViewById(config.views.direct)
+        iconLocal = findViewById(config.views.local)
+        iconCloud = findViewById(config.views.cloud)
+
+        elevation = config.elevation
     }
 
     private fun updateIconState(icon: ImageView, state: IconState) {
-        val color = when (state) {
-            IconState.DISABLED -> context.getColor(R.color.icon_disabled)
-            IconState.DISCONNECTED -> context.getColor(R.color.icon_disconnected)
-            IconState.CONNECTED_STANDBY -> context.getColor(R.color.icon_connected_standby)
-            IconState.CONNECTED_ACTIVE -> context.getColor(R.color.icon_connected_active)
+        val colorResId = when (state) {
+            IconState.DISABLED -> config.colors.disabled
+            IconState.DISCONNECTED -> config.colors.disconnected
+            IconState.CONNECTED_STANDBY -> config.colors.connectedStandby
+            IconState.CONNECTED_ACTIVE -> config.colors.connectedActive
         }
-        icon.setColorFilter(color)
+        icon.setColorFilter(context.getColor(colorResId))
     }
 
-    fun updateStatus(statuses: Map<ConnectivityType, ConnectivityStatus>) {
+    fun updateStatus(statuses: Map<ConnectType, ConnectStatus>) {
         uiHandler.post {
             // Find the highest priority connected device
             val highestPriorityConnected = ConnectivityPriority.values()
@@ -80,9 +104,9 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
                 }
 
             val iconMapping = mapOf(
-                ConnectivityType.DIRECT to iconDirect,
-                ConnectivityType.LOCAL to iconLocal,
-                ConnectivityType.CLOUD to iconCloud
+                ConnectType.DIRECT to iconDirect,
+                ConnectType.LOCAL to iconLocal,
+                ConnectType.CLOUD to iconCloud
             )
 
             statuses.forEach { (type, status) ->
@@ -92,7 +116,8 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
                 val iconState = when {
                     !status.permitted || !status.available -> IconState.DISABLED
                     !status.connected -> IconState.DISCONNECTED
-                    highestPriorityConnected != null && priority != highestPriorityConnected -> IconState.CONNECTED_STANDBY
+                    highestPriorityConnected != null && priority != highestPriorityConnected ->
+                        IconState.CONNECTED_STANDBY
                     else -> IconState.CONNECTED_ACTIVE
                 }
 
@@ -104,13 +129,14 @@ class DataViewConnectivityStatus @JvmOverloads constructor(
     @SuppressLint("ClickableViewAccessibility")
     fun setOnDoubleTapListener(listener: () -> Unit) {
         this.doubleTapListener = listener
-        gestureDetector =
-            GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        gestureDetector = GestureDetector(context,
+            object : GestureDetector.SimpleOnGestureListener() {
                 override fun onDoubleTap(e: MotionEvent): Boolean {
                     doubleTapListener.invoke()
                     return true
                 }
-            })
+            }
+        )
 
         setOnTouchListener { _, event ->
             gestureDetector.onTouchEvent(event)

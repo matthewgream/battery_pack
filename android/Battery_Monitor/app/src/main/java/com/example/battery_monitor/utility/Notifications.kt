@@ -1,4 +1,4 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.utility
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -6,12 +6,20 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import androidx.annotation.DrawableRes
 
 @SuppressLint("MissingPermission")
 class NotificationsManager(
     private val activity: Activity,
-    private val config: NotificationsConfig
+    private val config: Config,
+    @DrawableRes val iconResourceId: Int
 ) {
+
+    open class Config(
+        val name: String,
+        val description: String,
+    )
+
     private val permissions: PermissionsManager = PermissionsManagerFactory(activity).create("Notifications",
         arrayOf(
             android.Manifest.permission.POST_NOTIFICATIONS
@@ -38,7 +46,7 @@ class NotificationsManager(
             val text = current.joinToString("\n") { "${it.first}: ${it.second}" }
             manager.notify(identifier,
                 Notification.Builder(activity, channel)
-                    .setSmallIcon(R.drawable.ic_notification)
+                    .setSmallIcon(iconResourceId)
                     .setContentTitle(title)
                     .setContentText(text)
                     .setStyle(Notification.BigTextStyle().bigText(text))

@@ -27,11 +27,11 @@
             android:orientation="vertical"
             android:gravity="center">
 
-            <ImageView android:contentDescription="@string/textview_direct_connection_status"
+            <ImageView android:contentDescription="@string/textview_connect_direct_status"
                 android:id="@+id/iconDirect"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/ic_device_direct"/>
+                android:src="@drawable/ic_connect_direct"/>
         </LinearLayout>
 
         <!-- Local status (WiFi) -->
@@ -42,11 +42,11 @@
             android:gravity="center"
             android:layout_marginStart="16dp">
 
-            <ImageView android:contentDescription="@string/textview_local_connection_status"
+            <ImageView android:contentDescription="@string/textview_connect_local_status"
                 android:id="@+id/iconLocal"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/ic_device_local"/>
+                android:src="@drawable/ic_connect_local"/>
         </LinearLayout>
 
         <!-- Cloud status (mqtt) -->
@@ -57,11 +57,11 @@
             android:gravity="center"
             android:layout_marginStart="16dp">
 
-            <ImageView android:contentDescription="@string/textview_cloud_connection_status"
+            <ImageView android:contentDescription="@string/textview_connect_cloud_status"
                 android:id="@+id/iconCloud"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/ic_device_cloud"/>
+                android:src="@drawable/ic_connect_cloud"/>
         </LinearLayout>
 
     </LinearLayout>

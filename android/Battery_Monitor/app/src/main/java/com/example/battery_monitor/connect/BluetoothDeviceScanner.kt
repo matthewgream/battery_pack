@@ -1,4 +1,4 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
@@ -112,7 +112,7 @@ class BluetoothDeviceScanner(
     private val adapter: AdapterBluetooth,
     private val config: Config,
     private val onFound: (BluetoothDevice) -> Unit
-) : ConnectivityComponent(tag, config.scanPeriod) {
+) : ConnectComponent(tag, config.scanPeriod) {
 
     class Config(
         val name: String,

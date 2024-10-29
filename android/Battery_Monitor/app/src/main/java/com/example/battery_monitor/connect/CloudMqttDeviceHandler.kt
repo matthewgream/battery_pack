@@ -1,4 +1,4 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.connect
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -14,19 +14,19 @@ class CloudMqttDeviceHandler(
     tag: String,
     @Suppress("unused") private val activity: Activity,
     @Suppress("unused") private val adapter: AdapterNetworkInternet,
-    val config: CloudMqttDeviceConfig,
-    private val connectivityInfo: ConnectivityInfo,
+    val config: CloudMqttDeviceManager.Config,
+    private val connectInfo: ConnectInfo,
     private val dataCallback: (String) -> Unit,
     statusCallback: () -> Unit,
     isAvailable: () -> Boolean,
     isPermitted: () -> Boolean
-) : ConnectivityDeviceHandler(tag, statusCallback, 0, 0, isAvailable, isPermitted) {
+) : ConnectDeviceHandler(tag, statusCallback, 0, 0, isAvailable, isPermitted) {
 
     //
 
     private class MqttDeviceConnection(
         private val tag: String,
-        private val config: CloudMqttDeviceConfig,
+        private val config: CloudMqttDeviceManager.Config,
         private val identity: String,
         private val onKeepalive: (MqttDeviceConnection) -> Unit,
         private val onConnected: (MqttDeviceConnection) -> Unit,
@@ -35,18 +35,8 @@ class CloudMqttDeviceHandler(
         private val onReceived: (MqttDeviceConnection, String) -> Unit
     ) {
         private var client: Mqtt5AsyncClient? = null
-        private inline fun <T> mqttOperation(operation: String, block: () -> T?): T? {
-            return try {
-                block()?.also {
-                    Log.d(tag, "MQTT $operation: success")
-                }
-            } catch (e: Exception) {
-                Log.e(tag, "MQTT $operation: exception", e)
-                null
-            }
-        }
         @SuppressLint("CheckResult")
-        fun connect(): Boolean = mqttOperation("connect") {
+        fun connect(): Boolean = tag.withOperation("MQTT", "connect") {
             MqttClient.builder()
                 .useMqttVersion5()
                 .identifier(identity)
@@ -89,7 +79,7 @@ class CloudMqttDeviceHandler(
                 }
             true
         } ?: false
-        fun subscribe(topic: String): Boolean = mqttOperation("subscribe") {
+        fun subscribe(topic: String): Boolean = tag.withOperation("MQTT", "subscribe") {
             client?.subscribeWith()
                 ?.topicFilter(topic)
                 ?.retainAsPublished(true)
@@ -117,7 +107,7 @@ class CloudMqttDeviceHandler(
                 }
             true
         } ?: false
-        fun unsubscribe(topic: String): Boolean = mqttOperation("unsubscribe") {
+        fun unsubscribe(topic: String): Boolean = tag.withOperation("MQTT", "unsubscribe") {
             client?.unsubscribeWith()
                 ?.topicFilter(topic)
                 ?.send()
@@ -138,7 +128,7 @@ class CloudMqttDeviceHandler(
                 }
             true
         } ?: false
-        fun publish(topic: String, message: String): Boolean = mqttOperation("publish") {
+        fun publish(topic: String, message: String): Boolean = tag.withOperation("MQTT", "publish") {
             client?.publishWith()
                 ?.topic(topic)
                 ?.payload(message.toByteArray())
@@ -162,7 +152,7 @@ class CloudMqttDeviceHandler(
                 }
             true
         } ?: false
-        fun disconnect() = mqttOperation("disconnect") {
+        fun disconnect() = tag.withOperation("MQTT", "disconnect") {
             client?.disconnectWith()
                 ?.sessionExpiryInterval(0)
                 ?.send()
@@ -180,12 +170,12 @@ class CloudMqttDeviceHandler(
 
     //
 
-    private var root = "${config.root}/${connectivityInfo.deviceAddress}"
+    private var root = "${config.root}/${connectInfo.deviceAddress}"
     private var topic = ""
 
     private val connection = MqttDeviceConnection(tag,
         config,
-        connectivityInfo.identity,
+        connectInfo.identity,
         onConnected = {
             Log.d(tag, "Device connected")
             setConnectionIsConnected()
@@ -222,7 +212,7 @@ class CloudMqttDeviceHandler(
         connection.disconnect()
     }
     override fun doConnectionIdentify(): Boolean {
-        return connection.publish("${root}/peer", connectivityInfo.toJsonString())
+        return connection.publish("${root}/peer", connectInfo.toJsonString())
     }
 
     //

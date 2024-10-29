@@ -1,4 +1,4 @@
-package com.example.battery_monitor
+package com.example.battery_monitor.utility
 
 import android.annotation.SuppressLint
 import android.app.Activity
