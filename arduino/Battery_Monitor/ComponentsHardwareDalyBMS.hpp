@@ -19,106 +19,112 @@ public:
     using Receiver = RequestResponseFrame_Receiver;
 
     struct Constants {
-        static constexpr size_t FRAME_SIZE = 13;
-        static constexpr uint8_t START_BYTE = 0xA5;
-        static constexpr uint8_t HOST_ADDRESS = 0x40;
-        static constexpr uint8_t SLAVE_ADDRESS = 0x01;
-        static constexpr size_t HEADER_SIZE = 4;
-        static constexpr size_t DATA_SIZE = (FRAME_SIZE - HEADER_SIZE - 1);
-        static constexpr size_t CHECKSUM_OFFSET = (FRAME_SIZE - 1);
+        static constexpr size_t SIZE_FRAME = 13;
+        static constexpr size_t SIZE_HEADER = 4;
+        static constexpr size_t SIZE_DATA = (SIZE_FRAME - SIZE_HEADER - 1);
+
+        static constexpr size_t OFFSET_BYTE_START = 0;
+        static constexpr size_t OFFSET_ADDRESS = 1;
+        static constexpr size_t OFFSET_COMMAND = 2;
+        static constexpr size_t OFFSET_SIZE = 3;
+        static constexpr size_t OFFSET_CHECKSUM = (SIZE_FRAME - 1);
+
+        static constexpr uint8_t VALUE_BYTE_START = 0xA5;
+        static constexpr uint8_t VALUE_ADDRESS_HOST = 0x40;
+        static constexpr uint8_t VALUE_ADDRESS_SLAVE = 0x01;
     };
 
     RequestResponseFrame()
         : _data{} {
-        setStartByte(Constants::START_BYTE);
-        setFrameSize(Constants::DATA_SIZE);
+        setStartByte(Constants::VALUE_BYTE_START);
+        setFrameSize(Constants::SIZE_DATA);
     }
 
-    void setHostAddress(const uint8_t value) {
-        _data[1] = value;
+    void setAddress(const uint8_t value) {
+        _data[Constants::OFFSET_ADDRESS] = value;
     }
-    uint8_t getCommandId() const {
-        return _data[2];
+    uint8_t getCommand() const {
+        return _data[Constants::OFFSET_COMMAND];
     }
-    void setCommandId(const uint8_t value) {
-        _data[2] = value;
+    void setCommand(const uint8_t value) {
+        _data[Constants::OFFSET_COMMAND] = value;
     }
 
     const RequestResponseFrame& finalize() {
-        _data[Constants::CHECKSUM_OFFSET] = calculateChecksum();
+        _data[Constants::OFFSET_CHECKSUM] = calculateChecksum();
         return *this;
     }
 
     bool valid() const {
-        return _data[0] == Constants::START_BYTE && _data[1] != Constants::SLAVE_ADDRESS && _data[3] == Constants::DATA_SIZE && _data[Constants::CHECKSUM_OFFSET] == calculateChecksum();
+        return _data[Constants::OFFSET_BYTE_START] == Constants::VALUE_BYTE_START && _data[Constants::OFFSET_ADDRESS] != Constants::VALUE_ADDRESS_SLAVE && _data[Constants::OFFSET_SIZE] == Constants::SIZE_DATA && _data[Constants::OFFSET_CHECKSUM] == calculateChecksum();
     }
 
     //
 
     inline uint8_t getUInt8(const size_t offset) const {
         validateDataOffset(offset);
-        return _data[Constants::HEADER_SIZE + offset];
+        return _data[Constants::SIZE_HEADER + offset];
     }
     inline RequestResponseFrame& setUInt8(const size_t offset, const uint8_t value) {
         validateDataOffset(offset);
-        _data[Constants::HEADER_SIZE + offset] = value;
+        _data[Constants::SIZE_HEADER + offset] = value;
         return *this;
     }
     inline uint16_t getUInt16(const size_t offset) const {
         validateDataOffset(offset);
-        return ((uint16_t)_data[Constants::HEADER_SIZE + offset] << 8) | (uint16_t)_data[Constants::HEADER_SIZE + offset + 1];
+        return ((uint16_t)_data[Constants::SIZE_HEADER + offset] << 8) | (uint16_t)_data[Constants::SIZE_HEADER + offset + 1];
     }
     inline uint32_t getUInt32(const size_t offset) const {
         validateDataOffset(offset);
-        return ((uint32_t)_data[Constants::HEADER_SIZE + offset] << 24) | ((uint32_t)_data[Constants::HEADER_SIZE + offset + 1] << 16) | ((uint32_t)_data[Constants::HEADER_SIZE + offset + 2] << 8) | (uint32_t)_data[Constants::HEADER_SIZE + offset + 3];
+        return ((uint32_t)_data[Constants::SIZE_HEADER + offset] << 24) | ((uint32_t)_data[Constants::SIZE_HEADER + offset + 1] << 16) | ((uint32_t)_data[Constants::SIZE_HEADER + offset + 2] << 8) | (uint32_t)_data[Constants::SIZE_HEADER + offset + 3];
     }
     inline bool getBit(const size_t offset, const uint8_t position) const {
         validateDataOffset(offset);
-        return (_data[Constants::HEADER_SIZE + offset] >> position) & 0x01;
+        return (_data[Constants::SIZE_HEADER + offset] >> position) & 0x01;
     }
     inline bool getBit(const size_t index) const {
         validateDataOffset(index >> 3);
-        return (_data[Constants::HEADER_SIZE + (index >> 3)] >> (index & 0x07)) & 0x01;
+        return (_data[Constants::SIZE_HEADER + (index >> 3)] >> (index & 0x07)) & 0x01;
     }
 
     const uint8_t* data() const {
         return _data.data();
     }
     static constexpr size_t size() {
-        return Constants::FRAME_SIZE;
+        return Constants::SIZE_FRAME;
     }
 
 protected:
     friend Receiver;
     uint8_t& operator[](const size_t index) {
-        assert(index < Constants::FRAME_SIZE);
+        assert(index < Constants::SIZE_FRAME);
         return _data[index];
     }
     const uint8_t& operator[](const size_t index) const {
-        assert(index < Constants::FRAME_SIZE);
+        assert(index < Constants::SIZE_FRAME);
         return _data[index];
     }
 
 private:
     void setStartByte(const uint8_t value) {
-        _data[0] = value;
+        _data[Constants::OFFSET_BYTE_START] = value;
     }
     void setFrameSize(const uint8_t value) {
-        _data[3] = value;
+        _data[Constants::OFFSET_SIZE] = value;
     }
 
     inline void validateDataOffset(const size_t offset) const {
-        assert(offset < Constants::DATA_SIZE);
+        assert(offset < Constants::SIZE_DATA);
     }
 
     uint8_t calculateChecksum() const {
         uint8_t sum = 0;
-        for (int i = 0; i < Constants::CHECKSUM_OFFSET; i++)
+        for (int i = 0; i < Constants::OFFSET_CHECKSUM; i++)
             sum += _data[i];
         return sum;
     }
 
-    std::array<uint8_t, Constants::FRAME_SIZE> _data;
+    std::array<uint8_t, Constants::SIZE_FRAME> _data;
 };
 
 // -----------------------------------------------------------------------------------------------
@@ -146,19 +152,19 @@ public:
         while (getByte(&byte)) {
             switch (_readState) {
                 case ReadState::WaitingForStart:
-                    if (byte == RequestResponseFrame::Constants::START_BYTE) {
-                        _readFrame[0] = byte;
-                        _readOffset = 1;
+                    if (byte == RequestResponseFrame::Constants::VALUE_BYTE_START) {
+                        _readFrame[RequestResponseFrame::Constants::OFFSET_BYTE_START] = byte;
+                        _readOffset = RequestResponseFrame::Constants::OFFSET_ADDRESS;
                         _readState = ReadState::ReadingHeader;
                     }
                     break;
 
                 case ReadState::ReadingHeader:
                     _readFrame[_readOffset++] = byte;
-                    if (_readOffset == RequestResponseFrame::Constants::HEADER_SIZE) {
-                        if (_readFrame[1] >= RequestResponseFrame::Constants::SLAVE_ADDRESS) {    // SLEEPING
+                    if (_readOffset == RequestResponseFrame::Constants::SIZE_HEADER) {
+                        if (_readFrame[RequestResponseFrame::Constants::OFFSET_ADDRESS] >= RequestResponseFrame::Constants::VALUE_ADDRESS_SLAVE) {    // SLEEPING
                             _readState = ReadState::WaitingForStart;
-                            _readOffset = 0;
+                            _readOffset = RequestResponseFrame::Constants::OFFSET_BYTE_START;
                         } else {
                             _readState = ReadState::ReadingData;
                         }
@@ -167,11 +173,11 @@ public:
 
                 case ReadState::ReadingData:
                     _readFrame[_readOffset++] = byte;
-                    if (_readOffset == RequestResponseFrame::Constants::FRAME_SIZE) {
+                    if (_readOffset == RequestResponseFrame::Constants::SIZE_FRAME) {
                         if (_readFrame.valid())
                             _handler(_readFrame);
                         _readState = ReadState::WaitingForStart;
-                        _readOffset = 0;
+                        _readOffset = RequestResponseFrame::Constants::OFFSET_BYTE_START;
                     }
                     break;
             }
@@ -186,7 +192,7 @@ public:
 private:
     const Handler _handler;
     ReadState _readState = ReadState::WaitingForStart;
-    size_t _readOffset = 0;
+    size_t _readOffset = RequestResponseFrame::Constants::OFFSET_BYTE_START;
     RequestResponseFrame _readFrame;
 };
 
@@ -196,10 +202,10 @@ private:
 class RequestResponse_Builder {
 public:
     RequestResponse_Builder() {
-        _request.setHostAddress(RequestResponseFrame::Constants::HOST_ADDRESS);
+        _request.setAddress(RequestResponseFrame::Constants::VALUE_ADDRESS_HOST);
     }
-    RequestResponse_Builder& setCommandId(const uint8_t cmd) {
-        _request.setCommandId(cmd);
+    RequestResponse_Builder& setCommand(const uint8_t cmd) {
+        _request.setCommand(cmd);
         return *this;
     }
     RequestResponse_Builder& setResponseCount(const size_t count) {
@@ -226,8 +232,8 @@ public:
     RequestResponse(RequestResponse_Builder& builder)
         : _request(builder.getRequest()), _responsesExpected(builder.getResponseCount()), _responsesReceived(0) {}
     virtual ~RequestResponse() = default;
-    uint8_t getCommandId() const {
-        return _request.getCommandId();
+    uint8_t getCommand() const {
+        return _request.getCommand();
     }
     bool isValid() const {
         return _valid;
@@ -273,13 +279,17 @@ private:
 template<uint8_t COMMAND>
 class RequestResponseCommand : public RequestResponse {
 public:
-    static constexpr uint8_t COMMAND_ID = COMMAND;
     RequestResponseCommand()
-        : RequestResponse(RequestResponse::Builder().setCommandId(COMMAND)) {}
+        : RequestResponse(RequestResponse::Builder().setCommand(COMMAND)) {}
 protected:
     using RequestResponse::setValid;
     using RequestResponse::setResponseCount;
 };
+
+template<uint8_t COMMAND>
+bool operator==(const RequestResponseCommand<COMMAND>& lhs, const uint8_t rhs) {
+    return rhs == COMMAND;
+}
 
 template<uint8_t COMMAND, int LENGTH = 1>
 class RequestResponse_TYPE_STRING : public RequestResponseCommand<COMMAND> {
@@ -294,7 +304,7 @@ protected:
     using RequestResponseCommand<COMMAND>::setResponseCount;
     bool processFrame(const RequestResponseFrame& frame, const size_t frameNum) override {
         if (frameNum == 1) string = "";
-        for (size_t i = 0; i < RequestResponseFrame::Constants::DATA_SIZE - 1; i++)
+        for (size_t i = 0; i < RequestResponseFrame::Constants::SIZE_DATA - 1; i++)
             string += static_cast<char>(frame.getUInt8(1 + i));
         if (frameNum == LENGTH) {
             string.trim();
@@ -406,13 +416,19 @@ protected:
 };
 
 using RequestResponse_CELL_VOLTAGES_THRESHOLDS = RequestResponse_THRESHOLD_MINMAX_TYPE<0x59, float,
-    [](uint16_t v) -> float { return static_cast<float>(v) / 1000.0f; }>;
+                                                                                       [](uint16_t v) -> float {
+                                                                                           return static_cast<float>(v) / 1000.0f;
+                                                                                       }>;
 
 using RequestResponse_PACK_VOLTAGES_THRESHOLDS = RequestResponse_THRESHOLD_MINMAX_TYPE<0x5A, float,
-    [](uint16_t v) -> float { return static_cast<float>(v) / 10.0f; }>;
+                                                                                       [](uint16_t v) -> float {
+                                                                                           return static_cast<float>(v) / 10.0f;
+                                                                                       }>;
 
 using RequestResponse_PACK_CURRENTS_THRESHOLDS = RequestResponse_THRESHOLD_MINMAX_TYPE<0x5B, float,
-    [](uint16_t v) -> float { return (static_cast<float>(v) - 30000) / 10.0f; }>;
+                                                                                       [](uint16_t v) -> float {
+                                                                                           return (static_cast<float>(v) - 30000) / 10.0f;
+                                                                                       }>;
 
 class RequestResponse_PACK_TEMPERATURE_THRESHOLDS : public RequestResponseCommand<0x5C> {
 public:
@@ -440,7 +456,9 @@ protected:
 };
 
 using RequestResponse_PACK_SOC_THRESHOLDS = RequestResponse_THRESHOLD_MINMAX_TYPE<0x5D, float,
-    [](uint16_t v) -> float { return static_cast<float>(v) / 10.0f; }>;
+                                                                                  [](uint16_t v) -> float {
+                                                                                      return static_cast<float>(v) / 10.0f;
+                                                                                  }>;
 
 class RequestResponse_CELL_SENSORS_THRESHOLDS : public RequestResponseCommand<0x5E> {
 public:
@@ -543,14 +561,20 @@ protected:
 };
 
 using RequestResponse_CELL_VOLTAGES_MINMAX = RequestResponse_TYPE_VALUE_MINMAX<0x91, float, 2,
-    [](const RequestResponseFrame& frame, size_t offset) -> float { return static_cast<float>(frame.getUInt16(offset)) / 1000.0f; }>;
+                                                                               [](const RequestResponseFrame& frame, size_t offset) -> float {
+                                                                                   return static_cast<float>(frame.getUInt16(offset)) / 1000.0f;
+                                                                               }>;
 
 using RequestResponse_CELL_TEMPERATURES_MINMAX = RequestResponse_TYPE_VALUE_MINMAX<0x92, int8_t, 1,
-    [](const RequestResponseFrame& frame, size_t offset) -> int8_t { return frame.getUInt8(offset) - 40; }>;
+                                                                                   [](const RequestResponseFrame& frame, size_t offset) -> int8_t {
+                                                                                       return frame.getUInt8(offset) - 40;
+                                                                                   }>;
 
 class RequestResponse_MOSFET_STATUS : public RequestResponseCommand<0x93> {
 public:
-    enum class ChargeStatus : uint8_t { Stationary = 0x00, Charge = 0x01, Discharge = 0x02 };
+    enum class ChargeStatus : uint8_t { Stationary = 0x00,
+                                        Charge = 0x01,
+                                        Discharge = 0x02 };
     ChargeStatus chargeStatus = ChargeStatus::Stationary;
     bool chargeMosState = false;
     bool dischargeMosState = false;
@@ -619,13 +643,19 @@ protected:
 };
 
 using RequestResponse_CELL_VOLTAGES = RequestResponse_TYPE_ARRAY<0x95, float, 48, 3,
-    [](const RequestResponseFrame& frame, size_t i) -> float { return static_cast<float>(frame.getUInt16(1 + i * 2)) / 1000.0f; }>;
+                                                                 [](const RequestResponseFrame& frame, size_t i) -> float {
+                                                                     return static_cast<float>(frame.getUInt16(1 + i * 2)) / 1000.0f;
+                                                                 }>;
 
 using RequestResponse_CELL_TEMPERATURES = RequestResponse_TYPE_ARRAY<0x96, int8_t, 16, 7,
-    [](const RequestResponseFrame& frame, size_t i) -> int8_t { return frame.getUInt8(1 + i) - 40; }>;
+                                                                     [](const RequestResponseFrame& frame, size_t i) -> int8_t {
+                                                                         return frame.getUInt8(1 + i) - 40;
+                                                                     }>;
 
 using RequestResponse_CELL_BALANCES = RequestResponse_TYPE_ARRAY<0x97, bool, 48, 48,
-    [](const RequestResponseFrame& frame, size_t i) -> bool { return frame.getBit(i); }>;
+                                                                 [](const RequestResponseFrame& frame, size_t i) -> bool {
+                                                                     return frame.getBit(i);
+                                                                 }>;
 
 class RequestResponse_FAILURE_STATUS : public RequestResponseCommand<0x98> {
     static constexpr size_t NUM_FAILURE_BYTES = 7;
@@ -720,7 +750,7 @@ public:
     }
 
     bool receiveFrame(const RequestResponseFrame& frame) {
-        auto it = _requestsMap.find(frame.getCommandId());
+        auto it = _requestsMap.find(frame.getCommand());
         if (it != _requestsMap.end() && it->second->processResponse(frame)) {
             if (it->second->isValid())
                 notifyListeners(it->second);
@@ -732,7 +762,7 @@ public:
     explicit RequestResponseManager(const std::vector<RequestResponse*>& requests)
         : _requests(requests) {
         for (auto request : _requests)
-            _requestsMap[request->getCommandId()] = request;
+            _requestsMap[request->getCommand()] = request;
     }
 
 private:
@@ -788,7 +818,15 @@ public:
         RequestResponse_BATTERY_STAT battery_stat;
         RequestResponse_BMS_RTC rtc;
         void forEach(const std::function<void(RequestResponse*)>& fn) {
-            fn(&hardware_config); fn(&hardware_version); fn(&firmware_index); fn(&software_version); fn(&battery_ratings); fn(&battery_code); fn(&battery_info); fn(&battery_stat); fn(&rtc);
+            fn(&hardware_config);
+            fn(&hardware_version);
+            fn(&firmware_index);
+            fn(&software_version);
+            fn(&battery_ratings);
+            fn(&battery_code);
+            fn(&battery_info);
+            fn(&battery_stat);
+            fn(&rtc);
         }
     } information;
     struct Thresholds {    // static, unofficial
@@ -801,7 +839,14 @@ public:
         RequestResponse_CELL_BALANCES_THRESHOLDS cell_balances;
         RequestResponse_PACK_SHORTCIRCUIT_THRESHOLDS pack_shortcircuit;
         void forEach(const std::function<void(RequestResponse*)>& fn) {
-            fn(&pack_voltages); fn(&pack_currents); fn(&pack_temperatures); fn(&pack_soc); fn(&cell_voltages); fn(&cell_sensors); fn(&cell_balances); fn(&pack_shortcircuit);
+            fn(&pack_voltages);
+            fn(&pack_currents);
+            fn(&pack_temperatures);
+            fn(&pack_soc);
+            fn(&cell_voltages);
+            fn(&cell_sensors);
+            fn(&cell_balances);
+            fn(&pack_shortcircuit);
         }
     } thresholds;
     struct Status {
@@ -812,7 +857,12 @@ public:
         RequestResponse_PACK_INFORMATION info;
         RequestResponse_FAILURE_STATUS failures;
         void forEach(const std::function<void(RequestResponse*)>& fn) {
-            fn(&pack); fn(&cell_voltages); fn(&cell_temperatures); fn(&fets); fn(&info); fn(&failures);
+            fn(&pack);
+            fn(&cell_voltages);
+            fn(&cell_temperatures);
+            fn(&fets);
+            fn(&info);
+            fn(&failures);
         }
     } status;
     struct Diagnostics {
@@ -820,7 +870,9 @@ public:
         RequestResponse_CELL_TEMPERATURES temperatures;
         RequestResponse_CELL_BALANCES balances;
         void forEach(const std::function<void(RequestResponse*)>& fn) {
-            fn(&voltages); fn(&temperatures); fn(&balances);
+            fn(&voltages);
+            fn(&temperatures);
+            fn(&balances);
         }
     } diagnostics;
     struct Commands {    // unofficial
@@ -832,15 +884,9 @@ public:
     explicit DalyBmsInterface(HardwareSerial& serial)
         : thresholds{}, status{}, diagnostics{}, commands{},
           _connector(serial, [this](const RequestResponseFrame& frame) {
-            _manager.receiveFrame(frame);
+              _manager.receiveFrame(frame);
           }),
-          _manager({
-            &information.hardware_config, &information.hardware_version, &information.firmware_index, &information.software_version, &information.battery_ratings, &information.battery_code, &information.battery_info, &information.battery_stat, &information.rtc,
-            &thresholds.pack_voltages, &thresholds.pack_currents, &thresholds.pack_temperatures, &thresholds.pack_soc, &thresholds.cell_voltages, &thresholds.cell_sensors, &thresholds.cell_balances, &thresholds.pack_shortcircuit,
-            &status.pack, &status.cell_voltages, &status.cell_temperatures, &status.fets, &status.info, &status.failures,
-            &diagnostics.voltages, &diagnostics.temperatures, &diagnostics.balances, 
-            &commands.reset, &commands.discharge, &commands.charge
-          }) {
+          _manager({ &information.hardware_config, &information.hardware_version, &information.firmware_index, &information.software_version, &information.battery_ratings, &information.battery_code, &information.battery_info, &information.battery_stat, &information.rtc, &thresholds.pack_voltages, &thresholds.pack_currents, &thresholds.pack_temperatures, &thresholds.pack_soc, &thresholds.cell_voltages, &thresholds.cell_sensors, &thresholds.cell_balances, &thresholds.pack_shortcircuit, &status.pack, &status.cell_voltages, &status.cell_temperatures, &status.fets, &status.info, &status.failures, &diagnostics.voltages, &diagnostics.temperatures, &diagnostics.balances, &commands.reset, &commands.discharge, &commands.charge }) {
         _manager.registerListener(this);
     }
 
@@ -855,23 +901,30 @@ public:
         if (request->isRequestable())
             _connector.write(request->prepareRequest());
     }
-
     void requestStatus() {
-        status.forEach([this](auto* r) { issue(r); });
+        status.forEach([this](auto* r) {
+            issue(r);
+        });
     }
     void requestDiagnostics() {
-        diagnostics.forEach([this](auto* r) { issue(r); });
+        diagnostics.forEach([this](auto* r) {
+            issue(r);
+        });
     }
     void requestInitial() {
-        information.forEach([this](auto* r) { issue(r); });
-        thresholds.forEach([this](auto* r) { issue(r); });
+        information.forEach([this](auto* r) {
+            issue(r);
+        });
+        thresholds.forEach([this](auto* r) {
+            issue(r);
+        });
         requestStatus();
         requestDiagnostics();
     }
 
 protected:
     void onValidResponse(RequestResponse* response) override {
-        if (response->getCommandId() == RequestResponse_PACK_INFORMATION::COMMAND_ID) {
+        if (response->getCommand() == status.info) {
             diagnostics.voltages.setCount(status.info.numberOfCells);
             diagnostics.temperatures.setCount(status.info.numberOfSensors);
             diagnostics.balances.setCount(status.info.numberOfCells);
