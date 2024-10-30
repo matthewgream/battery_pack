@@ -261,10 +261,10 @@ private:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-/* 
+/*
   offical 0x90-0x98
   https://robu.in/wp-content/uploads/2021/10/Daly-CAN-Communications-Protocol-V1.0-1.pdf
-  
+
   unofficial
   https://diysolarforum.com/threads/decoding-the-daly-smartbms-protocol.21898/
   https://diysolarforum.com/threads/daly-bms-communication-protocol.65439/

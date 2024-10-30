@@ -146,7 +146,7 @@ public:
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 
-class WebServer: public JsonSerializable  {
+class WebServer: public JsonSerializable {
 public:
     typedef struct {
         bool enabled;
@@ -190,7 +190,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class WebSocket: private Singleton <WebSocket>, public ConnectionReceiver <WebSocket>::Insertable, public JsonSerializable  {
+class WebSocket: private Singleton <WebSocket>, public ConnectionReceiver <WebSocket>::Insertable, public JsonSerializable {
 public:
     typedef struct {
         bool enabled;

@@ -83,7 +83,7 @@
 
     8MB flash
     - partitions_esp32s3fn8.csv
-    -      x0009K    
+    -      x0009K
     - NVS, x000DK (52Kb)
     - OTA, x0002K (8Kb) (OTADATA)
     - APP, x0300K (3Mb) (OTA0)
@@ -100,12 +100,12 @@
 #define PIN_CD74HC4067_ADDR_S1  9
 #define PIN_CD74HC4067_ADDR_S2  8
 #define PIN_CD74HC4067_ADDR_S3  7
-#define PIN_OSQM_I2CSDA         1
-#define PIN_OSQM_I2CSCL         2
-#define PIN_OSQM_PWM_0          3
-#define PIN_OSQM_PWM_1          4
-#define PIN_OSQM_PWM_2          5
-#define PIN_OSQM_PWM_3          6
+#define PIN_OSQMD_I2CSDA        1
+#define PIN_OSQMD_I2CSCL        2
+#define PIN_OSQMD_PWM_0         3
+#define PIN_OSQMD_PWM_1         4
+#define PIN_OSQMD_PWM_2         5
+#define PIN_OSQMD_PWM_3         6
 #elif defined (HARDWARE_ESP32_S3_SUPERMINI_UPSIDEDOWN)
 #define PIN_DS18B0_DAT          1   // MOVE
 #define PIN_CD74HC4067_EN       2   // MOVE
@@ -114,12 +114,12 @@
 #define PIN_CD74HC4067_ADDR_S1  4   // AS IS
 #define PIN_CD74HC4067_ADDR_S2  5   // AS IS
 #define PIN_CD74HC4067_ADDR_S3  6   // AS IS
-#define PIN_OSQM_I2CSDA         12  // AS IS
-#define PIN_OSQM_I2CSCL         11  // AS IS
-#define PIN_OSQM_PWM_0          10  // AS IS
-#define PIN_OSQM_PWM_1          9   // AS IS
-#define PIN_OSQM_PWM_2          8   // AS IS
-#define PIN_OSQM_PWM_3          7   // AS IS
+#define PIN_OSQMD_I2CSDA        12  // AS IS
+#define PIN_OSQMD_I2CSCL        11  // AS IS
+#define PIN_OSQMD_PWM_0         10  // AS IS
+#define PIN_OSQMD_PWM_1         9   // AS IS
+#define PIN_OSQMD_PWM_2         8   // AS IS
+#define PIN_OSQMD_PWM_3         7   // AS IS
 #endif
 
 // -----------------------------------------------------------------------------------------------
@@ -142,7 +142,7 @@ struct Config {
         .strategyDefault = { .A = -0.012400427786, .B = 0.006860769298, .C = -0.001057743719, .D = 0.000056166727 } // XXX populate from calibration data
     };
     FanInterface::Config fanInterface = {
-        .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = PIN_OSQM_I2CSDA, .PIN_I2C_SCL = PIN_OSQM_I2CSCL, .PIN_PWMS = { PIN_OSQM_PWM_0, PIN_OSQM_PWM_1, PIN_OSQM_PWM_2, PIN_OSQM_PWM_3 }, .frequency = 5000, .invertedPWM = true },
+        .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = PIN_OSQMD_I2CSDA, .PIN_I2C_SCL = PIN_OSQMD_I2CSCL, .PIN_PWMS = { PIN_OSQMD_PWM_0, PIN_OSQMD_PWM_1, PIN_OSQMD_PWM_2, PIN_OSQMD_PWM_3 }, .frequency = 5000, .invertedPWM = true },
         .DIRECTION = OpenSmart_QuadMotorDriver::MOTOR_CLOCKWISE, .MIN_SPEED = 96, .MAX_SPEED = 255, // duplicated, not ideal
         .MOTOR_ORDER = { 0, 1, 2, 3 }, .MOTOR_ROTATE = 5*60*1000
     };
@@ -165,8 +165,8 @@ struct Config {
         .blue = { .name = DEFAULT_NAME, .serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", .characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", .pin = DEFAULT_BLUE_PIN, .intervalConnectionCheck = 1*60*1000 },
         .mdns = {},
         .mqtt = { .client = DEFAULT_NAME, .host = DEFAULT_MQTT_HOST, .port = DEFAULT_MQTT_PORT, .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .bufferSize = 3*1024 },
-        .webserver = { .enabled  = true, .port = 80 },
-        .websocket = { .enabled  = true, .port = 81, .root = "/" },
+        .webserver = { .enabled = true, .port = 80 },
+        .websocket = { .enabled = true, .port = 81, .root = "/" },
         .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME }
     };
 

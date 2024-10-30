@@ -2,7 +2,6 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-
 #define HARDWARE_ESP32_C3_ZERO
 //#define HARDWARE_ESP32_S3_SUPERMINI_UPSIDEDOWN
 
@@ -24,7 +23,7 @@
 #endif
 
 #define DEFAULT_NAME "BatteryMonitor"
-#define DEFAULT_VERS "1.3.4"
+#define DEFAULT_VERS "1.3.5"
 #define DEFAULT_TYPE "batterymonitor-" HARDWARE_VARIANT_PLATFORM
 #define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 
@@ -39,6 +38,7 @@
 
 #include "Components.hpp"
 #include "ComponentsHardware.hpp"
+#include "ComponentsHardwareDalyBMS.hpp"
 #include "ComponentsDevices.hpp"
 #include "ComponentsDevicesBluetooth.hpp"
 
@@ -217,6 +217,7 @@ class Program: public Component, public Diagnosticable {
     }
 
     Gate processGate;
+    void gate () { processGate.waitforThreshold (); }
 
 public:
     Program () :
@@ -242,9 +243,7 @@ public:
 
     Component::List components;
     void setup () { for (const auto& component : components) component->begin (); }
-    void loop () { for (const auto& component : components) component->process (); }
-    void gate () { processGate.waitforThreshold (); }
-
+    void loop () { gate (); for (const auto& component : components) component->process (); }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {

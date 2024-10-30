@@ -397,7 +397,7 @@ public:
         else if (_boundaryLast > 0) _misses ++;
         _boundaryLast = millis ();
     }
-    const counter_t misses () const {
+    counter_t misses () const {
         return _misses;
     }
 };
