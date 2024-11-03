@@ -226,7 +226,7 @@ class Program : public Component, public Diagnosticable {
         cycles++;
     }
 
-    Gate intervalProcess;
+    Intervalable intervalProcess;
     void gate() {
         intervalProcess.wait();
     }
@@ -284,8 +284,8 @@ protected:
         program["build"] = build;
         program["uptime"] = uptime;
         program["cycles"] = cycles;
-        if (processGate.misses() > 0)
-            program["misses"] = processGate.misses();
+        if (intervalProcess.exceeded() > 0)
+            program["exceeda"] = intervalProcess.exceeded();
     }
 };
 

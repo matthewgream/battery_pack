@@ -239,7 +239,7 @@ public:
 
 class Intervalable {
     interval_t _interval, _previous;
-    counter_t _misses = 0;
+    counter_t _exceeded = 0;
 public:
     explicit Intervalable(const interval_t interval = 0, const interval_t previous = 0)
         : _interval(interval), _previous(previous) {}
@@ -270,11 +270,11 @@ public:
         const interval_t current = millis();
         if (current - _previous < _interval)
             delay(_interval - (current - _previous));
-        else if (_previous > 0) _misses++;
+        else if (_previous > 0) _exceeded++;
         _previous = millis();
     }
-    counter_t misses() const {
-        return _misses;
+    counter_t exceeded() const {
+        return _exceeded;
     }
 };
 
