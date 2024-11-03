@@ -1,0 +1,3 @@
+[submodule "arduino/Battery_Monitor/ArduinoLightMDNS"]
+	path = arduino/Battery_Monitor/ArduinoLightMDNS
+	url = https://github.com/matthewgream/ArduinoLightMDNS
