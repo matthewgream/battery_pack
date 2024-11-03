@@ -2,14 +2,14 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-#define HARDWARE_ESP32_C3_ZERO
-//#define HARDWARE_ESP32_S3_SUPERMINI_UPSIDEDOWN
+#undef HARDWARE_ESP32_C3_ZERO
+#define HARDWARE_ESP32_S3_YD_ESP32_S3_C
 
 // as matches build tools (not so great)
 #if defined(HARDWARE_ESP32_C3_ZERO)
-#define HARDWARE_VARIANT_PLATFORM "esp32c3dev-esp32"
-#elif defined(HARDWARE_ESP32_S3_SUPERMINI_UPSIDEDOWN)
-#define HARDWARE_VARIANT_PLATFORM "esp32s3dev-esp32"
+#define HARDWARE_VARIANT_PLATFORM "c3zero-esp32"
+#elif defined(HARDWARE_ESP32_S3_YD_ESP32_S3_C)
+#define HARDWARE_VARIANT_PLATFORM "s3devkitc1-esp32"
 #endif
 
 // -----------------------------------------------------------------------------------------------
@@ -226,9 +226,9 @@ class Program : public Component, public Diagnosticable {
         cycles++;
     }
 
-    Gate processGate;
+    Gate intervalProcess;
     void gate() {
-        processGate.waitforThreshold();
+        intervalProcess.wait();
     }
 
 public:
@@ -263,7 +263,7 @@ public:
           alarms(config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
           diagnostics(config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
           operational(this),
-          intervalDeliver(config.intervalDeliver), intervalCapture(config.intervalCapture), intervalDiagnose(config.intervalDiagnose), processGate(config.intervalProcess),
+          intervalDeliver(config.intervalDeliver), intervalCapture(config.intervalCapture), intervalDiagnose(config.intervalDiagnose), intervalProcess(config.intervalProcess),
           components({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
         DEBUG_PRINTF("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };

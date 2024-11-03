@@ -92,6 +92,15 @@
 
 */
 
+/*
+  HARDWARE_ESP32_S3_YD_ESP32_S3_C
+  ESP32-S3-DEVKITC-1
+
+  - COM (non-native USB) for develop/debug, using Serial1.begin(SERIAL1_BAUD, SERIAL_8N1, GPIO_NUM_44, GPIO_NUM_43) - leaving Serial2
+  - USB (native USB) otherwise, using Serial, leaving Serial1/Serial2
+
+*/
+
 #if defined(HARDWARE_ESP32_C3_ZERO)
 #define PIN_DS18B0_DAT 21
 #define PIN_CD74HC4067_EN 20
@@ -106,7 +115,7 @@
 #define PIN_OSQMD_PWM_1 4
 #define PIN_OSQMD_PWM_2 5
 #define PIN_OSQMD_PWM_3 6
-#elif defined(HARDWARE_ESP32_S3_SUPERMINI_UPSIDEDOWN)
+#elif defined(HARDWARE_ESP32_S3_YD_ESP32_S3_C)
 #define PIN_DS18B0_DAT 1            // MOVE
 #define PIN_CD74HC4067_EN 2         // MOVE
 #define PIN_CD74HC4067_SIG 13       // AS IS

@@ -239,7 +239,7 @@ public:
 
 class Intervalable {
     interval_t _interval, _previous;
-
+    counter_t _misses = 0;
 public:
     explicit Intervalable(const interval_t interval = 0, const interval_t previous = 0)
         : _interval(interval), _previous(previous) {}
@@ -265,6 +265,16 @@ public:
         if (interval != std::numeric_limits<interval_t>::max())
             _interval = interval;
         _previous = millis();
+    }
+    void wait() {
+        const interval_t current = millis();
+        if (current - _previous < _interval)
+            delay(_interval - (current - _previous));
+        else if (_previous > 0) _misses++;
+        _previous = millis();
+    }
+    counter_t misses() const {
+        return _misses;
     }
 };
 
@@ -410,29 +420,6 @@ public:
         std::lock_guard<std::mutex> guard(_mutex);
         while (!_queue.empty())
             _queue.pop();
-    }
-};
-
-// -----------------------------------------------------------------------------------------------
-
-#include <Arduino.h>
-
-class Gate {
-    const interval_t _interval;
-    interval_t _boundaryLast = 0;
-    counter_t _misses = 0;
-public:
-    explicit Gate(const interval_t interval)
-        : _interval(interval) {}
-    void waitforThreshold() {
-        const interval_t interval = millis() - _boundaryLast;
-        if (_interval > interval)
-            delay(_interval - interval);
-        else if (_boundaryLast > 0) _misses++;
-        _boundaryLast = millis();
-    }
-    counter_t misses() const {
-        return _misses;
     }
 };
 
