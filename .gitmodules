@@ -1,6 +1,8 @@
 [submodule "arduino/Battery_Monitor/ArduinoLightMDNS"]
 	path = arduino/Battery_Monitor/ArduinoLightMDNS
 	url = https://github.com/matthewgream/ArduinoLightMDNS
+	branch = main
 [submodule "arduino/Battery_Monitor/DalyBMS"]
 	path = arduino/Battery_Monitor/DalyBMS
 	url = https://github.com/matthewgream/daly_bms_interface
+	branch = main
