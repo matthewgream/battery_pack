@@ -102,8 +102,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 #include <WiFiUdp.h>
-// announce+response, not lookup, see https://gist.github.com/matthewgream/1c535fa86fd006ae794f4f245216b1a0
-#include <ArduinoLightMDNS.h>
+#include "src/ArduinoLightMDNS/ArduinoLightMDNS.hpp" // https://github.com/matthewgream/ArduinoLightMDNS
 
 class MulticastDNS : public JsonSerializable {
 public:
