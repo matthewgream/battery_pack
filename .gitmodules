@@ -2,7 +2,7 @@
 	path = arduino/Battery_Monitor/src/ArduinoLightMDNS
 	url = https://github.com/matthewgream/ArduinoLightMDNS
 	branch = main
-[submodule "arduino/Battery_Monitor/DalyBMS"]
+[submodule "arduino/Battery_Monitor/DalyBMSInterface"]
 	path = arduino/Battery_Monitor/src/DalyBMSInterface
-	url = https://github.com/matthewgream/daly_bms_interface
+	url = https://github.com/matthewgream/DalyBMSInterface
 	branch = main
