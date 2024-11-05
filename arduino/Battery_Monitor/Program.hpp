@@ -38,7 +38,6 @@
 
 #include "Components.hpp"
 #include "ComponentsHardware.hpp"
-#include "ComponentsHardwareDalyBMS.hpp"
 #include "ComponentsDevices.hpp"
 #include "ComponentsDevicesBluetooth.hpp"
 
@@ -51,6 +50,7 @@ using AlarmInterface = ActivablePIN;
 #include "ProgramHardwareInterface.hpp"
 #include "ProgramHardwareManage.hpp"
 #include "ProgramNetworkManage.hpp"
+#include "ComponentsHardwareDalyBMS.hpp" // XXX
 #include "ProgramDataManage.hpp"
 #include "ProgramTemperatureCalibration.hpp"
 #include "UtilitiesOTA.hpp"    // breaks if included earlier due to SPIFFS headers
@@ -63,13 +63,18 @@ using TemperatureCalibrator = TemperatureCalibrationManager<HARDWARE_TEMP_SIZE, 
 
 // -----------------------------------------------------------------------------------------------
 
-#include "Config.hpp"
-
-// -----------------------------------------------------------------------------------------------
-
 #include "driver/temperature_sensor.h"
 
 class PlatformArduino : public Alarmable, public Diagnosticable {
+
+public:
+    struct Config {
+        int pinRandomNoise;
+    };
+    
+private:
+    const Config& config;
+
     static constexpr int HEAP_FREE_PERCENTAGE_MINIMUM = 5;
     static constexpr int TEMP_RANGE_MINIMUM = 0, TEMP_RANGE_MAXIMUM = 80;
     const unsigned long code_size, heap_size;
@@ -80,19 +85,20 @@ class PlatformArduino : public Alarmable, public Diagnosticable {
     const bool reset_okay;
 
 public:
-    PlatformArduino()
+    PlatformArduino(const Config& conf)
         : Alarmable({ AlarmCondition(ALARM_SYSTEM_MEMORYLOW, [this]() {
                           return ((100 * esp_get_minimum_free_heap_size()) / heap_size) < HEAP_FREE_PERCENTAGE_MINIMUM;
                       }),
                       AlarmCondition(ALARM_SYSTEM_BADRESET, [this]() {
                           return !reset_okay;
-                      }) }),
+                      }) }), config (conf),
           code_size(ESP.getSketchSize()), heap_size(ESP.getHeapSize()), reset_reason(getResetReason()), reset_details(getResetDetails(reset_reason)), reset_okay(getResetOkay(reset_reason)) {
         const temperature_sensor_config_t temp_sensor = TEMPERATURE_SENSOR_CONFIG_DEFAULT(TEMP_RANGE_MINIMUM, TEMP_RANGE_MAXIMUM);
         float temp_read = 0.0f;
         temp_okay = (temperature_sensor_install(&temp_sensor, &temp_handle) == ESP_OK && temperature_sensor_enable(temp_handle) == ESP_OK && temperature_sensor_get_celsius(temp_handle, &temp_read) == ESP_OK);
         if (!temp_okay) DEBUG_PRINTF("PlatformArduino::init: could not enable temperature sensor\n");
         DEBUG_PRINTF("PlatformArduino::init: code=%lu, heap=%lu, temp=%.2f, reset=%d\n", code_size, heap_size, temp_read, reset_reason);
+        RandomNumber::seed (analogRead (config.pinRandomNoise)); // XXX TIDY
     }
 
 protected:
@@ -116,10 +122,16 @@ protected:
 
 // -----------------------------------------------------------------------------------------------
 
+#include "Config.hpp"
+
+// -----------------------------------------------------------------------------------------------
+
 class Program : public Component, public Diagnosticable {
 
     const Config config;
     const String address;
+
+    PlatformArduino platform;
 
     FanInterfaceStrategy_motorMapWithRotation fanInterfaceSetrategy;
     PidController<double> fanControllingAlgorithm;
@@ -131,6 +143,8 @@ class Program : public Component, public Diagnosticable {
     TemperatureManagerEnvironment temperatureManagerEnvironment;
     FanInterface fanInterface;
     FanManager fanManager;
+
+    DalyBMSManager bms;
 
     DeviceManager devices;
 
@@ -144,7 +158,6 @@ class Program : public Component, public Diagnosticable {
     UpdateManager updater;
     AlarmInterface alarmsInterface;
     AlarmManager alarms;
-    PlatformArduino platform;
 
     Uptime uptime;
     ActivationTracker cycles;
@@ -234,6 +247,7 @@ class Program : public Component, public Diagnosticable {
 public:
     Program()
         : address(getMacAddressBase("")),
+          platform(config.platform),
           fanControllingAlgorithm(config.FAN_CONTROL_P, config.FAN_CONTROL_I, config.FAN_CONTROL_D),
           fanSmoothingAlgorithm(config.FAN_SMOOTH_A),
           temperatureCalibrator(config.temperatureCalibrator),
@@ -246,6 +260,7 @@ public:
           fanManager(config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, [&]() {
               return FanManager::TargetSet(temperatureManagerBatterypack.setpoint(), temperatureManagerBatterypack.current());
           }),
+          bms(config.bms),
           devices(config.devices, [&]() {
               return network.available();
           }),
@@ -261,10 +276,10 @@ public:
           }),
           alarmsInterface(config.alarmsInterface),
           alarms(config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
-          diagnostics(config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
+          diagnostics(config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &bms, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
           operational(this),
           intervalDeliver(config.intervalDeliver), intervalCapture(config.intervalCapture), intervalDiagnose(config.intervalDiagnose), intervalProcess(config.intervalProcess),
-          components({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
+          components({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &bms, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
         DEBUG_PRINTF("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
 

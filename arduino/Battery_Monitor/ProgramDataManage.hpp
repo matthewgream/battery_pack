@@ -86,8 +86,8 @@ public:
         // XXX for now ...
         _devices.blue().insertReceivers({ { String("ctrl"), std::make_shared<BluetoothReceiver_TypeCtrl>() }, { String("info"), std::make_shared<BluetoothReceiver_TypeInfo>() } });
         _devices.websocket().insertReceivers({ { String("info"), std::make_shared<WebSocketReceiver_TypeInfo>() } });
-        _devices.mdns().__implementation().addServiceRecord(MDNSServiceTCP, 80, "webserver._http", { "build=" + build, "type=BatteryMonitor" });
-        _devices.mdns().__implementation().addServiceRecord(MDNSServiceTCP, 81, "BatteryMonitor._ws", { "addr=" + addr, "type=BatteryMonitor" });
+        _devices.mdns().__implementation().addServiceRecord(MDNS::ServiceTCP, 80, "webserver._http", { "build=" + build, "type=BatteryMonitor" });
+        _devices.mdns().__implementation().addServiceRecord(MDNS::ServiceTCP, 81, "BatteryMonitor._ws", { "addr=" + addr, "type=BatteryMonitor" });
     }
     //
 

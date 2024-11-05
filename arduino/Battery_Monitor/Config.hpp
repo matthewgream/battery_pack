@@ -131,9 +131,24 @@
 #define PIN_OSQMD_PWM_3 7           // AS IS
 #endif
 
+// TBC
+#define PIN_DALY_MANAGER_SERIAL_ID 1
+#define PIN_DALY_MANAGER_SERIAL_RX GPIO_NUM_1
+#define PIN_DALY_MANAGER_SERIAL_TX GPIO_NUM_1
+#define PIN_DALY_MANAGER_SERIAL_EN GPIO_NUM_1
+#define PIN_DALY_BALANCE_SERIAL_ID 2
+#define PIN_DALY_BALANCE_SERIAL_RX GPIO_NUM_1
+#define PIN_DALY_BALANCE_SERIAL_TX GPIO_NUM_1
+#define PIN_DALY_BALANCE_SERIAL_EN GPIO_NUM_1
+#define PIN_RANDOM_NOISE GPIO_NUM_1
+
 // -----------------------------------------------------------------------------------------------
 
 struct Config {
+
+    PlatformArduino::Config platform = {
+        .pinRandomNoise = PIN_RANDOM_NOISE
+    };
 
     TemperatureSensor_DS18B20::Config ds18b20 = {
         .PIN_DAT = PIN_DS18B0_DAT, .INDEX = 0
@@ -173,6 +188,34 @@ struct Config {
     };
     double FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
     FanManager::Config fanManager = {};
+
+    // bms
+    DalyBMSManager::Config bms = {
+        .manager = {
+            .manager = {
+                .id = "manager",
+                .capabilities = daly_bms::Capabilities::Managing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex - daly_bms::Capabilities::RealTimeClock,
+                .categories = daly_bms::Categories::All,
+                .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
+            },
+            .serialId = PIN_DALY_MANAGER_SERIAL_ID,
+            .serialRxPin = PIN_DALY_MANAGER_SERIAL_RX,
+            .serialTxPin = PIN_DALY_MANAGER_SERIAL_TX,
+            .enPin = PIN_DALY_MANAGER_SERIAL_EN },
+        .balance = { .manager = {
+                         .id = "balance",
+                         .capabilities = daly_bms::Capabilities::Balancing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex,
+                         .categories = daly_bms::Categories::All,
+                         .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
+                     },
+                     .serialId = PIN_DALY_BALANCE_SERIAL_ID,
+                     .serialRxPin = PIN_DALY_BALANCE_SERIAL_RX,
+                     .serialTxPin = PIN_DALY_BALANCE_SERIAL_TX,
+                     .enPin = PIN_DALY_BALANCE_SERIAL_EN },
+        .intervalInstant = 15 * 1000,
+        .intervalStatus = 60 * 1000,
+        .intervalDiagnostics = 5 * 60 * 1000
+    };
 
     // devices
     DeviceManager::Config devices = {

@@ -121,13 +121,13 @@ public:
         : config(cfg), _mdns(_udp) {}
 
     void begin() {
-        MDNSStatus_t status = _mdns.begin();
-        if (status != MDNSSuccess)
+        auto status = _mdns.begin();
+        if (status != MDNS::Success)
             DEBUG_PRINTF("NetworkManager::begin: mdns begin error=%d\n", status);
     }
     void process() {
-        MDNSStatus_t status = _mdns.process();
-        if (status != MDNSSuccess)
+        auto status = _mdns.process();
+        if (status != MDNS::Success)
             DEBUG_PRINTF("NetworkManager::process: mdns process error=%d\n", status);
     }
     __implementation_t &__implementation() {

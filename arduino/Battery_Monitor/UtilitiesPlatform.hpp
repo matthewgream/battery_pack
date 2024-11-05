@@ -127,6 +127,28 @@ public:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+#include <Arduino.h>
+#include <type_traits>
+
+struct RandomNumber {
+    static void seed(const unsigned long seed) {
+        ::randomSeed(seed);
+    }
+    template<typename T>
+    static T get(T max) {
+        static_assert(std::is_integral_v<T>, "T must be an integral type");
+        return static_cast<T>(::random(static_cast<long>(max)));
+    }
+    template<typename T>
+    static T get(T min, T max) {
+        static_assert(std::is_integral_v<T>, "T must be an integral type");
+        return static_cast<T>(::random(static_cast<long>(min), static_cast<long>(max)));
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
 #include <esp_mac.h>
 
 String getMacAddressBase(const char *separator = ":") {

@@ -266,6 +266,9 @@ public:
             _interval = interval;
         _previous = millis();
     }
+    void setat(const interval_t place) {
+        _previous = millis() - ((_interval - place) % _interval);
+    }
     void wait() {
         const interval_t current = millis();
         if (current - _previous < _interval)
@@ -290,6 +293,22 @@ public:
         : _started(millis()) {}
     inline interval_t seconds() const {
         return (millis() - _started) / 1000;
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+
+class Enableable {
+    bool _enabled = false;
+public:
+    inline void operator++(int) {
+        _enabled = true;
+    }
+    inline operator bool() const {
+        return _enabled;
+    }
+    void operator=(const bool state) {
+        _enabled = state;
     }
 };
 
