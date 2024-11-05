@@ -7,6 +7,8 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+#include <tuple>
+
 class DalyBMSManager : public Component, public Diagnosticable {
 
 public:
@@ -43,6 +45,12 @@ public:
             if (intervalDiagnostics) dalyInterfaces.requestDiagnostics(), dalyInterfaces.updateInitial();
             dalyInterfaces.process();
         }
+    }
+
+    struct Instant { float voltage, current, charge; };
+    Instant instant () const {
+        // dalyInterfaces ["name"].status.status;
+        return { .voltage = 0.0f, .current = 0.0f, .charge = 0.0f };
     }
 
 protected:

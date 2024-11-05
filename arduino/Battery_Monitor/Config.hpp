@@ -190,7 +190,7 @@ struct Config {
     FanManager::Config fanManager = {};
 
     // bms
-    DalyBMSManager::Config bms = {
+    DalyBMSManager::Config batteryManager = {
         .manager = {
             .manager = {
                 .id = "manager",

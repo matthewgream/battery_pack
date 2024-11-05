@@ -144,7 +144,7 @@ class Program : public Component, public Diagnosticable {
     FanInterface fanInterface;
     FanManager fanManager;
 
-    DalyBMSManager bms;
+    DalyBMSManager batteryManager;
 
     DeviceManager devices;
 
@@ -260,7 +260,7 @@ public:
           fanManager(config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, [&]() {
               return FanManager::TargetSet(temperatureManagerBatterypack.setpoint(), temperatureManagerBatterypack.current());
           }),
-          bms(config.bms),
+          batteryManager(config.batteryManager),
           devices(config.devices, [&]() {
               return network.available();
           }),
@@ -276,10 +276,10 @@ public:
           }),
           alarmsInterface(config.alarmsInterface),
           alarms(config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
-          diagnostics(config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &bms, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
+          diagnostics(config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &batteryManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
           operational(this),
           intervalDeliver(config.intervalDeliver), intervalCapture(config.intervalCapture), intervalDiagnose(config.intervalDiagnose), intervalProcess(config.intervalProcess),
-          components({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &bms, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
+          components({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &batteryManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
         DEBUG_PRINTF("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
 
@@ -308,14 +308,19 @@ protected:
 
 void Program::OperationalManager::collect(JsonVariant& obj) const {
     JsonObject tmp = obj["tmp"].to<JsonObject>();
+    JsonObject bms = tmp["bms"].to<JsonObject>();
+        auto x = _program->batteryManager.instant();
+        bms["V"] = x.voltage;
+        bms["I"] = x.current;
+        bms["C"] = x.charge;
     tmp["env"] = _program->temperatureManagerEnvironment.getTemperature();
     JsonObject bat = tmp["bat"].to<JsonObject>();
-    bat["avg"] = _program->temperatureManagerBatterypack.avg();
-    bat["min"] = _program->temperatureManagerBatterypack.min();
-    bat["max"] = _program->temperatureManagerBatterypack.max();
+        bat["avg"] = _program->temperatureManagerBatterypack.avg();
+        bat["min"] = _program->temperatureManagerBatterypack.min();
+        bat["max"] = _program->temperatureManagerBatterypack.max();
     JsonArray val = bat["val"].to<JsonArray>();
-    for (const auto& v : _program->temperatureManagerBatterypack.getTemperatures())
-        val.add(v);
+        for (const auto& v : _program->temperatureManagerBatterypack.getTemperatures())
+            val.add(v);        
     obj["fan"] = _program->fanInterface.getSpeed();
     obj["alm"] = _program->alarms.toString();
 }
