@@ -6,3 +6,7 @@
 	path = arduino/Battery_Monitor/src/DalyBMSInterface
 	url = https://github.com/matthewgream/DalyBMSInterface
 	branch = main
+[submodule "arduino/Battery_Monitor/src/BluetoothTPMS"]
+	path = arduino/Battery_Monitor/src/BluetoothTPMS
+	url = https://github.com/matthewgream/BluetoothTPMS
+	branch = main

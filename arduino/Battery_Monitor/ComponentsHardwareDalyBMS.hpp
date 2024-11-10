@@ -61,7 +61,7 @@ protected:
         // alarms
             // failure details
             // soc empty, low, nearlycharged, charged
-            // 
+            //
     }
 };
 

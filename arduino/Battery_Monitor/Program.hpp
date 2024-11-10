@@ -71,7 +71,7 @@ public:
     struct Config {
         int pinRandomNoise;
     };
-    
+
 private:
     const Config& config;
 
@@ -320,7 +320,7 @@ void Program::OperationalManager::collect(JsonVariant& obj) const {
         bat["max"] = _program->temperatureManagerBatterypack.max();
     JsonArray val = bat["val"].to<JsonArray>();
         for (const auto& v : _program->temperatureManagerBatterypack.getTemperatures())
-            val.add(v);        
+            val.add(v);
     obj["fan"] = _program->fanInterface.getSpeed();
     obj["alm"] = _program->alarms.toString();
 }
