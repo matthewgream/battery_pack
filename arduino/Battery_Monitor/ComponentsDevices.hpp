@@ -102,7 +102,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 #include <WiFiUdp.h>
-#include "src/ArduinoLightMDNS/ArduinoLightMDNS.hpp" // https://github.com/matthewgream/ArduinoLightMDNS
+#include <LightMDNS.hpp>
 
 class MulticastDNS : public JsonSerializable {
 public:
@@ -122,12 +122,12 @@ public:
 
     void begin() {
         auto status = _mdns.begin();
-        if (status != MDNS::Success)
+        if (status != MDNS::Status::Success)
             DEBUG_PRINTF("NetworkManager::begin: mdns begin error=%d\n", status);
     }
     void process() {
         auto status = _mdns.process();
-        if (status != MDNS::Success)
+        if (status != MDNS::Status::Success)
             DEBUG_PRINTF("NetworkManager::process: mdns process error=%d\n", status);
     }
     __implementation_t &__implementation() {
