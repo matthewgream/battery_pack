@@ -1,4 +1,0 @@
-[submodule "arduino/Battery_Monitor/DalyBMSInterface"]
-	path = arduino/Battery_Monitor/src/DalyBMSInterface
-	url = https://github.com/matthewgream/DalyBMSInterface
-	branch = main
