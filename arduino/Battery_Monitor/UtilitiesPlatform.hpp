@@ -122,6 +122,9 @@ public:
         const uint32_t timet = static_cast<uint32_t>(time(NULL));
         return timet > 0 && _previous > static_cast<uint32_t>(0) ? (timet - _previous) * 1000 : 0;
     }
+    void reset() {
+        _previous = static_cast<uint32_t>(time(NULL));
+    }
 };
 
 // -----------------------------------------------------------------------------------------------

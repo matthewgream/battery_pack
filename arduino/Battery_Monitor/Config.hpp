@@ -133,13 +133,13 @@
 
 // TBC
 #define PIN_DALY_MANAGER_SERIAL_ID 1
-#define PIN_DALY_MANAGER_SERIAL_RX GPIO_NUM_1
-#define PIN_DALY_MANAGER_SERIAL_TX GPIO_NUM_1
-#define PIN_DALY_MANAGER_SERIAL_EN GPIO_NUM_1
+#define PIN_DALY_MANAGER_SERIAL_RX GPIO_NUM_5
+#define PIN_DALY_MANAGER_SERIAL_TX GPIO_NUM_6
+#define PIN_DALY_MANAGER_SERIAL_EN GPIO_NUM_7
 #define PIN_DALY_BALANCE_SERIAL_ID 2
-#define PIN_DALY_BALANCE_SERIAL_RX GPIO_NUM_1
-#define PIN_DALY_BALANCE_SERIAL_TX GPIO_NUM_1
-#define PIN_DALY_BALANCE_SERIAL_EN GPIO_NUM_1
+#define PIN_DALY_BALANCE_SERIAL_RX GPIO_NUM_15
+#define PIN_DALY_BALANCE_SERIAL_TX GPIO_NUM_16
+#define PIN_DALY_BALANCE_SERIAL_EN GPIO_NUM_17
 #define PIN_RANDOM_NOISE GPIO_NUM_1
 
 // -----------------------------------------------------------------------------------------------
@@ -252,7 +252,7 @@ struct Config {
 
     // program
     ControlManager::Config control = { .url_version = "/version" };
-    UpdateManager::Config updater = { .intervalCheck = 1 * 24 * 60 * 60 * 1000, .intervalLong = (interval_t)28 * 24 * 60 * 60 * 1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase() };
+    UpdateManager::Config updater = { .startupCheck = true, .updateImmmediately = true, .intervalCheck = 1 * 24 * 60 * 60 * 1000, .intervalLong = (interval_t)28 * 24 * 60 * 60 * 1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase() };
     AlarmManager::Config alarms = {};
     ActivablePIN::Config alarmsInterface = { .PIN = -1, .ACTIVE = LOW };
     DiagnosticManager::Config diagnostics = {};

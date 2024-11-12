@@ -4,15 +4,15 @@
 
 #include <utility>
 
-String __encodeUrlWithParameters(const String& result) {
+inline String __encodeUrlWithParameters(const String& result) {
     return result;
 }
 template<typename K, typename V, typename... R>
-String __encodeUrlWithParameters(const String& result, K&& key, V&& value, R&&... rest) {
+inline String __encodeUrlWithParameters(const String& result, K&& key, V&& value, R&&... rest) {
     return __encodeUrlWithParameters(result + (result.isEmpty() ? "?" : "&") + String(key) + "=" + String(value), std::forward<R>(rest)...);
 }
 template<typename... A>
-String encodeUrlWithParameters(const String& url, A&&... args) {
+inline String encodeUrlWithParameters(const String& url, A&&... args) {
     return url + __encodeUrlWithParameters("", std::forward<A>(args)...);
 }
 
@@ -22,40 +22,38 @@ String encodeUrlWithParameters(const String& url, A&&... args) {
 #include <esp32fota.h>
 #include <WiFi.h>
 
-static void __ota_image_update_progress(const size_t progress, const size_t size) {
-    DEBUG_PRINTF(progress < size ? "." : "\n");
-}
-static void __ota_image_update_failure(const char* process, const int partition, const int error = 0) {
-    DEBUG_PRINTF("OTA_IMAGE_UPDATE: failed, process=%s, partition=%s, error=%d\n", process, partition == U_SPIFFS ? "spiffs" : "firmware", error ? error : -1);
-}
-static void __ota_image_update_success(const int partition, const bool restart) {
-    DEBUG_PRINTF("OTA_IMAGE_UPDATE: succeeded, partition=%s, restart=%d\n", partition == U_SPIFFS ? "spiffs" : "firmware", restart);
-}
 static bool __ota_image_update_check(esp32FOTA& ota, const char* json, const char* type, const char* vers, const char* addr, char* newr) {
     DEBUG_PRINTF("OTA_IMAGE_CHECK: fetch json=%s, type=%s, vers=%s, addr=%s ...", json, type, vers, addr);
     ota.setManifestURL(encodeUrlWithParameters(json, "type", type, "vers", vers, "addr", addr).c_str());
     const bool update = ota.execHTTPcheck();
     if (update) {
         ota.getPayloadVersion(newr);
-        DEBUG_PRINTF(" newer vers=%s\n", newr);
+        DEBUG_PRINTF(" newer version=%s\n", newr);
         return true;
     } else {
-        DEBUG_PRINTF(" no newer vers\n");
+        DEBUG_PRINTF(" no newer version (or error)\n");
         return false;
     }
 }
 static void __ota_image_update_execute(esp32FOTA& ota, const char* newr, const std::function<void()>& func) {
-    DEBUG_PRINTF("OTA_IMAGE_UPDATE: downloading and installing, vers=%s\n", newr);
-    ota.setProgressCb(__ota_image_update_progress);
-    ota.setUpdateBeginFailCb([](int partition) {
-        __ota_image_update_failure("begin", partition);
+    bool updated = false;
+    DEBUG_PRINTF("OTA_IMAGE_UPDATE: download and install, vers=%s\n", newr);
+    ota.setProgressCb([&](size_t progress, size_t size) {
+        if (progress >= size ) updated = true;
+        DEBUG_PRINTF(!updated ? "." : "\n");
     });
-    ota.setUpdateCheckFailCb([](int partition, int error) {
-        __ota_image_update_failure("check", partition, error);
+    ota.setUpdateBeginFailCb([&](int partition) {
+        if (!updated) DEBUG_PRINTF ("\n");
+        DEBUG_PRINTF("\nOTA_IMAGE_UPDATE: failed begin, partition=%\n", partition == U_SPIFFS ? "spiffs" : "firmware");
+    });
+    ota.setUpdateCheckFailCb([&](int partition, int error) {
+        if (!updated) DEBUG_PRINTF ("\n");
+        DEBUG_PRINTF("OTA_IMAGE_UPDATE: failed check, partition=%s, error=%d\n", partition == U_SPIFFS ? "spiffs" : "firmware", error);
     });
     bool restart = false;
     ota.setUpdateFinishedCb([&](int partition, bool _restart) {
-        __ota_image_update_success(partition, _restart);
+        if (!updated) DEBUG_PRINTF ("\n");
+        DEBUG_PRINTF("OTA_IMAGE_UPDATE: success, partition=%s, restart=%d\n", partition == U_SPIFFS ? "spiffs" : "firmware", _restart);
         restart = _restart;
     });
     ota.execOTA();
@@ -67,17 +65,19 @@ static void __ota_image_update_execute(esp32FOTA& ota, const char* newr, const s
 
 // -----------------------------------------------------------------------------------------------
 
-void ota_image_update(const String& json, const String& type, const String& vers, const String& addr, const std::function<void()>& func = nullptr) {
+bool ota_image_update(const String& json, const String& type, const String& vers, const String& addr, const std::function<void()>& func) {
     esp32FOTA ota(type.c_str(), vers.c_str());
-    char newr[32] = { '\0' };
-    if (__ota_image_update_check(ota, json.c_str(), type.c_str(), vers.c_str(), addr.c_str(), newr))
-        __ota_image_update_execute(ota, newr, func);
+    char buffer[32] = { 0 };
+    if (__ota_image_update_check(ota, json.c_str(), type.c_str(), vers.c_str(), addr.c_str(), buffer))
+        __ota_image_update_execute(ota, buffer, func);
+    return false;
 }
-String ota_image_check(const String& json, const String& type, const String& vers, const String& addr) {
+bool ota_image_check(const String& json, const String& type, const String& vers, const String& addr, String* newr) {
     esp32FOTA ota(type.c_str(), vers.c_str());
-    char newr[32] = { '\0' };
-    __ota_image_update_check(ota, json.c_str(), type.c_str(), vers.c_str(), addr.c_str(), newr);
-    return newr;
+    char buffer[32] = { 0 };
+    const bool result = __ota_image_update_check(ota, json.c_str(), type.c_str(), vers.c_str(), addr.c_str(), buffer);
+    *newr = buffer;
+    return result;
 }
 
 // -----------------------------------------------------------------------------------------------

@@ -30,21 +30,21 @@ public:
           intervalInstant(config.intervalInstant), intervalStatus(config.intervalStatus), intervalDiagnostics(config.intervalDiagnostics) {}    // XXX need to randomise to prevent synchronicity
 
     void begin() override {
-        if (dalyInterfaces.begin())
-            DEBUG_PRINTF("DalyBMSManager::begin: daly begin failed\n");
-        else {
-            enabled ++;
-            intervalStatus.setat(RandomNumber::get<interval_t>(config.intervalStatus));
-            intervalDiagnostics.setat(RandomNumber::get<interval_t>(config.intervalDiagnostics));
-        }
+        // if (dalyInterfaces.begin())
+        //     DEBUG_PRINTF("DalyBMSManager::begin: daly begin failed\n");
+        // else {
+        //     enabled ++;
+        //     intervalStatus.setat(RandomNumber::get<interval_t>(config.intervalStatus));
+        //     intervalDiagnostics.setat(RandomNumber::get<interval_t>(config.intervalDiagnostics));
+        // }
     }
     void process() override {
-        if (enabled) {
-            if (intervalInstant) dalyInterfaces.requestInstant();
-            if (intervalStatus) dalyInterfaces.requestStatus();
-            if (intervalDiagnostics) dalyInterfaces.requestDiagnostics(), dalyInterfaces.updateInitial();
-            dalyInterfaces.process();
-        }
+        // if (enabled) {
+        //     if (intervalInstant) dalyInterfaces.requestInstant();
+        //     if (intervalStatus) dalyInterfaces.requestStatus();
+        //     if (intervalDiagnostics) dalyInterfaces.requestDiagnostics(), dalyInterfaces.updateInitial();
+        //     dalyInterfaces.process();
+        // }
     }
 
     struct Instant { float voltage, current, charge; };

@@ -299,8 +299,9 @@ public:
 // -----------------------------------------------------------------------------------------------
 
 class Enableable {
-    bool _enabled = false;
+    bool _enabled;
 public:
+    explicit Enableable(const bool enabled = false): _enabled (enabled) {}
     inline void operator++(int) {
         _enabled = true;
     }

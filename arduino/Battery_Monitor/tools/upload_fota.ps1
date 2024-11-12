@@ -30,6 +30,7 @@ function Extract-Info {
     }
     return $result
 }
+
 function Upload-Image {
     param ([string]$binPath, [string]$url, [string]$newFileName, [int]$timeout = 30)    
     try {
@@ -45,9 +46,19 @@ function Upload-Image {
             $fileEnc,
             "--$boundary--$LF"
         ) -join $LF
-        $response = Invoke-RestMethod -Uri $url -Method Put -ContentType "multipart/form-data; boundary=`"$boundary`"" -Body $bodyLines -TimeoutSec $timeout
-        Write-Verbose "Upload response: $response"
-        return $response
+
+        try {
+            $response = Invoke-RestMethod -Uri $url -Method Put -ContentType "multipart/form-data; boundary=`"$boundary`"" -Body $bodyLines -TimeoutSec $timeout
+            Write-Verbose "Upload response: $response"
+            return $true
+        }
+        catch {
+            if ($_.Exception.Message -like "*File with this name already exists*") {
+                Write-Warning "File already exists on server: $newFileName"
+                return $false
+            }
+            throw
+        }
     }
     catch {
         throw "Upload failed: $_"
@@ -58,6 +69,7 @@ $patterns = @{
     'name' = '#define\s+DEFAULT_NAME\s+"([^"]+)"'
     'vers' = '#define\s+DEFAULT_VERS\s+"(\d+\.\d+\.\d+)"'
 }
+
 Write-Verbose "Using $file_info"
 $matches = Extract-Info -filePath $file_info -patterns $patterns
 if (-not $matches -or ($matches.Values -contains $null)) {
@@ -83,14 +95,26 @@ if (Test-Path $path) {
     exit 0
 }
 
+# Main execution block
+$uploadSuccessful = $false
 try {
     Write-Verbose "Image upload: $image as $file"
-    Upload-Image -binPath $image -url $server -newFileName $file
-    Write-Output  "Image upload succeeded: $file"
-    Copy-Item -Path $image -Destination $path -Force
-    Write-Output  "Image copied to build directory: $path"
+    $uploadSuccessful = Upload-Image -binPath $image -url $server -newFileName $file
 }
 catch {
-    Write-Error "Image transfer error: $_"
+    Write-Warning "Server upload failed: $_"
+}
+
+# Always attempt the local copy, regardless of upload result
+try {
+    Copy-Item -Path $image -Destination $path -Force
+    Write-Output "Image copied to build directory: $path"
+    if ($uploadSuccessful) {
+        Write-Output "Image upload succeeded: $file"
+    }
+    exit 0
+}
+catch {
+    Write-Error "Failed to copy image to build directory: $_"
     exit 1
 }

@@ -68,7 +68,7 @@ const String build (String (__build_name) + " V" + String (__build_vers) + "-" +
 // -----------------------------------------------------------------------------------------------
 
 Program *program;
-Watchdog watchdog (DEFAULT_WATCHDOG_SECS);
+// Watchdog watchdog (DEFAULT_WATCHDOG_SECS);
 
 void setup () {
 
@@ -94,7 +94,7 @@ void setup () {
         esp_deep_sleep_start ();
     }
 
-    watchdog.start ();
+    // watchdog.start ();
     exception_catcher ([&] () {
         program = new Program ();
         program->setup ();
@@ -106,7 +106,7 @@ void loop () {
     exception_catcher ([&] () {
         program->loop ();
     });
-    watchdog.reset ();
+    // watchdog.reset ();
 }
 
 // -----------------------------------------------------------------------------------------------

@@ -5,12 +5,20 @@
 #undef HARDWARE_ESP32_C3_ZERO
 #define HARDWARE_ESP32_S3_YD_ESP32_S3_C
 
-// as matches build tools (not so great)
-#if defined(HARDWARE_ESP32_C3_ZERO)
-#define HARDWARE_VARIANT_PLATFORM "c3zero-esp32"
-#elif defined(HARDWARE_ESP32_S3_YD_ESP32_S3_C)
-#define HARDWARE_VARIANT_PLATFORM "s3devkitc1-esp32"
-#endif
+// -----------------------------------------------------------------------------------------------
+
+// {build.source.path}\tools\upload_fota.ps1 -file_info {build.source.path}\Program.hpp -path_build {build.path} -platform {build.board}-{build.arch} -image {build.path}\{build.project_name}.bin -server http://ota.local:8090/images -verbose
+// -DARDUINO_BOARD="ESP32S3_DEV" -DARDUINO_ARCH_ESP32
+
+static String __DEFAULT_TYPE_BUILDER(const char* prefix, const char* board, const char* arch) {
+    String a = arch; a.replace ("ARDUINO_ARCH_", "");
+    String b = board; b.replace ("_", ""); b.replace ("-", "");
+    String r = String (prefix) + "-" + b + "-" + a;
+    r.toLowerCase();
+    return r;
+}
+#define __DEFAULT_TYPE_BUILT __DEFAULT_TYPE_BUILDER (DEFAULT_NAME, ARDUINO_BOARD, __DEFAULT_TYPE_STRINGIFIER (ARDUINO_ARCH_ESP32))
+#define __DEFAULT_TYPE_STRINGIFIER(x) #x
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
@@ -23,8 +31,8 @@
 #endif
 
 #define DEFAULT_NAME "BatteryMonitor"
-#define DEFAULT_VERS "1.3.5"
-#define DEFAULT_TYPE "batterymonitor-" HARDWARE_VARIANT_PLATFORM
+#define DEFAULT_VERS "1.4.2"
+#define DEFAULT_TYPE __DEFAULT_TYPE_BUILT
 #define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 
 // -----------------------------------------------------------------------------------------------
@@ -50,7 +58,7 @@ using AlarmInterface = ActivablePIN;
 #include "ProgramHardwareInterface.hpp"
 #include "ProgramHardwareManage.hpp"
 #include "ProgramNetworkManage.hpp"
-#include "ComponentsHardwareDalyBMS.hpp" // XXX
+#include "ComponentsHardwareDalyBMS.hpp"    // XXX
 #include "ProgramDataManage.hpp"
 #include "ProgramTemperatureCalibration.hpp"
 #include "UtilitiesOTA.hpp"    // breaks if included earlier due to SPIFFS headers
@@ -91,14 +99,14 @@ public:
                       }),
                       AlarmCondition(ALARM_SYSTEM_BADRESET, [this]() {
                           return !reset_okay;
-                      }) }), config (conf),
-          code_size(ESP.getSketchSize()), heap_size(ESP.getHeapSize()), reset_reason(getResetReason()), reset_details(getResetDetails(reset_reason)), reset_okay(getResetOkay(reset_reason)) {
+                      }) }),
+          config(conf), code_size(ESP.getSketchSize()), heap_size(ESP.getHeapSize()), reset_reason(getResetReason()), reset_details(getResetDetails(reset_reason)), reset_okay(getResetOkay(reset_reason)) {
         const temperature_sensor_config_t temp_sensor = TEMPERATURE_SENSOR_CONFIG_DEFAULT(TEMP_RANGE_MINIMUM, TEMP_RANGE_MAXIMUM);
         float temp_read = 0.0f;
         temp_okay = (temperature_sensor_install(&temp_sensor, &temp_handle) == ESP_OK && temperature_sensor_enable(temp_handle) == ESP_OK && temperature_sensor_get_celsius(temp_handle, &temp_read) == ESP_OK);
         if (!temp_okay) DEBUG_PRINTF("PlatformArduino::init: could not enable temperature sensor\n");
         DEBUG_PRINTF("PlatformArduino::init: code=%lu, heap=%lu, temp=%.2f, reset=%d\n", code_size, heap_size, temp_read, reset_reason);
-        RandomNumber::seed (analogRead (config.pinRandomNoise)); // XXX TIDY
+        RandomNumber::seed(analogRead(config.pinRandomNoise));    // XXX TIDY
     }
 
 protected:
@@ -261,19 +269,13 @@ public:
               return FanManager::TargetSet(temperatureManagerBatterypack.setpoint(), temperatureManagerBatterypack.current());
           }),
           batteryManager(config.batteryManager),
-          devices(config.devices, [&]() {
-              return network.available();
-          }),
-          network(config.network, devices.mdns()), nettime(config.nettime, [&]() {
-              return network.available();
-          }),
+          devices(config.devices, [&]() { return network.available(); }),
+          network(config.network, devices.mdns()), nettime(config.nettime, [&]() { return network.available(); }),
           control(config.control, address, devices),
           deliver(config.deliver, address, devices.blue(), devices.mqtt(), devices.websocket()),
           publish(config.publish, address, devices.mqtt()),
           storage(config.storage),
-          updater(config.updater, [&]() {
-              return network.available();
-          }),
+          updater(config.updater, [&]() { return network.available(); }),
           alarmsInterface(config.alarmsInterface),
           alarms(config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
           diagnostics(config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &batteryManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
