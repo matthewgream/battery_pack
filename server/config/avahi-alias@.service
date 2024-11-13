@@ -1,9 +1,13 @@
 [Unit]
 Description=Publish %I as alias for %H.local via mdns
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/bin/bash -c "/usr/bin/avahi-publish -a -R %I $(hostname -I | awk '{print $1}')"
+ExecStart=/bin/bash -c 'until ip addr show | grep -q "inet.*192\.168"; do sleep 1; done; exec /usr/bin/avahi-publish -a -R %I $$(hostname -I | awk "{print \$1}")'
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

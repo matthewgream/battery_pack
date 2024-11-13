@@ -1,33 +1,221 @@
-#!/usr/bin/bash
+#!/bin/bash
 
-#############
+##################################################################################################################################
 
-SERVICE_NAME_INT="$SERVICE_NAME-service-upnp"
-SERVICE_ADDR_INT=$(ip address | grep 192 | awk '{ print $2; }' | sed s,/.*$,,)
-#
-__CHECK=$(/usr/bin/upnpc -l | grep $SERVICE_NAME_INT)
-if [ -z "$__CHECK" ]; then
-        /usr/bin/upnpc -e $SERVICE_NAME_INT -r $SERVICE_PORT_INT $SERVICE_PORT_EXT $SERVICE_TYPE
-elif [[ "$__CHECK" != *"$SERVICE_ADDR_INT"* ]] || [[ "$__CHECK" != *"$SERVICE_PORT_EXT"* ]] || [[ "$__CHECK" != *"$SERVICE_PORT_INT"* ]]; then
-        /usr/bin/upnpc -d $SERVICE_PORT_EXT $SERVICE_PROTOCOL
-        /usr/bin/upnpc -e $SERVICE_NAME_INT -r $SERVICE_PORT_INT $SERVICE_PORT_EXT $SERVICE_TYPE
-fi
+dns_cloudflare_dns_zone_name_lookup() {
+    local zone_name
+    local response
+    response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID" \
+        -H "Authorization: Bearer $CF_TOKEN" \
+        -H "Content-Type: application/json")
+    if ! echo "$response" | jq -e '.success' >/dev/null; then
+        echo "Error: Failed to fetch zone name: $(echo "$response" | jq -r '.errors[].message')" >&2
+        return 1
+    fi
+    zone_name=$(echo "$response" | jq -r '.result.name')
+    if [ -z "$zone_name" ] || [ "$zone_name" = "null" ]; then
+        echo "Error: Could not fetch zone name" >&2
+        return 1
+    fi
+    echo "$zone_name"
+}
+dns_cloudflare_dns_record_lookup() {
+    local full_dns_name=$1
+    local response
+    response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records" \
+         -H "Authorization: Bearer $CF_TOKEN" \
+         -H "Content-Type: application/json")
+    if ! echo "$response" | jq -e '.success' >/dev/null; then
+        echo "Error: Failed to fetch DNS records: $(echo "$response" | jq -r '.errors[].message')" >&2
+        return 1
+    fi
+    local record_info
+    record_info=$(echo "$response" | jq -r ".result[] | select(.name == \"$full_dns_name\") | {id: .id, content: .content}")
+    if [ -z "$record_info" ] || [ "$record_info" = "" ]; then
+        echo "Error: No matching DNS record found for $full_dns_name" >&2
+        return 1
+    fi
+    echo "$record_info"
+}
+dns_cloudflare_get_current_ip() {
+    local current_ip
+    current_ip=$(curl --silent https://api.ipify.org/)
+    if [ -z "$current_ip" ]; then
+        echo "Error: Could not fetch current IP address" >&2
+        return 1
+    fi
+    echo "$current_ip"
+}
+dns_cloudflare_dns_record_update() {
+    local record_id=$1
+    local current_ip=$2
+    local current_time=$3
+    local response
+    response=$(curl --silent --request PUT \
+      --url "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records/$record_id" \
+      --header "Content-Type: application/json" \
+      --header "Authorization: Bearer $CF_TOKEN" \
+      --data "{
+        \"name\": \"$CF_DNS_NAME\",
+        \"type\": \"A\",
+        \"content\": \"$current_ip\",
+        \"proxied\": false,
+        \"ttl\": 600,
+        \"comment\": \"$CF_DNS_NAME $current_time\"
+      }")
 
-#############
+    if ! echo "$response" | jq -e '.success' >/dev/null; then
+        echo "Error: Failed to update DNS record: $(echo "$response" | jq -r '.errors[].message')" >&2
+        return 1
+    fi
+    echo "$response" | jq -r '.result | {"id", "name", "type", "content", "comment", "modified_on"} | to_entries | .[] | "    \(.key): \(.value)"'
+}
 
-SERVICE_NAME_EXT="$SERVICE_NAME-service"
-SERVICE_ADDR_EXT=$(curl --silent https://api.ipify.org/)
-#
-__RECORD=$(curl --silent --request GET --url https://api.cloudflare.com/client/v4/zones/$SERVICE_CDNS_ZONE/dns_records?comment.contains=$SERVICE_NAME \
-	--header "Authorization: Bearer $SERVICE_CDNS_TOKEN" | jq ".result[0].id" | tr -d '"')
-if [ -z "$__RECORD" ]; then
-	echo "CANNOT FIND CDNS RECORD ID TO UPDATE"
-else
-	__CURRENT=$(date --iso-8601=seconds)
-	curl --silent --request PUT --url https://api.cloudflare.com/client/v4/zones/$SERVICE_CDNS_ZONE/dns_records/$__RECORD \
-		--header "Content-Type: application/json" --header "Authorization: Bearer $SERVICE_CDNS_TOKEN" \
-		--data "{ \"name\": \"$SERVICE_NAME_EXT\", \"proxied\": false, \"ttl\": 600, \"content\": \"$SERVICE_ADDR_EXT\", \"type\": \"A\", \"comment\": \"$SERVICE_NAME $__CURRENT\" }" | jq
-fi
+dns_check_requirements() {
+    local missing_vars=()
+    [ -z "$CF_TOKEN" ] && missing_vars+=("CF_TOKEN")
+    [ -z "$CF_ZONE_ID" ] && missing_vars+=("CF_ZONE_ID")
+    [ -z "$CF_DNS_NAME" ] && missing_vars+=("CF_DNS_NAME")
+    if [ ${#missing_vars[@]} -ne 0 ]; then
+        echo "DNS CONNECT skipping due to missing variables: ${missing_vars[*]}" >&2
+        return 1
+    fi
+    return 0
+}
+dns_connect() {
+    local ZONE_NAME FULL_DNS_NAME RECORD_INFO RECORD_ID RECORD_IP CURRENT_IP CURRENT_TIME
+    
+    if ! dns_check_requirements; then
+        return 1
+    fi
 
-#############
+    ZONE_NAME=$(dns_cloudflare_dns_zone_name_lookup) || return 1
+    FULL_DNS_NAME="${CF_DNS_NAME}.${ZONE_NAME}"
+    echo "Cloudflare updater: looking for records matching $FULL_DNS_NAME"
+
+    RECORD_INFO=$(dns_cloudflare_dns_record_lookup "$FULL_DNS_NAME") || return 1
+    RECORD_ID=$(echo "$RECORD_INFO" | jq -r '.id')
+    RECORD_IP=$(echo "$RECORD_INFO" | jq -r '.content')
+    if [ -z "$RECORD_ID" ] || [ "$RECORD_ID" = "null" ] || [ -z "$RECORD_IP" ] || [ "$RECORD_IP" = "null" ]; then
+        echo "Error: Failed to parse record information" >&2
+        return 1
+    fi
+    echo "Cloudflare updater: found record ID $RECORD_ID with IP $RECORD_IP"
+
+    CURRENT_IP=$(dns_cloudflare_get_current_ip) || return 1
+    if [ "$CURRENT_IP" = "$RECORD_IP" ]; then
+        echo "Cloudflare updater: IP address $CURRENT_IP unchanged, skipping update"
+        return 0
+    fi
+
+    CURRENT_TIME=$(date --iso-8601=seconds)
+    echo "Cloudflare updater: updating IP address from $RECORD_IP to $CURRENT_IP at $CURRENT_TIME"
+    dns_cloudflare_dns_record_update "$RECORD_ID" "$CURRENT_IP" "$CURRENT_TIME"
+}
+
+##################################################################################################################################
+
+upnp_mapping_format() {
+    tr -s ' \t' ' ' | sed 's/^ *//' | sed 's/^/    /'
+}
+upnp_mapping_list() {
+    /usr/bin/upnpc -l 2>/dev/null | grep -A 20 "ExternalIPAddress = " | grep "TCP\|UDP"
+}
+upnp_mapping_update() {
+    /usr/bin/upnpc -e "$UPNP_SERVICE" -r "$UPNP_PORT_INT" "$UPNP_PORT_EXT" "$UPNP_PROTOCOL" 2>/dev/null || {
+        echo "Error: Failed to create service mapping" >&2
+        return 1
+    }
+}
+upnp_mapping_remove() {
+    /usr/bin/upnpc -d "$UPNP_PORT_EXT" "$UPNP_PROTOCOL" 2>/dev/null || {
+        echo "Warning: Failed to remove old service mapping" >&2
+        return 1
+    }
+}
+
+upnp_check_requirements() {
+    local missing_vars=()
+    [ -z "$UPNP_SERVICE" ] && missing_vars+=("UPNP_SERVICE")
+    [ -z "$UPNP_PORT_EXT" ] && missing_vars+=("UPNP_PORT_EXT")
+    [ -z "$UPNP_PORT_INT" ] && missing_vars+=("UPNP_PORT_INT")
+    [ -z "$UPNP_PROTOCOL" ] && missing_vars+=("UPNP_PROTOCOL")
+    if [ ${#missing_vars[@]} -ne 0 ]; then
+        echo "UPNP CONNECT skipping due to missing variables: ${missing_vars[*]}" >&2
+        return 1
+    fi
+    return 0
+}
+upnp_show_configuration() {
+    echo "UPNP service mapping setup:"
+    echo "    Service:          $UPNP_SERVICE"
+    echo "    Protocol:         $UPNP_PROTOCOL"
+    echo "    External-port:    $UPNP_PORT_EXT"
+    echo "    Internal-port:    $UPNP_PORT_INT"
+    echo "    Internal-address: $ADDRESS"
+}
+upnp_connect() {
+    local ADDRESS UPNP_LIST CHECK CURRENT_IP CURRENT_PORT FINAL_CHECK
+    
+    ADDRESS=$(ip address | grep -m1 '192\.' | awk '{print $2}' | cut -d'/' -f1)
+    if [ -z "$ADDRESS" ]; then
+        echo "Error: Could not determine local IP address" >&2
+        return 1
+    fi
+
+    if ! upnp_check_requirements; then
+        return 1
+    fi
+    
+    upnp_show_configuration
+
+    echo "UPNP service mapping list:"
+    UPNP_LIST=$(upnp_mapping_list) || {
+        echo "Warning: Unable to get service mapping list, but will try to set mapping"
+    }
+    if [ -n "$UPNP_LIST" ]; then
+        echo "$UPNP_LIST" | upnp_mapping_format
+    fi
+
+    CHECK=$(echo "$UPNP_LIST" | awk -v port="$UPNP_PORT_EXT" -v service="$UPNP_SERVICE" '$0 ~ port && $0 ~ service {print}')
+    if [ -z "$CHECK" ]; then
+        echo "UPNP service mapping check: not found, port=$UPNP_PORT_EXT, service=$UPNP_SERVICE -- will create new rule"
+        upnp_mapping_update
+    else
+        echo "UPNP service mapping check: found"
+        echo "$CHECK" | upnp_mapping_format
+        CURRENT_IP=$(echo "$CHECK" | awk -F'>' '{print $2}' | awk -F':' '{print $1}' | tr -d ' ')
+        CURRENT_PORT=$(echo "$CHECK" | awk -F':' '{print $2}' | awk '{print $1}')
+        if [ "$CURRENT_IP" != "$ADDRESS" ] || [ "$CURRENT_PORT" != "$UPNP_PORT_INT" ]; then
+            echo -n "UPNP service mapping update "
+            [ "$CURRENT_IP" != "$ADDRESS" ] && echo "- IP address mismatch (current: $CURRENT_IP, desired: $ADDRESS)"
+            [ "$CURRENT_PORT" != "$UPNP_PORT_INT" ] && echo "- internal port mismatch (current: $CURRENT_PORT, desired: $UPNP_PORT_INT)"
+            echo "UPNP service mapping removing old rule and creating new:"
+            upnp_mapping_remove
+            upnp_mapping_update
+        else
+            echo "UPNP service mapping valid: no changes needed"
+            return 0
+        fi
+    fi
+
+    echo "UPNP service mapping verify:"
+    FINAL_CHECK=$(upnp_mapping_list | awk -v port="$UPNP_PORT_EXT" '$0 ~ "[ \t]"port"[- ]"')
+    if [ -n "$FINAL_CHECK" ]; then
+        echo "$FINAL_CHECK" | upnp_mapping_format
+    else
+        echo "Warning: Unable to verify service mapping" >&2
+    fi
+}
+
+##################################################################################################################################
+
+dns_connect
+DNS_STATUS=$?
+upnp_connect
+UPNP_STATUS=$?
+[ $DNS_STATUS -ne 0 ] || [ $UPNP_STATUS -ne 0 ] && exit 1
+exit 0
+
+##################################################################################################################################
 

@@ -1,6 +1,5 @@
 #!/bin/sh -e
 
-# after dhcp
 if [ -f /opt/battery_pack/server/scripts/start ]; then
         /bin/sh /opt/battery_pack/server/scripts/start &
 fi
