@@ -6,4 +6,6 @@ Secrets.kt
 android/Battery_Monitor/gradle
 android/Battery_Monitor/.idea
 arduino/Battery_Monitor/.theia
+arduino/Battery_Monitor/.pio
+arduino/Battery_Monitor/.vscode
 database

@@ -7,9 +7,16 @@
 
 // -----------------------------------------------------------------------------------------------
 
+#ifdef PLATFORMIO
+static String __DEFAULT_TYPE_BUILDER(const char* prefix, const char* platform, const char* hardware) {
+    String r = String (prefix) + "-" + platform + "-" + hardware;
+    r.toLowerCase();
+    return r;
+}
+#define __DEFAULT_TYPE_BUILT __DEFAULT_TYPE_BUILDER (DEFAULT_NAME, BUILD_PLATFORM, BUILD_HARDWARE)
+#else
 // {build.source.path}\tools\upload_fota.ps1 -file_info {build.source.path}\Program.hpp -path_build {build.path} -platform {build.board}-{build.arch} -image {build.path}\{build.project_name}.bin -server http://ota.local:8090/images -verbose
 // -DARDUINO_BOARD="ESP32S3_DEV" -DARDUINO_ARCH_ESP32
-
 static String __DEFAULT_TYPE_BUILDER(const char* prefix, const char* board, const char* arch) {
     String a = arch; a.replace ("ARDUINO_ARCH_", "");
     String b = board; b.replace ("_", ""); b.replace ("-", "");
@@ -19,6 +26,7 @@ static String __DEFAULT_TYPE_BUILDER(const char* prefix, const char* board, cons
 }
 #define __DEFAULT_TYPE_BUILT __DEFAULT_TYPE_BUILDER (DEFAULT_NAME, ARDUINO_BOARD, __DEFAULT_TYPE_STRINGIFIER (ARDUINO_ARCH_ESP32))
 #define __DEFAULT_TYPE_STRINGIFIER(x) #x
+#endif
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
@@ -31,7 +39,7 @@ static String __DEFAULT_TYPE_BUILDER(const char* prefix, const char* board, cons
 #endif
 
 #define DEFAULT_NAME "BatteryMonitor"
-#define DEFAULT_VERS "1.4.2"
+#define DEFAULT_VERS "1.5.0"
 #define DEFAULT_TYPE __DEFAULT_TYPE_BUILT
 #define DEFAULT_JSON "http://ota.local:8090/images/images.json"
 
