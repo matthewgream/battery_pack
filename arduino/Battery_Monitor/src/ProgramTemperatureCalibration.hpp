@@ -2,10 +2,10 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-template<size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
+template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationDefinitions {
 public:
-    static constexpr size_t TEMP_SIZE = static_cast<size_t>((TEMP_END - TEMP_START) / TEMP_STEP) + 1;
+    static constexpr size_t TEMP_SIZE = static_cast<size_t> ((TEMP_END - TEMP_START) / TEMP_STEP) + 1;
     using Temperatures = std::array<float, TEMP_SIZE>;
     using Resistances = std::array<uint16_t, TEMP_SIZE>;
     struct Collection {
@@ -17,64 +17,64 @@ public:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-template<size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
+template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationCollector {
 public:
     using Definitions = TemperatureCalibrationDefinitions<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
     using Collection = typename Definitions::Collection;
-    using TemperatureReadFunc = std::function<float()>;
-    using ResistanceReadFunc = std::function<uint16_t(size_t)>;
+    using TemperatureReadFunc = std::function<float ()>;
+    using ResistanceReadFunc = std::function<uint16_t (size_t)>;
 
-    bool collect(Collection& collection, const TemperatureReadFunc readTemperature, const ResistanceReadFunc readResistance) {
+    bool collect (Collection &collection, const TemperatureReadFunc readTemperature, const ResistanceReadFunc readResistance) {
         static constexpr int DELAY = 100, COUNT = 5 * 1000 / DELAY, AVG_MASTER = 12, AVG_SAMPLE = 6;
         MovingAverage<float, AVG_MASTER> temperature;
 
         static constexpr float temperatureBegin = (TEMP_START - TEMP_STEP);
-        if ((temperature = readTemperature()) > temperatureBegin) {
-            DEBUG_PRINTF("TemperatureCalibrationCollector: waiting for DS18B20 temperature to reduce to %.2f°C ... \n", temperatureBegin);
+        if ((temperature = readTemperature ()) > temperatureBegin) {
+            DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to reduce to %.2f°C ... \n", temperatureBegin);
             int where = 0;
             while (temperature > temperatureBegin) {
                 if (--where < 0) {
-                    DEBUG_PRINTF("(at %.2f°C)\n", static_cast<float>(temperature));
+                    DEBUG_PRINTF ("(at %.2f°C)\n", static_cast<float> (temperature));
                     where = COUNT;
                 }
-                delay(DELAY);
-                temperature = readTemperature();
+                delay (DELAY);
+                temperature = readTemperature ();
             }
-            DEBUG_PRINTF("done\n");
+            DEBUG_PRINTF ("done\n");
         }
 
-        DEBUG_PRINTF("TemperatureCalibrationCollector: collecting from %.2f°C to %.2f°C in %.2f°C steps (%d total) for %d NTC resistances [master_avg=%d, sample_avg=%d]\n", TEMP_START, TEMP_END, TEMP_STEP, Definitions::TEMP_SIZE, SENSOR_SIZE, AVG_MASTER, AVG_SAMPLE);
+        DEBUG_PRINTF ("TemperatureCalibrationCollector: collecting from %.2f°C to %.2f°C in %.2f°C steps (%d total) for %d NTC resistances [master_avg=%d, sample_avg=%d]\n", TEMP_START, TEMP_END, TEMP_STEP, Definitions::TEMP_SIZE, SENSOR_SIZE, AVG_MASTER, AVG_SAMPLE);
         for (size_t step = 0; step < Definitions::TEMP_SIZE; step++) {
 
             const float temperatureTarget = TEMP_START + (step * TEMP_STEP);
-            DEBUG_PRINTF("TemperatureCalibrationCollector: waiting for DS18B20 temperature to increase to %.2f°C ... \n", temperatureTarget);
+            DEBUG_PRINTF ("TemperatureCalibrationCollector: waiting for DS18B20 temperature to increase to %.2f°C ... \n", temperatureTarget);
             int where = 0;
             while (temperature < temperatureTarget) {
                 if (--where < 0) {
-                    DEBUG_PRINTF("(at %.2f°C)\n", static_cast<float>(temperature));
+                    DEBUG_PRINTF ("(at %.2f°C)\n", static_cast<float> (temperature));
                     where = COUNT;
                 }
-                delay(DELAY);
-                temperature = readTemperature();
+                delay (DELAY);
+                temperature = readTemperature ();
             }
 
-            DEBUG_PRINTF("... reached %.2f°C, collecting %d NTC resistances ...\n", static_cast<float>(temperature), SENSOR_SIZE);
-            collection.temperatures[step] = temperature;
+            DEBUG_PRINTF ("... reached %.2f°C, collecting %d NTC resistances ...\n", static_cast<float> (temperature), SENSOR_SIZE);
+            collection.temperatures [step] = temperature;
             std::array<uint32_t, SENSOR_SIZE> resistances;
-            resistances.fill(static_cast<uint32_t>(0));
+            resistances.fill (static_cast<uint32_t> (0));
             for (int count = 0; count < AVG_SAMPLE; count++)
-                for (size_t sensor = 0; sensor < resistances.size(); sensor++)
-                    resistances[sensor] += static_cast<uint32_t>(readResistance(sensor));
-            for (size_t sensor = 0; sensor < resistances.size(); sensor++)
-                collection.resistances[sensor][step] = static_cast<uint16_t>(resistances[sensor] / static_cast<uint32_t>(AVG_SAMPLE));
-            DEBUG_PRINTF("done\n");
+                for (size_t sensor = 0; sensor < resistances.size (); sensor++)
+                    resistances [sensor] += static_cast<uint32_t> (readResistance (sensor));
+            for (size_t sensor = 0; sensor < resistances.size (); sensor++)
+                collection.resistances [sensor][step] = static_cast<uint16_t> (resistances [sensor] / static_cast<uint32_t> (AVG_SAMPLE));
+            DEBUG_PRINTF ("done\n");
 
             //
-            DEBUG_PRINTF("= %d,%.2f", step, collection.temperatures[step]);
-            for (size_t sensor = 0; sensor < collection.resistances.size(); sensor++)
-                DEBUG_PRINTF(",%u", collection.resistances[sensor][step]);
-            DEBUG_PRINTF("\n");
+            DEBUG_PRINTF ("= %d,%.2f", step, collection.temperatures [step]);
+            for (size_t sensor = 0; sensor < collection.resistances.size (); sensor++)
+                DEBUG_PRINTF (",%u", collection.resistances [sensor][step]);
+            DEBUG_PRINTF ("\n");
         }
         return true;
     }
@@ -83,27 +83,27 @@ public:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-template<size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
+template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationAdjustmentStrategy {
 public:
     using Definitions = TemperatureCalibrationDefinitions<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
     using StatsErrors = Stats<float>;
 
-    virtual ~TemperatureCalibrationAdjustmentStrategy() = default;
-    virtual String calibrate(const Definitions::Temperatures& temperatures, const Definitions::Resistances& resistances) = 0;
-    virtual bool calculate(float& temperature, const uint16_t resistance) const = 0;
-    virtual void serialize(JsonObject& obj) const = 0;
-    virtual void deserialize(JsonObject& obj) = 0;
-    virtual String getName() const = 0;
-    virtual String getDetails() const = 0;
+    virtual ~TemperatureCalibrationAdjustmentStrategy () = default;
+    virtual String calibrate (const Definitions::Temperatures &temperatures, const Definitions::Resistances &resistances) = 0;
+    virtual bool calculate (float &temperature, const uint16_t resistance) const = 0;
+    virtual void serialize (JsonObject &obj) const = 0;
+    virtual void deserialize (JsonObject &obj) = 0;
+    virtual String getName () const = 0;
+    virtual String getDetails () const = 0;
 
-    StatsErrors calculateStatsErrors(const Definitions::Temperatures& temperatures, const Definitions::Resistances& resistances) const {
+    StatsErrors calculateStatsErrors (const Definitions::Temperatures &temperatures, const Definitions::Resistances &resistances) const {
         StatsErrors stats;
-        assert(temperatures.size() == resistances.size());
-        for (size_t index = 0; index < temperatures.size(); index++) {
+        assert (temperatures.size () == resistances.size ());
+        for (size_t index = 0; index < temperatures.size (); index++) {
             float temperature;
-            if (calculate(temperature, resistances[index]))
-                stats += std::abs(temperature - temperatures[index]);
+            if (calculate (temperature, resistances [index]))
+                stats += std::abs (temperature - temperatures [index]);
         }
         return stats;
     }
@@ -111,55 +111,56 @@ public:
 
 // -----------------------------------------------------------------------------------------------
 
-template<size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
+template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationAdjustmentStrategy_Lookup : public TemperatureCalibrationAdjustmentStrategy<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP> {
 public:
     using Definitions = TemperatureCalibrationDefinitions<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
-    static constexpr const char* NAME = "lookup";
+    static constexpr const char *NAME = "lookup";
 
 private:
     Definitions::Temperatures temperatures;
     Definitions::Resistances resistances;
 
 public:
-    String calibrate(const Definitions::Temperatures& t, const Definitions::Resistances& r) override {
+    String calibrate (const Definitions::Temperatures &t, const Definitions::Resistances &r) override {
         temperatures = t;
         resistances = r;
-        return String();
+        return String ();
     }
-    bool calculate(float& temperature, const uint16_t resistance) const override {
-        const auto it = std::lower_bound(resistances.begin(), resistances.end(), resistance, std::greater<uint16_t>());
-        if (it == resistances.end() || it == resistances.begin()) return false;
-        const size_t index = std::distance(resistances.begin(), it);
-        temperature = temperatures[index - 1] + (temperatures[index] - temperatures[index - 1]) * (resistance - resistances[index - 1]) / (resistances[index] - resistances[index - 1]);
+    bool calculate (float &temperature, const uint16_t resistance) const override {
+        const auto it = std::lower_bound (resistances.begin (), resistances.end (), resistance, std::greater<uint16_t> ());
+        if (it == resistances.end () || it == resistances.begin ())
+            return false;
+        const size_t index = std::distance (resistances.begin (), it);
+        temperature = temperatures [index - 1] + (temperatures [index] - temperatures [index - 1]) * (resistance - resistances [index - 1]) / (resistances [index] - resistances [index - 1]);
         return true;
     }
     //
-    void serialize(JsonObject& obj) const override {
-        JsonArray t = obj["T"].to<JsonArray>(), r = obj["R"].to<JsonArray>();
-        for (size_t index = 0; index < temperatures.size(); index++)
-            t.add(temperatures[index]), r.add(resistances[index]);
+    void serialize (JsonObject &obj) const override {
+        JsonArray t = obj ["T"].to<JsonArray> (), r = obj ["R"].to<JsonArray> ();
+        for (size_t index = 0; index < temperatures.size (); index++)
+            t.add (temperatures [index]), r.add (resistances [index]);
     }
-    void deserialize(JsonObject& obj) override {
-        JsonArray t = obj["T"], r = obj["R"];
-        for (size_t index = 0; index < temperatures.size(); index++)
-            temperatures[index] = t[index], resistances[index] = r[index];
+    void deserialize (JsonObject &obj) override {
+        JsonArray t = obj ["T"], r = obj ["R"];
+        for (size_t index = 0; index < temperatures.size (); index++)
+            temperatures [index] = t [index], resistances [index] = r [index];
     }
-    String getName() const override {
+    String getName () const override {
         return NAME;
     }
-    String getDetails() const override {
-        return "lookup (N=" + ArithmeticToString(temperatures.size()) + ")";
+    String getDetails () const override {
+        return "lookup (N=" + ArithmeticToString (temperatures.size ()) + ")";
     }
 };
 
 // -----------------------------------------------------------------------------------------------
 
-template<size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
+template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationAdjustmentStrategy_Steinhart : public TemperatureCalibrationAdjustmentStrategy<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP> {
 public:
     using Definitions = TemperatureCalibrationDefinitions<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
-    static constexpr const char* NAME = "steinhart";
+    static constexpr const char *NAME = "steinhart";
     typedef struct {
         double A, B, C, D;
     } Config;
@@ -167,34 +168,40 @@ public:
 private:
     double A, B, C, D;
 
-    inline bool isResistanceReasonable(const uint16_t resistance) const {
+    inline bool isResistanceReasonable (const uint16_t resistance) const {
         return resistance > 0 && resistance < 10 * 1000;
     }
-    inline bool isTemperatureReasonable(const float temperature) const {
+    inline bool isTemperatureReasonable (const float temperature) const {
         return temperature > -100.0f && temperature < 150.0f;
     }
 
 public:
-    explicit TemperatureCalibrationAdjustmentStrategy_Steinhart(const double a = 0.0, const double b = 0.0, const double c = 0.0, const double d = 0.0)
-        : A(a), B(b), C(c), D(d) {}
-    explicit TemperatureCalibrationAdjustmentStrategy_Steinhart(const Config& config)
-        : A(config.A), B(config.B), C(config.C), D(config.D) {}
+    explicit TemperatureCalibrationAdjustmentStrategy_Steinhart (const double a = 0.0, const double b = 0.0, const double c = 0.0, const double d = 0.0) :
+        A (a),
+        B (b),
+        C (c),
+        D (d) { }
+    explicit TemperatureCalibrationAdjustmentStrategy_Steinhart (const Config &config) :
+        A (config.A),
+        B (config.B),
+        C (config.C),
+        D (config.D) { }
 
-    String calibrate(const Definitions::Temperatures& temperatures, const Definitions::Resistances& resistances) override {
-        assert(temperatures.size() >= 4 && temperatures.size() == resistances.size());
+    String calibrate (const Definitions::Temperatures &temperatures, const Definitions::Resistances &resistances) override {
+        assert (temperatures.size () >= 4 && temperatures.size () == resistances.size ());
 
         // build matrices
-        double siz = static_cast<double>(temperatures.size());
+        double siz = static_cast<double> (temperatures.size ());
         double sum_Y = 0;
         double sum_L1 = 0, sum_L2 = 0, sum_L3 = 0, sum_L4 = 0, sum_L5 = 0, sum_L6 = 0;
         double sum_YL1 = 0, sum_YL2 = 0, sum_YL3 = 0;
-        for (size_t index = 0; index < temperatures.size(); index++) {
-            if (!isTemperatureReasonable(temperatures[index]))
-                return String("invalid temperature at index ") + ArithmeticToString(index);
-            if (!isResistanceReasonable(resistances[index]))
-                return String("invalid resistance at index ") + ArithmeticToString(index);
-            const double Y = 1.0 / (temperatures[index] + 273.15);
-            const double L1 = std::log(static_cast<double>(resistances[index])), L2 = L1 * L1, L3 = L2 * L1;
+        for (size_t index = 0; index < temperatures.size (); index++) {
+            if (! isTemperatureReasonable (temperatures [index]))
+                return String ("invalid temperature at index ") + ArithmeticToString (index);
+            if (! isResistanceReasonable (resistances [index]))
+                return String ("invalid resistance at index ") + ArithmeticToString (index);
+            const double Y = 1.0 / (temperatures [index] + 273.15);
+            const double L1 = std::log (static_cast<double> (resistances [index])), L2 = L1 * L1, L3 = L2 * L1;
             sum_Y += Y;
             sum_L1 += L1;
             sum_L2 += L2;
@@ -206,162 +213,165 @@ public:
             sum_YL2 += Y * L2;
             sum_YL3 += Y * L3;
         }
-        gaussian::matrix4<double> matrix = { { { siz, sum_L1, sum_L2, sum_L3 },
-                                               { sum_L1, sum_L2, sum_L3, sum_L4 },
-                                               { sum_L2, sum_L3, sum_L4, sum_L5 },
-                                               { sum_L3, sum_L4, sum_L5, sum_L6 } } };
+        gaussian::matrix4<double> matrix = {
+            { { siz, sum_L1, sum_L2, sum_L3 },
+             { sum_L1, sum_L2, sum_L3, sum_L4 },
+             { sum_L2, sum_L3, sum_L4, sum_L5 },
+             { sum_L3, sum_L4, sum_L5, sum_L6 } }
+        };
         // solve matrices
         gaussian::vector4<double> result = { sum_Y, sum_YL1, sum_YL2, sum_YL3 };
-        const String faults = gaussian::solve(matrix, result);
-        if (!faults.isEmpty())
+        const String faults = gaussian::solve (matrix, result);
+        if (! faults.isEmpty ())
             return faults;
-        A = result[0];
-        B = result[1];
-        C = result[2];
-        D = result[3];
+        A = result [0];
+        B = result [1];
+        C = result [2];
+        D = result [3];
 
         // check result and errors
-        for (size_t index = 0; index < temperatures.size(); index++) {
+        for (size_t index = 0; index < temperatures.size (); index++) {
             float temperature;
-            if (!calculate(temperature, resistances[index]) || std::abs(temperature - temperatures[index]) > 5.0f)    // Allow 5 degrees of error
-                return String("unreliable result, error = ") + ArithmeticToString(std::abs(temperature - temperatures[index]));
+            if (! calculate (temperature, resistances [index]) || std::abs (temperature - temperatures [index]) > 5.0f)    // Allow 5 degrees of error
+                return String ("unreliable result, error = ") + ArithmeticToString (std::abs (temperature - temperatures [index]));
         }
 
-        return String();
+        return String ();
     }
-    String calibrate(const Definitions::Collection& collection) {
-        assert(collection.temperatures.size() >= 4);
+    String calibrate (const Definitions::Collection &collection) {
+        assert (collection.temperatures.size () >= 4);
 
         // build matrices
         gaussian::matrix4<double> XtX = { 0 };
         gaussian::vector4<double> XtY = { 0 };
-        for (size_t index = 0; index < collection.temperatures.size(); index++) {
-            if (!isTemperatureReasonable(collection.temperatures[index]))
-                return String("invalid temperature at index ") + ArithmeticToString(index);
-            const double T = 1.0 / (collection.temperatures[index] + 273.15);
-            for (size_t sensor = 0; sensor < collection.resistances.size(); sensor++) {
-                if (!isResistanceReasonable(collection.resistances[sensor][index]))
-                    return String("invalid resistance at index ") + ArithmeticToString(index);
-                const double lnR = std::log(static_cast<double>(collection.resistances[sensor][index]));
+        for (size_t index = 0; index < collection.temperatures.size (); index++) {
+            if (! isTemperatureReasonable (collection.temperatures [index]))
+                return String ("invalid temperature at index ") + ArithmeticToString (index);
+            const double T = 1.0 / (collection.temperatures [index] + 273.15);
+            for (size_t sensor = 0; sensor < collection.resistances.size (); sensor++) {
+                if (! isResistanceReasonable (collection.resistances [sensor][index]))
+                    return String ("invalid resistance at index ") + ArithmeticToString (index);
+                const double lnR = std::log (static_cast<double> (collection.resistances [sensor][index]));
                 const std::array<double, 4> row = { 1, lnR, lnR * lnR, lnR * lnR * lnR };
                 for (int j = 0; j < 4; j++) {
                     for (int k = 0; k < 4; k++)
-                        XtX[j][k] += row[j] * row[k];
-                    XtY[j] += row[j] * T;
+                        XtX [j][k] += row [j] * row [k];
+                    XtY [j] += row [j] * T;
                 }
             }
         }
         // solve matrices
         gaussian::vector4<double> result;
-        const String faults = gaussian::solve(XtX, XtY, result);
-        if (!faults.isEmpty())
+        const String faults = gaussian::solve (XtX, XtY, result);
+        if (! faults.isEmpty ())
             return faults;
-        A = result[0];
-        B = result[1];
-        C = result[2];
-        D = result[3];
+        A = result [0];
+        B = result [1];
+        C = result [2];
+        D = result [3];
 
         // check result and errors
-        for (size_t index = 0; index < collection.temperatures.size(); index++) {
-            for (size_t sensor = 0; sensor < collection.resistances.size(); sensor++) {
+        for (size_t index = 0; index < collection.temperatures.size (); index++) {
+            for (size_t sensor = 0; sensor < collection.resistances.size (); sensor++) {
                 float temperature;
-                if (!calculate(temperature, collection.resistances[sensor][index]) || std::abs(temperature - collection.temperatures[index]) > 10.0f)    // Allow 10 degrees of error
-                    return String("unreliable result, error = ") + ArithmeticToString(std::abs(temperature - collection.temperatures[index]));
+                if (! calculate (temperature, collection.resistances [sensor][index]) || std::abs (temperature - collection.temperatures [index]) > 10.0f)    // Allow 10 degrees of error
+                    return String ("unreliable result, error = ") + ArithmeticToString (std::abs (temperature - collection.temperatures [index]));
             }
         }
 
-        return String();
+        return String ();
     }
     //
-    bool calculate(uint16_t& resistance, const float temperature) const {
-        if (!isTemperatureReasonable(temperature)) {
-            DEBUG_PRINTF("calculateSteinhartHart: invalid temperature value.\n");
+    bool calculate (uint16_t &resistance, const float temperature) const {
+        if (! isTemperatureReasonable (temperature)) {
+            DEBUG_PRINTF ("calculateSteinhartHart: invalid temperature value.\n");
             return false;
         }
-        double lnR = std::log(10000.0);
+        double lnR = std::log (10000.0);
         for (int i = 0; i < 10; i++) {
             const double delta = (A + B * lnR + C * lnR * lnR + D * lnR * lnR * lnR - (1.0 / (temperature + 273.15))) / (B + 2 * C * lnR + 3 * D * lnR * lnR);
             lnR -= delta;
-            if (std::abs(delta) < 1e-9) break;
+            if (std::abs (delta) < 1e-9)
+                break;
         }
-        resistance = static_cast<uint16_t>(std::exp(lnR));
-        return isResistanceReasonable(resistance);
+        resistance = static_cast<uint16_t> (std::exp (lnR));
+        return isResistanceReasonable (resistance);
     };
-    bool calculate(float& temperature, const uint16_t resistance) const override {
-        if (!isResistanceReasonable(resistance)) {
-            DEBUG_PRINTF("calculateSteinhartHart: invalid resistance value.\n");
+    bool calculate (float &temperature, const uint16_t resistance) const override {
+        if (! isResistanceReasonable (resistance)) {
+            DEBUG_PRINTF ("calculateSteinhartHart: invalid resistance value.\n");
             return false;
         }
-        const double lnR = std::log(static_cast<double>(resistance));
-        temperature = static_cast<float>(1.0 / (A + B * lnR + C * lnR * lnR + D * lnR * lnR * lnR) - 273.15);
-        return isTemperatureReasonable(temperature);
+        const double lnR = std::log (static_cast<double> (resistance));
+        temperature = static_cast<float> (1.0 / (A + B * lnR + C * lnR * lnR + D * lnR * lnR * lnR) - 273.15);
+        return isTemperatureReasonable (temperature);
     }
     //
-    void serialize(JsonObject& obj) const override {
-        obj["A"] = A, obj["B"] = B, obj["C"] = C, obj["D"] = D;
+    void serialize (JsonObject &obj) const override {
+        obj ["A"] = A, obj ["B"] = B, obj ["C"] = C, obj ["D"] = D;
     }
-    void deserialize(JsonObject& obj) override {
-        A = obj["A"], B = obj["B"], C = obj["C"], D = obj["D"];
+    void deserialize (JsonObject &obj) override {
+        A = obj ["A"], B = obj ["B"], C = obj ["C"], D = obj ["D"];
     }
-    String getName() const override {
+    String getName () const override {
         return NAME;
     }
-    String getDetails() const override {
-        return "steinhart (A=" + ArithmeticToString(A, 12) + ", B=" + ArithmeticToString(B, 12) + ", C=" + ArithmeticToString(C, 12) + ", D=" + ArithmeticToString(D, 12) + ")";
+    String getDetails () const override {
+        return "steinhart (A=" + ArithmeticToString (A, 12) + ", B=" + ArithmeticToString (B, 12) + ", C=" + ArithmeticToString (C, 12) + ", D=" + ArithmeticToString (D, 12) + ")";
     }
 };
 
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-template<size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
+template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationCalculator {
 public:
     using Definitions = TemperatureCalibrationDefinitions<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
     using StrategyType = TemperatureCalibrationAdjustmentStrategy<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
     using StrategyDefault = TemperatureCalibrationAdjustmentStrategy_Steinhart<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
-    using StrategyFactory = std::function<std::shared_ptr<StrategyType>()>;
+    using StrategyFactory = std::function<std::shared_ptr<StrategyType> ()>;
     using StrategyFactories = std::map<String, StrategyFactory>;
 
     using __CalibrationStrategySet = std::vector<std::shared_ptr<StrategyType>>;
     using CalibrationStrategies = std::array<__CalibrationStrategySet, SENSOR_SIZE>;
 
-    bool compute(CalibrationStrategies& calibrations, const Definitions::Collection& collection, const StrategyFactories& factories) {
-        DEBUG_PRINTF("TemperatureCalibrationCalculator: calculating from %.2f°C to %.2f°C in %.2f°C steps (%d total) for %d NTC resistances\n", TEMP_START, TEMP_END, TEMP_STEP, Definitions::TEMP_SIZE, SENSOR_SIZE);
+    bool compute (CalibrationStrategies &calibrations, const Definitions::Collection &collection, const StrategyFactories &factories) {
+        DEBUG_PRINTF ("TemperatureCalibrationCalculator: calculating from %.2f°C to %.2f°C in %.2f°C steps (%d total) for %d NTC resistances\n", TEMP_START, TEMP_END, TEMP_STEP, Definitions::TEMP_SIZE, SENSOR_SIZE);
         for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor++) {
-            DEBUG_PRINTF("[%d/%d]: ", sensor, SENSOR_SIZE);
-            for (const auto& factory : factories) {
-                auto name = factory.first, strategy = factory.second();
-                const String faults = strategy->calibrate(collection.temperatures, collection.resistances[sensor]);
-                if (faults.isEmpty()) {
-                    DEBUG_ONLY(auto stats = strategy->calculateStatsErrors(collection.temperatures, collection.resistances[sensor]));
-                    DEBUG_PRINTF("%s%s (okay, error avg=%.4f,max=%.4f,min=%.4f)", calibrations[sensor].size() > 0 ? ", " : "", name.c_str(), stats.avg(), stats.max(), stats.min());
-                    calibrations[sensor].push_back(strategy);
+            DEBUG_PRINTF ("[%d/%d]: ", sensor, SENSOR_SIZE);
+            for (const auto &factory : factories) {
+                auto name = factory.first, strategy = factory.second ();
+                const String faults = strategy->calibrate (collection.temperatures, collection.resistances [sensor]);
+                if (faults.isEmpty ()) {
+                    DEBUG_ONLY (auto stats = strategy->calculateStatsErrors (collection.temperatures, collection.resistances [sensor]));
+                    DEBUG_PRINTF ("%s%s (okay, error avg=%.4f,max=%.4f,min=%.4f)", calibrations [sensor].size () > 0 ? ", " : "", name.c_str (), stats.avg (), stats.max (), stats.min ());
+                    calibrations [sensor].push_back (strategy);
                 } else {
-                    DEBUG_PRINTF("%s%s (fail, %s)", calibrations[sensor].size() > 0 ? ", " : "", name.c_str(), faults.c_str());
-                    //return false;
+                    DEBUG_PRINTF ("%s%s (fail, %s)", calibrations [sensor].size () > 0 ? ", " : "", name.c_str (), faults.c_str ());
+                    // return false;
                 }
             }
-            DEBUG_PRINTF("\n");
+            DEBUG_PRINTF ("\n");
         }
         return true;
     }
 
-    bool computeDefault(StrategyDefault& strategyDefault, const Definitions::Collection& collection) {
-        DEBUG_PRINTF("TemperatureCalibrationCalculator::computeDefault: using %s\n", strategyDefault.getName().c_str());
-        const String faults = strategyDefault.calibrate(collection);
-        if (!faults.isEmpty()) {
-            DEBUG_PRINTF("TemperatureCalibrationCalculator::computeDefault: fail, %s\n", faults.c_str());
+    bool computeDefault (StrategyDefault &strategyDefault, const Definitions::Collection &collection) {
+        DEBUG_PRINTF ("TemperatureCalibrationCalculator::computeDefault: using %s\n", strategyDefault.getName ().c_str ());
+        const String faults = strategyDefault.calibrate (collection);
+        if (! faults.isEmpty ()) {
+            DEBUG_PRINTF ("TemperatureCalibrationCalculator::computeDefault: fail, %s\n", faults.c_str ());
             return false;
         }
-        DEBUG_PRINTF("TemperatureCalibrationCalculator::computeDefault: %s\n", strategyDefault.getDetails().c_str());
-        DEBUG_PRINTF("(resistances [%.2f°C -> %.2f°C at %.2f°C]: ", TEMP_START, TEMP_END, TEMP_STEP);
+        DEBUG_PRINTF ("TemperatureCalibrationCalculator::computeDefault: %s\n", strategyDefault.getDetails ().c_str ());
+        DEBUG_PRINTF ("(resistances [%.2f°C -> %.2f°C at %.2f°C]: ", TEMP_START, TEMP_END, TEMP_STEP);
         for (float temperature = TEMP_START; temperature <= TEMP_END; temperature += TEMP_STEP) {
             uint16_t resistance = 0;
-            strategyDefault.calculate(resistance, temperature);
-            DEBUG_PRINTF("%s%u", (temperature == TEMP_START) ? "" : ",", resistance);
+            strategyDefault.calculate (resistance, temperature);
+            DEBUG_PRINTF ("%s%u", (temperature == TEMP_START) ? "" : ",", resistance);
         }
-        DEBUG_PRINTF(")\n");
+        DEBUG_PRINTF (")\n");
         return true;
     }
 };
@@ -369,7 +379,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-template<size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
+template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationStorage {
 public:
     using Definitions = TemperatureCalibrationDefinitions<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
@@ -380,61 +390,61 @@ public:
     using StrategyFactories = typename Calculator::StrategyFactories;
     using CalibrationStrategies = typename Calculator::CalibrationStrategies;
 
-    static bool serialize(const String& filename, const StrategyDefault& defaultStrategy, const CalibrationStrategies& calibrationStrategies) {
+    static bool serialize (const String &filename, const StrategyDefault &defaultStrategy, const CalibrationStrategies &calibrationStrategies) {
         JsonDocument doc;
 
         for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor++) {
-            JsonObject sensorObj = doc["sensor" + ArithmeticToString(sensor)].to<JsonObject>();
-            for (const auto& strategy : calibrationStrategies[sensor]) {
-                JsonObject strategyDetails = sensorObj[String(strategy->getName())].to<JsonObject>();
-                strategy->serialize(strategyDetails);
+            JsonObject sensorObj = doc ["sensor" + ArithmeticToString (sensor)].to<JsonObject> ();
+            for (const auto &strategy : calibrationStrategies [sensor]) {
+                JsonObject strategyDetails = sensorObj [String (strategy->getName ())].to<JsonObject> ();
+                strategy->serialize (strategyDetails);
             }
         }
-        JsonObject strategyDefault = doc["default"].to<JsonObject>();
-        defaultStrategy.serialize(strategyDefault);
+        JsonObject strategyDefault = doc ["default"].to<JsonObject> ();
+        defaultStrategy.serialize (strategyDefault);
 
-        SPIFFSFile file(filename);
+        SPIFFSFile file (filename);
         size_t size;
-        if (!file.begin() || !((size = file.write(doc)) > 0)) {
-            DEBUG_PRINTF("TemperatureCalibrationStorage::serialize: could not write to '%s'\n", filename.c_str());
+        if (! file.begin () || ! ((size = file.write (doc)) > 0)) {
+            DEBUG_PRINTF ("TemperatureCalibrationStorage::serialize: could not write to '%s'\n", filename.c_str ());
             return false;
         }
-        DEBUG_PRINTF("TemperatureCalibrationStorage::serialize: wrote %d bytes to '%s'\n", size, filename.c_str());
+        DEBUG_PRINTF ("TemperatureCalibrationStorage::serialize: wrote %d bytes to '%s'\n", size, filename.c_str ());
         return true;
     }
 
-    static int deserialize(const String& filename, StrategyDefault& defaultStrategy, CalibrationStrategies& calibrationStrategies, const StrategyFactories& strategyFactories) {
+    static int deserialize (const String &filename, StrategyDefault &defaultStrategy, CalibrationStrategies &calibrationStrategies, const StrategyFactories &strategyFactories) {
         JsonDocument doc;
 
-        SPIFFSFile file(filename);
+        SPIFFSFile file (filename);
         size_t size;
-        if (!file.begin() || !((size = file.read(doc)) > 0)) {
-            DEBUG_PRINTF("TemperatureCalibrationStorage::deserialize: could not read from '%s'\n", filename.c_str());
+        if (! file.begin () || ! ((size = file.read (doc)) > 0)) {
+            DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: could not read from '%s'\n", filename.c_str ());
             return 0;
         }
-        DEBUG_PRINTF("TemperatureCalibrationStorage::deserialize: read %d bytes from '%s'\n", size, filename.c_str());
+        DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: read %d bytes from '%s'\n", size, filename.c_str ());
 
         int count = 0;
         for (size_t sensor = 0; sensor < SENSOR_SIZE; sensor++) {
-            JsonObject sensorObj = doc["sensor" + ArithmeticToString(sensor)].as<JsonObject>();
+            JsonObject sensorObj = doc ["sensor" + ArithmeticToString (sensor)].as<JsonObject> ();
             if (sensorObj) {
                 for (JsonPair kv : sensorObj) {
-                    auto factory = strategyFactories.find(String(kv.key().c_str()));
-                    if (factory != strategyFactories.end()) {
-                        auto strategy = factory->second();
-                        JsonObject details = kv.value().as<JsonObject>();
-                        strategy->deserialize(details);
-                        DEBUG_PRINTF("TemperatureCalibrationStorage::deserialize: sensor %d, installed %s\n", sensor, strategy->getDetails().c_str());
-                        calibrationStrategies[sensor].push_back(strategy);
+                    auto factory = strategyFactories.find (String (kv.key ().c_str ()));
+                    if (factory != strategyFactories.end ()) {
+                        auto strategy = factory->second ();
+                        JsonObject details = kv.value ().as<JsonObject> ();
+                        strategy->deserialize (details);
+                        DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: sensor %d, installed %s\n", sensor, strategy->getDetails ().c_str ());
+                        calibrationStrategies [sensor].push_back (strategy);
                         count++;
                     }
                 }
             } else
-                DEBUG_PRINTF("TemperatureCalibrationStorage::deserialize: did not find sensor %d\n", sensor);
+                DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: did not find sensor %d\n", sensor);
         }
-        JsonObject details = doc["default"].as<JsonObject>();
+        JsonObject details = doc ["default"].as<JsonObject> ();
         if (details)
-            defaultStrategy.deserialize(details), count++;
+            defaultStrategy.deserialize (details), count++;
         return count;
     }
 };
@@ -442,7 +452,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-template<size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
+template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationRuntime {
 public:
     using Definitions = TemperatureCalibrationDefinitions<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
@@ -457,29 +467,29 @@ private:
     CalibrationStrategies calibrationStrategies;
 
 public:
-    TemperatureCalibrationRuntime(const StrategyDefault& defaultStrategy, const CalibrationStrategies& calibrationStrategies)
-        : defaultStrategy(defaultStrategy), calibrationStrategies(calibrationStrategies) {
-        DEBUG_PRINTF("TemperatureCalibrationRuntime::init: default [%s", defaultStrategy.getDetails().c_str());
-        DEBUG_ONLY(
-            for (int index = 0; index < calibrationStrategies.size(); index++) {
-                DEBUG_PRINTF("], %d [", index);
+    TemperatureCalibrationRuntime (const StrategyDefault &defaultStrategy, const CalibrationStrategies &calibrationStrategies) :
+        defaultStrategy (defaultStrategy),
+        calibrationStrategies (calibrationStrategies) {
+        DEBUG_PRINTF ("TemperatureCalibrationRuntime::init: default [%s", defaultStrategy.getDetails ().c_str ());
+        DEBUG_ONLY (
+            for (int index = 0; index < calibrationStrategies.size (); index++) {
+                DEBUG_PRINTF ("], %d [", index);
                 int count = 0;
-                for (const auto& strategy : calibrationStrategies[index])
-                    DEBUG_PRINTF("%s%s", count++ == 0 ? "" : ",", strategy->getName().c_str());
+                for (const auto &strategy : calibrationStrategies [index])
+                    DEBUG_PRINTF ("%s%s", count++ == 0 ? "" : ",", strategy->getName ().c_str ());
             });
-        DEBUG_PRINTF("]\n");
+        DEBUG_PRINTF ("]\n");
     }
 
-    float calculateTemperature(const size_t index, const uint16_t resistance) const {
+    float calculateTemperature (const size_t index, const uint16_t resistance) const {
         float temperature = 0.0f;
-        if (std::any_of(calibrationStrategies[index].begin(), calibrationStrategies[index].end(),
-                        [&](const auto& strategy) {
-                            return strategy->calculate(temperature, resistance);
-                        }))
+        if (std::any_of (calibrationStrategies [index].begin (), calibrationStrategies [index].end (), [&] (const auto &strategy) {
+                return strategy->calculate (temperature, resistance);
+            }))
             return temperature;
-        if (defaultStrategy.calculate(temperature, resistance))
+        if (defaultStrategy.calculate (temperature, resistance))
             return temperature;
-        DEBUG_PRINTF("TemperatureCalibrationRuntime::calculateTemperature: failed, sensor %d, resistance %u", index, resistance);
+        DEBUG_PRINTF ("TemperatureCalibrationRuntime::calculateTemperature: failed, sensor %d, resistance %u", index, resistance);
         return NAN;
     }
 };
@@ -487,7 +497,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-static const char* temperatureCalibrationData_STATIC[] = {
+static const char *temperatureCalibrationData_STATIC [] = {
     "0,5.01,3145,3078,3083,3081,3160,3084,3155,3168,3148,3094,2827,2925,2967,2924,3073,2991",
     "1,5.51,3133,3081,3079,3077,3156,3096,3160,3150,3126,3083,2864,2923,2960,2826,3064,2991",
     "2,6.04,3094,3055,3075,3069,3112,3123,3194,3138,3058,3031,2851,2911,2916,2824,3059,2987",
@@ -601,22 +611,22 @@ static const char* temperatureCalibrationData_STATIC[] = {
     "110,60.00,880,841,871,864,900,876,880,870,894,893,981,1014,1047,957,1015,1036"
 };
 
-template<size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
+template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationStaticDataLoader {
     using Definitions = TemperatureCalibrationDefinitions<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
     using Collector = TemperatureCalibrationCollector<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
 
-    bool parse(const char* line, float& temperature, std::array<uint16_t, SENSOR_SIZE>& resistances) {
+    bool parse (const char *line, float &temperature, std::array<uint16_t, SENSOR_SIZE> &resistances) {
         const char *token = line, *next_token;
-        if (!(token = strchr(token, ',')))
+        if (! (token = strchr (token, ',')))
             return false;
         token++;
-        temperature = strtof(token, const_cast<char**>(&next_token));
+        temperature = strtof (token, const_cast<char **> (&next_token));
         if (next_token == token)
             return false;
         token = next_token + 1;
         for (int i = 0; i < SENSOR_SIZE; i++) {
-            resistances[i] = static_cast<uint16_t>(strtol(token, const_cast<char**>(&next_token), 10));
+            resistances [i] = static_cast<uint16_t> (strtol (token, const_cast<char **> (&next_token), 10));
             if (next_token == token)
                 return false;
             token = next_token + 1;
@@ -625,15 +635,15 @@ class TemperatureCalibrationStaticDataLoader {
     }
 
 public:
-    bool load(Collector::Collection& collection) {
-        for (int index = 0; index < collection.temperatures.size(); index++) {
+    bool load (Collector::Collection &collection) {
+        for (int index = 0; index < collection.temperatures.size (); index++) {
             std::array<uint16_t, SENSOR_SIZE> resistances;    // need to be transposed
-            if (!parse(temperatureCalibrationData_STATIC[index], collection.temperatures[index], resistances)) {
-                DEBUG_PRINTF("TemperatureCalibrationManager::calibateTemperatures - parsing failed\n");
+            if (! parse (temperatureCalibrationData_STATIC [index], collection.temperatures [index], resistances)) {
+                DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - parsing failed\n");
                 return false;
             }
             for (int sensor = 0; sensor < SENSOR_SIZE; sensor++)
-                collection.resistances[sensor][index] = resistances[sensor];
+                collection.resistances [sensor][index] = resistances [sensor];
         }
         return true;
     }
@@ -642,7 +652,7 @@ public:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-template<size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
+template <size_t SENSOR_SIZE, float TEMP_START, float TEMP_END, float TEMP_STEP>
 class TemperatureCalibrationManager : public Component, public Diagnosticable {
 public:
     using Definitions = TemperatureCalibrationDefinitions<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>;
@@ -663,86 +673,87 @@ public:
     };
 
 private:
-    const Config& config;
+    const Config &config;
     std::shared_ptr<Runtime> runtime;
     size_t _loaded = 0;
 
-    StrategyFactories createStrategyFactoriesForCalibration() const {    // store the lookup tables, but don't use them
-        return StrategyFactories{
-            { StrategyLookup::NAME, [] {
-                 return std::make_shared<StrategyLookup>();
-             } },
+    StrategyFactories createStrategyFactoriesForCalibration () const {    // store the lookup tables, but don't use them
+        return StrategyFactories {
+            {    StrategyLookup::NAME, [] {
+ return std::make_shared<StrategyLookup> ();
+ } },
             { StrategySteinhart::NAME, [] {
-                 return std::make_shared<StrategySteinhart>();
-             } }
+ return std::make_shared<StrategySteinhart> ();
+ } }
         };
     }
-    StrategyFactories createStrategyFactoriesForOperation() const {
-        return StrategyFactories{
+    StrategyFactories createStrategyFactoriesForOperation () const {
+        return StrategyFactories {
             { StrategySteinhart::NAME, [] {
-                 return std::make_shared<StrategySteinhart>();
+                 return std::make_shared<StrategySteinhart> ();
              } }
         };
     }
 
 public:
-    explicit TemperatureCalibrationManager(const Config& cfg)
-        : config(cfg) {}
+    explicit TemperatureCalibrationManager (const Config &cfg) :
+        config (cfg) { }
 
-    void begin() override {
-        std::shared_ptr<typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_shared<typename Calculator::CalibrationStrategies>();
-        StrategyDefault defaultStrategy(config.strategyDefault);
-        if (!(_loaded = Storage::deserialize(config.filename, defaultStrategy, *calibrationStrategies, createStrategyFactoriesForOperation())))
-            DEBUG_PRINTF("TemperatureCalibrationManager:: no stored calibrations (filename = %s), will rely upon default\n", config.filename.c_str());
-        runtime = std::make_shared<Runtime>(defaultStrategy, *calibrationStrategies);
+    void begin () override {
+        std::shared_ptr<typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_shared<typename Calculator::CalibrationStrategies> ();
+        StrategyDefault defaultStrategy (config.strategyDefault);
+        if (! (_loaded = Storage::deserialize (config.filename, defaultStrategy, *calibrationStrategies, createStrategyFactoriesForOperation ())))
+            DEBUG_PRINTF ("TemperatureCalibrationManager:: no stored calibrations (filename = %s), will rely upon default\n", config.filename.c_str ());
+        runtime = std::make_shared<Runtime> (defaultStrategy, *calibrationStrategies);
     }
 
-    float calculateTemperature(const size_t index, const float resistance) const {
-        if (!runtime) return -273.15f;
-        return runtime->calculateTemperature(index, resistance);
+    float calculateTemperature (const size_t index, const float resistance) const {
+        if (! runtime)
+            return -273.15f;
+        return runtime->calculateTemperature (index, resistance);
     }
 
-    bool calibrateTemperatures() {
-        std::shared_ptr<typename Collector::Collection> calibrationData = std::make_shared<typename Collector::Collection>();
-        if (!TemperatureCalibrationStaticDataLoader<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP>().load(*calibrationData)) {
-            DEBUG_PRINTF("TemperatureCalibrationManager::calibateTemperatures - static load failed\n");
+    bool calibrateTemperatures () {
+        std::shared_ptr<typename Collector::Collection> calibrationData = std::make_shared<typename Collector::Collection> ();
+        if (! TemperatureCalibrationStaticDataLoader<SENSOR_SIZE, TEMP_START, TEMP_END, TEMP_STEP> ().load (*calibrationData)) {
+            DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - static load failed\n");
             return false;
         }
-        return calibrateTemperaturesFromData(*calibrationData);
+        return calibrateTemperaturesFromData (*calibrationData);
     }
-    bool calibrateTemperatures(const Collector::TemperatureReadFunc readTemperature, const Collector::ResistanceReadFunc readResistance) {
-        std::shared_ptr<typename Collector::Collection> calibrationData = std::make_shared<typename Collector::Collection>();
-        if (!Collector().collect(*calibrationData, readTemperature, readResistance)) {
-            DEBUG_PRINTF("TemperatureCalibrationManager::calibateTemperatures - collector failed\n");
+    bool calibrateTemperatures (const Collector::TemperatureReadFunc readTemperature, const Collector::ResistanceReadFunc readResistance) {
+        std::shared_ptr<typename Collector::Collection> calibrationData = std::make_shared<typename Collector::Collection> ();
+        if (! Collector ().collect (*calibrationData, readTemperature, readResistance)) {
+            DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - collector failed\n");
             return false;
         }
-        for (int index = 0; index < calibrationData->temperatures.size(); index++) {
-            DEBUG_PRINTF("= %d,%.2f", index, calibrationData->temperatures[index]);
-            for (size_t sensor = 0; sensor < calibrationData->resistances.size(); sensor++)
-                DEBUG_PRINTF(",%u", calibrationData->resistances[sensor][index]);
-            DEBUG_PRINTF("\n");
+        for (int index = 0; index < calibrationData->temperatures.size (); index++) {
+            DEBUG_PRINTF ("= %d,%.2f", index, calibrationData->temperatures [index]);
+            for (size_t sensor = 0; sensor < calibrationData->resistances.size (); sensor++)
+                DEBUG_PRINTF (",%u", calibrationData->resistances [sensor][index]);
+            DEBUG_PRINTF ("\n");
         }
-        return calibrateTemperaturesFromData(*calibrationData);
+        return calibrateTemperaturesFromData (*calibrationData);
     }
 
 private:
-    bool calibrateTemperaturesFromData(const Collector::Collection& calibrationData) {
+    bool calibrateTemperaturesFromData (const Collector::Collection &calibrationData) {
         Calculator calculator;
-        std::shared_ptr<typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_shared<typename Calculator::CalibrationStrategies>();
+        std::shared_ptr<typename Calculator::CalibrationStrategies> calibrationStrategies = std::make_shared<typename Calculator::CalibrationStrategies> ();
         StrategyDefault defaultStrategy;
-        if (!calculator.compute(*calibrationStrategies, calibrationData, createStrategyFactoriesForCalibration()) || !calculator.computeDefault(defaultStrategy, calibrationData)) {
-            DEBUG_PRINTF("TemperatureCalibrationManager::calibateTemperatures - calculator failed\n");
+        if (! calculator.compute (*calibrationStrategies, calibrationData, createStrategyFactoriesForCalibration ()) || ! calculator.computeDefault (defaultStrategy, calibrationData)) {
+            DEBUG_PRINTF ("TemperatureCalibrationManager::calibateTemperatures - calculator failed\n");
             return false;
         }
-        Storage::serialize(config.filename, defaultStrategy, *calibrationStrategies);
-        runtime = std::make_shared<Runtime>(defaultStrategy, *calibrationStrategies);
+        Storage::serialize (config.filename, defaultStrategy, *calibrationStrategies);
+        runtime = std::make_shared<Runtime> (defaultStrategy, *calibrationStrategies);
         return true;
     }
 
 protected:
-    void collectDiagnostics(JsonVariant& obj) const override {
-        JsonObject sub = obj["cal"].to<JsonObject>();
-        sub["loaded"] = _loaded;
+    void collectDiagnostics (JsonVariant &obj) const override {
+        JsonObject sub = obj ["cal"].to<JsonObject> ();
+        sub ["loaded"] = _loaded;
     }
 };
 

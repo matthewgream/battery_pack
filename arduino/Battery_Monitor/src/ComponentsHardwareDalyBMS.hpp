@@ -18,18 +18,21 @@ public:
     };
 
 private:
-    const Config& config;
+    const Config &config;
 
     daly_bms::Interfaces dalyInterfaces;
     Intervalable intervalInstant, intervalStatus, intervalDiagnostics;
     Enableable enabled;
 
 public:
-    DalyBMSManager(const Config& conf)
-        : config(conf), dalyInterfaces({ .interfaces = { config.manager, config.balance } }),
-          intervalInstant(config.intervalInstant), intervalStatus(config.intervalStatus), intervalDiagnostics(config.intervalDiagnostics) {}    // XXX need to randomise to prevent synchronicity
+    DalyBMSManager (const Config &conf) :
+        config (conf),
+        dalyInterfaces ({
+            .interfaces = { config.manager, config.balance }
+    }),
+        intervalInstant (config.intervalInstant), intervalStatus (config.intervalStatus), intervalDiagnostics (config.intervalDiagnostics) { }    // XXX need to randomise to prevent synchronicity
 
-    void begin() override {
+    void begin () override {
         // if (dalyInterfaces.begin())
         //     DEBUG_PRINTF("DalyBMSManager::begin: daly begin failed\n");
         // else {
@@ -38,7 +41,7 @@ public:
         //     intervalDiagnostics.setat(RandomNumber::get<interval_t>(config.intervalDiagnostics));
         // }
     }
-    void process() override {
+    void process () override {
         // if (enabled) {
         //     if (intervalInstant) dalyInterfaces.requestInstant();
         //     if (intervalStatus) dalyInterfaces.requestStatus();
@@ -47,21 +50,23 @@ public:
         // }
     }
 
-    struct Instant { float voltage, current, charge; };
+    struct Instant {
+        float voltage, current, charge;
+    };
     Instant instant () const {
         // dalyInterfaces ["name"].status.status;
         return { .voltage = 0.0f, .current = 0.0f, .charge = 0.0f };
     }
 
 protected:
-    void collectDiagnostics(JsonVariant& obj) const override {
+    void collectDiagnostics (JsonVariant &obj) const override {
         // last spoke
         // total comms
         // diags of each (but not deep diags!)
         // alarms
-            // failure details
-            // soc empty, low, nearlycharged, charged
-            //
+        // failure details
+        // soc empty, low, nearlycharged, charged
+        //
     }
 };
 

@@ -8,23 +8,32 @@
 // -----------------------------------------------------------------------------------------------
 
 #ifdef PLATFORMIO
-static String __DEFAULT_TYPE_BUILDER(const char* prefix, const char* platform, const char* hardware) {
+static String __DEFAULT_TYPE_BUILDER (const char *prefix, const char *platform, const char *hardware) {
     String r = String (prefix) + "-" + platform + "-" + hardware;
-    r.toLowerCase();
+    r.toLowerCase ();
     return r;
 }
+#ifndef BUILD_PLATFORM
+#define BUILD_PLATFORM "D3AD"
+#endif
+#ifndef BUILD_HARDWARE
+#define BUILD_HARDWARE "B33F"
+#endif
 #define __DEFAULT_TYPE_BUILT __DEFAULT_TYPE_BUILDER (DEFAULT_NAME, BUILD_PLATFORM, BUILD_HARDWARE)
 #else
 // {build.source.path}\tools\upload_fota.ps1 -file_info {build.source.path}\Program.hpp -path_build {build.path} -platform {build.board}-{build.arch} -image {build.path}\{build.project_name}.bin -server http://ota.local:8090/images -verbose
 // -DARDUINO_BOARD="ESP32S3_DEV" -DARDUINO_ARCH_ESP32
-static String __DEFAULT_TYPE_BUILDER(const char* prefix, const char* board, const char* arch) {
-    String a = arch; a.replace ("ARDUINO_ARCH_", "");
-    String b = board; b.replace ("_", ""); b.replace ("-", "");
+static String __DEFAULT_TYPE_BUILDER (const char *prefix, const char *board, const char *arch) {
+    String a = arch;
+    a.replace ("ARDUINO_ARCH_", "");
+    String b = board;
+    b.replace ("_", "");
+    b.replace ("-", "");
     String r = String (prefix) + "-" + b + "-" + a;
-    r.toLowerCase();
+    r.toLowerCase ();
     return r;
 }
-#define __DEFAULT_TYPE_BUILT __DEFAULT_TYPE_BUILDER (DEFAULT_NAME, ARDUINO_BOARD, __DEFAULT_TYPE_STRINGIFIER (ARDUINO_ARCH_ESP32))
+#define __DEFAULT_TYPE_BUILT          __DEFAULT_TYPE_BUILDER (DEFAULT_NAME, ARDUINO_BOARD, __DEFAULT_TYPE_STRINGIFIER (ARDUINO_ARCH_ESP32))
 #define __DEFAULT_TYPE_STRINGIFIER(x) #x
 #endif
 
@@ -89,7 +98,7 @@ public:
     };
 
 private:
-    const Config& config;
+    const Config &config;
 
     static constexpr int HEAP_FREE_PERCENTAGE_MINIMUM = 5;
     static constexpr int TEMP_RANGE_MINIMUM = 0, TEMP_RANGE_MAXIMUM = 80;
@@ -101,38 +110,40 @@ private:
     const bool reset_okay;
 
 public:
-    PlatformArduino(const Config& conf)
-        : Alarmable({ AlarmCondition(ALARM_SYSTEM_MEMORYLOW, [this]() {
-                          return ((100 * esp_get_minimum_free_heap_size()) / heap_size) < HEAP_FREE_PERCENTAGE_MINIMUM;
-                      }),
-                      AlarmCondition(ALARM_SYSTEM_BADRESET, [this]() {
-                          return !reset_okay;
-                      }) }),
-          config(conf), code_size(ESP.getSketchSize()), heap_size(ESP.getHeapSize()), reset_reason(getResetReason()), reset_details(getResetDetails(reset_reason)), reset_okay(getResetOkay(reset_reason)) {
-        const temperature_sensor_config_t temp_sensor = TEMPERATURE_SENSOR_CONFIG_DEFAULT(TEMP_RANGE_MINIMUM, TEMP_RANGE_MAXIMUM);
+    PlatformArduino (const Config &conf) :
+        Alarmable ({ AlarmCondition (ALARM_SYSTEM_MEMORYLOW, [this] () { return ((100 * esp_get_minimum_free_heap_size ()) / heap_size) < HEAP_FREE_PERCENTAGE_MINIMUM; }),
+                     AlarmCondition (ALARM_SYSTEM_BADRESET, [this] () { return ! reset_okay; }) }),
+        config (conf),
+        code_size (ESP.getSketchSize ()),
+        heap_size (ESP.getHeapSize ()),
+        reset_reason (getResetReason ()),
+        reset_details (getResetDetails (reset_reason)),
+        reset_okay (getResetOkay (reset_reason)) {
+        const temperature_sensor_config_t temp_sensor = TEMPERATURE_SENSOR_CONFIG_DEFAULT (TEMP_RANGE_MINIMUM, TEMP_RANGE_MAXIMUM);
         float temp_read = 0.0f;
-        temp_okay = (temperature_sensor_install(&temp_sensor, &temp_handle) == ESP_OK && temperature_sensor_enable(temp_handle) == ESP_OK && temperature_sensor_get_celsius(temp_handle, &temp_read) == ESP_OK);
-        if (!temp_okay) DEBUG_PRINTF("PlatformArduino::init: could not enable temperature sensor\n");
-        DEBUG_PRINTF("PlatformArduino::init: code=%lu, heap=%lu, temp=%.2f, reset=%d\n", code_size, heap_size, temp_read, reset_reason);
-        RandomNumber::seed(analogRead(config.pinRandomNoise));    // XXX TIDY
+        temp_okay = (temperature_sensor_install (&temp_sensor, &temp_handle) == ESP_OK && temperature_sensor_enable (temp_handle) == ESP_OK && temperature_sensor_get_celsius (temp_handle, &temp_read) == ESP_OK);
+        if (! temp_okay)
+            DEBUG_PRINTF ("PlatformArduino::init: could not enable temperature sensor\n");
+        DEBUG_PRINTF ("PlatformArduino::init: code=%lu, heap=%lu, temp=%.2f, reset=%d\n", code_size, heap_size, temp_read, reset_reason);
+        RandomNumber::seed (analogRead (config.pinRandomNoise));    // XXX TIDY
     }
 
 protected:
-    void collectDiagnostics(JsonVariant& obj) const override {
-        JsonObject system = obj["system"].to<JsonObject>();
-        JsonObject code = system["code"].to<JsonObject>();
-        code["size"] = code_size;
-        JsonObject heap = system["heap"].to<JsonObject>();
-        heap["size"] = heap_size;
-        heap["free"] = esp_get_free_heap_size();
-        heap["min"] = esp_get_minimum_free_heap_size();
+    void collectDiagnostics (JsonVariant &obj) const override {
+        JsonObject system = obj ["system"].to<JsonObject> ();
+        JsonObject code = system ["code"].to<JsonObject> ();
+        code ["size"] = code_size;
+        JsonObject heap = system ["heap"].to<JsonObject> ();
+        heap ["size"] = heap_size;
+        heap ["free"] = esp_get_free_heap_size ();
+        heap ["min"] = esp_get_minimum_free_heap_size ();
         float temp;
-        if (temp_okay && temperature_sensor_get_celsius(temp_handle, &temp) == ESP_OK)
-            system["temp"] = temp;
-        JsonObject reset = system["reset"].to<JsonObject>();
-        reset["okay"] = reset_okay;
-        reset["reason"] = reset_details.first;
-        //reset ["details"] = reset_details.second;
+        if (temp_okay && temperature_sensor_get_celsius (temp_handle, &temp) == ESP_OK)
+            system ["temp"] = temp;
+        JsonObject reset = system ["reset"].to<JsonObject> ();
+        reset ["okay"] = reset_okay;
+        reset ["reason"] = reset_details.first;
+        // reset ["details"] = reset_details.second;
     }
 };
 
@@ -182,157 +193,167 @@ class Program : public Component, public Diagnosticable {
 
     DiagnosticManager diagnostics;
     class OperationalManager {
-        const Program* _program;
+        const Program *_program;
+
     public:
-        explicit OperationalManager(const Program* program)
-            : _program(program){};
-        void collect(JsonVariant&) const;
+        explicit OperationalManager (const Program *program) :
+            _program (program) {};
+        void collect (JsonVariant &) const;
     } operational;
     Intervalable intervalDeliver, intervalCapture, intervalDiagnose;
-    String dataCollect(const String& name, const std::function<void(JsonVariant&)> func) const {
-        JsonCollector collector(name, getTimeString(), address);
-        JsonVariant obj = collector.document().as<JsonVariant>();
-        func(obj);
+    String dataCollect (const String &name, const std::function<void (JsonVariant &)> func) const {
+        JsonCollector collector (name, getTimeString (), address);
+        JsonVariant obj = collector.document ().as<JsonVariant> ();
+        func (obj);
         return collector;
     }
-    void dataCapture(const String& data, const bool publishData, const bool storageData) {
+    void dataCapture (const String &data, const bool publishData, const bool storageData) {
         class StorageLineHandler : public StorageManager::LineCallback {
-            PublishManager& _publish;
+            PublishManager &_publish;
+
         public:
-            explicit StorageLineHandler(PublishManager& publish)
-                : _publish(publish) {}
-            bool process(const String& line) override {
-                return line.isEmpty() ? true : _publish.publish(line, "data");
+            explicit StorageLineHandler (PublishManager &publish) :
+                _publish (publish) { }
+            bool process (const String &line) override {
+                return line.isEmpty () ? true : _publish.publish (line, "data");
             }
         };
         if (publishData) {
-            if (storage.available() && storage.size() > 0) {    // even if !storageData, still drain it
-                DEBUG_PRINTF("Program::doCapture: publish.connected () && storage.size () > 0\n");
+            if (storage.available () && storage.size () > 0) {    // even if !storageData, still drain it
+                DEBUG_PRINTF ("Program::doCapture: publish.connected () && storage.size () > 0\n");
                 // probably needs to be time bound and recall and reuse an offset ... or this will cause infinite watchdog loop one day
-                StorageLineHandler handler(publish);
-                if (storage.retrieve(handler))
-                    storage.erase();
+                StorageLineHandler handler (publish);
+                if (storage.retrieve (handler))
+                    storage.erase ();
             }
-            if (!publish.publish(data, "data"))
+            if (! publish.publish (data, "data"))
                 if (storageData)
-                    storage.append(data);
+                    storage.append (data);
         } else if (storageData)
-            storage.append(data);
+            storage.append (data);
     }
-    void dataProcess() {
+    void dataProcess () {
 
-        const bool dataShouldDeliver = intervalDeliver, dataToDeliver = dataShouldDeliver && deliver.available();
-        const bool dataShouldCapture = intervalCapture, dataToCaptureToPublish = dataShouldCapture && (config.publishData && publish.available()), dataToCaptureToStorage = dataShouldCapture && (config.storageData && storage.available());
-        const bool diagShould = intervalDiagnose && (config.deliverDiag || config.publishDiag), diagToDeliver = diagShould && (config.deliverDiag && deliver.available()), diagToPublish = diagShould && (config.publishDiag && publish.available());
+        const bool dataShouldDeliver = intervalDeliver, dataToDeliver = dataShouldDeliver && deliver.available ();
+        const bool dataShouldCapture = intervalCapture, dataToCaptureToPublish = dataShouldCapture && (config.publishData && publish.available ()), dataToCaptureToStorage = dataShouldCapture && (config.storageData && storage.available ());
+        const bool diagShould = intervalDiagnose && (config.deliverDiag || config.publishDiag), diagToDeliver = diagShould && (config.deliverDiag && deliver.available ()), diagToPublish = diagShould && (config.publishDiag && publish.available ());
 
-        DEBUG_PRINTF("Program::process: deliver=%d/%d, capture=%d/%d/%d, diagnose=%d/%d/%d\n", dataShouldDeliver, dataToDeliver, dataShouldCapture, dataToCaptureToPublish, dataToCaptureToStorage, diagShould, diagToDeliver, diagToPublish);
+        DEBUG_PRINTF ("Program::process: deliver=%d/%d, capture=%d/%d/%d, diagnose=%d/%d/%d\n", dataShouldDeliver, dataToDeliver, dataShouldCapture, dataToCaptureToPublish, dataToCaptureToStorage, diagShould, diagToDeliver, diagToPublish);
 
         if (dataToDeliver || (dataToCaptureToPublish || dataToCaptureToStorage)) {
-            const String data = dataCollect("data", [&](JsonVariant& obj) {
-                operational.collect(obj);
+            const String data = dataCollect ("data", [&] (JsonVariant &obj) {
+                operational.collect (obj);
             });
-            DEBUG_PRINTF("Program::process: data, length=%d, content=<<<%s>>>\n", data.length(), data.c_str());
-            if (dataToDeliver) deliver.deliver(data, "data", config.publishData && publish.available());
-            if (dataToCaptureToPublish || dataToCaptureToStorage) dataCapture(data, dataToCaptureToPublish, dataToCaptureToStorage);
+            DEBUG_PRINTF ("Program::process: data, length=%d, content=<<<%s>>>\n", data.length (), data.c_str ());
+            if (dataToDeliver)
+                deliver.deliver (data, "data", config.publishData && publish.available ());
+            if (dataToCaptureToPublish || dataToCaptureToStorage)
+                dataCapture (data, dataToCaptureToPublish, dataToCaptureToStorage);
         }
 
         if (diagToDeliver || diagToPublish) {
-            const String diag = dataCollect("diag", [&](JsonVariant& obj) {
-                diagnostics.collect(obj);
+            const String diag = dataCollect ("diag", [&] (JsonVariant &obj) {
+                diagnostics.collect (obj);
             });
-            DEBUG_PRINTF("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length(), diag.c_str());
+            DEBUG_PRINTF ("Program::process: diag, length=%d, content=<<<%s>>>\n", diag.length (), diag.c_str ());
             if (diagToDeliver)
-                deliver.deliver(diag, "diag", config.publishData && publish.available());
+                deliver.deliver (diag, "diag", config.publishData && publish.available ());
             if (diagToPublish)
-                publish.publish(diag, "diag");
+                publish.publish (diag, "diag");
         }
     }
 
     //
 
-    void process() override {
-        dataProcess();
+    void process () override {
+        dataProcess ();
         cycles++;
     }
 
     Intervalable intervalProcess;
-    void gate() {
-        intervalProcess.wait();
+    void gate () {
+        intervalProcess.wait ();
     }
 
 public:
-    Program()
-        : address(getMacAddressBase("")),
-          platform(config.platform),
-          fanControllingAlgorithm(config.FAN_CONTROL_P, config.FAN_CONTROL_I, config.FAN_CONTROL_D),
-          fanSmoothingAlgorithm(config.FAN_SMOOTH_A),
-          temperatureCalibrator(config.temperatureCalibrator),
-          temperatureInterface(config.temperatureInterface, [&](const int channel, const uint16_t resistance) {
-              return temperatureCalibrator.calculateTemperature(channel, resistance);
-          }),
-          temperatureManagerBatterypack(config.temperatureManagerBatterypack, temperatureInterface),
-          temperatureManagerEnvironment(config.temperatureManagerEnvironment, temperatureInterface),
-          fanInterface(config.fanInterface, fanInterfaceSetrategy),
-          fanManager(config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, [&]() {
-              return FanManager::TargetSet(temperatureManagerBatterypack.setpoint(), temperatureManagerBatterypack.current());
-          }),
-          batteryManager(config.batteryManager),
-          devices(config.devices, [&]() { return network.available(); }),
-          network(config.network, devices.mdns()), nettime(config.nettime, [&]() { return network.available(); }),
-          control(config.control, address, devices),
-          deliver(config.deliver, address, devices.blue(), devices.mqtt(), devices.websocket()),
-          publish(config.publish, address, devices.mqtt()),
-          storage(config.storage),
-          updater(config.updater, [&]() { return network.available(); }),
-          alarmsInterface(config.alarmsInterface),
-          alarms(config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
-          diagnostics(config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &batteryManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
-          operational(this),
-          intervalDeliver(config.intervalDeliver), intervalCapture(config.intervalCapture), intervalDiagnose(config.intervalDiagnose), intervalProcess(config.intervalProcess),
-          components({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &batteryManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
-        DEBUG_PRINTF("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
+    Program () :
+        address (getMacAddressBase ("")),
+        platform (config.platform),
+        fanControllingAlgorithm (config.FAN_CONTROL_P, config.FAN_CONTROL_I, config.FAN_CONTROL_D),
+        fanSmoothingAlgorithm (config.FAN_SMOOTH_A),
+        temperatureCalibrator (config.temperatureCalibrator),
+        temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) {
+            return temperatureCalibrator.calculateTemperature (channel, resistance);
+        }),
+        temperatureManagerBatterypack (config.temperatureManagerBatterypack, temperatureInterface),
+        temperatureManagerEnvironment (config.temperatureManagerEnvironment, temperatureInterface),
+        fanInterface (config.fanInterface, fanInterfaceSetrategy),
+        fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, [&] () {
+            return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ());
+        }),
+        batteryManager (config.batteryManager),
+        devices (config.devices, [&] () { return network.available (); }),
+        network (config.network, devices.mdns ()),
+        nettime (config.nettime, [&] () { return network.available (); }),
+        control (config.control, address, devices),
+        deliver (config.deliver, address, devices.blue (), devices.mqtt (), devices.websocket ()),
+        publish (config.publish, address, devices.mqtt ()),
+        storage (config.storage),
+        updater (config.updater, [&] () { return network.available (); }),
+        alarmsInterface (config.alarmsInterface),
+        alarms (config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
+        diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &batteryManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
+        operational (this),
+        intervalDeliver (config.intervalDeliver),
+        intervalCapture (config.intervalCapture),
+        intervalDiagnose (config.intervalDiagnose),
+        intervalProcess (config.intervalProcess),
+        components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &batteryManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
+        DEBUG_PRINTF ("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
 
     Component::List components;
-    void setup() {
-        for (const auto& component : components) component->begin();
+    void setup () {
+        for (const auto &component : components)
+            component->begin ();
     }
-    void loop() {
-        gate();
-        for (const auto& component : components) component->process();
+    void loop () {
+        gate ();
+        for (const auto &component : components)
+            component->process ();
     }
 
 protected:
-    void collectDiagnostics(JsonVariant& obj) const override {
-        JsonObject program = obj["program"].to<JsonObject>();
+    void collectDiagnostics (JsonVariant &obj) const override {
+        JsonObject program = obj ["program"].to<JsonObject> ();
         extern const String build;
-        program["build"] = build;
-        program["uptime"] = uptime;
-        program["cycles"] = cycles;
-        if (intervalProcess.exceeded() > 0)
-            program["exceeda"] = intervalProcess.exceeded();
+        program ["build"] = build;
+        program ["uptime"] = uptime;
+        program ["cycles"] = cycles;
+        if (intervalProcess.exceeded () > 0)
+            program ["exceeda"] = intervalProcess.exceeded ();
     }
 };
 
 // -----------------------------------------------------------------------------------------------
 
-void Program::OperationalManager::collect(JsonVariant& obj) const {
-    JsonObject tmp = obj["tmp"].to<JsonObject>();
-    JsonObject bms = tmp["bms"].to<JsonObject>();
-        auto x = _program->batteryManager.instant();
-        bms["V"] = x.voltage;
-        bms["I"] = x.current;
-        bms["C"] = x.charge;
-    tmp["env"] = _program->temperatureManagerEnvironment.getTemperature();
-    JsonObject bat = tmp["bat"].to<JsonObject>();
-        bat["avg"] = _program->temperatureManagerBatterypack.avg();
-        bat["min"] = _program->temperatureManagerBatterypack.min();
-        bat["max"] = _program->temperatureManagerBatterypack.max();
-    JsonArray val = bat["val"].to<JsonArray>();
-        for (const auto& v : _program->temperatureManagerBatterypack.getTemperatures())
-            val.add(v);
-    obj["fan"] = _program->fanInterface.getSpeed();
-    obj["alm"] = _program->alarms.toString();
+void Program::OperationalManager::collect (JsonVariant &obj) const {
+    JsonObject tmp = obj ["tmp"].to<JsonObject> ();
+    JsonObject bms = tmp ["bms"].to<JsonObject> ();
+    auto x = _program->batteryManager.instant ();
+    bms ["V"] = x.voltage;
+    bms ["I"] = x.current;
+    bms ["C"] = x.charge;
+    tmp ["env"] = _program->temperatureManagerEnvironment.getTemperature ();
+    JsonObject bat = tmp ["bat"].to<JsonObject> ();
+    bat ["avg"] = _program->temperatureManagerBatterypack.avg ();
+    bat ["min"] = _program->temperatureManagerBatterypack.min ();
+    bat ["max"] = _program->temperatureManagerBatterypack.max ();
+    JsonArray val = bat ["val"].to<JsonArray> ();
+    for (const auto &v : _program->temperatureManagerBatterypack.getTemperatures ())
+        val.add (v);
+    obj ["fan"] = _program->fanInterface.getSpeed ();
+    obj ["alm"] = _program->alarms.toString ();
 }
 
 // -----------------------------------------------------------------------------------------------

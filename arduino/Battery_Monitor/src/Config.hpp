@@ -9,7 +9,7 @@
 // #define DEFAULT_MQTT_USER "mqtt_user" // Secrets.hpp
 // #define DEFAULT_MQTT_PASS "mqtt_pass" // Secrets.hpp
 
-#if !defined(DEFAULT_WIFI_SSID) || !defined(DEFAULT_WIFI_PASS) || !defined(DEFAULT_MQTT_USER) || !defined(DEFAULT_MQTT_PASS)
+#if ! defined(DEFAULT_WIFI_SSID) || ! defined(DEFAULT_WIFI_PASS) || ! defined(DEFAULT_MQTT_USER) || ! defined(DEFAULT_MQTT_PASS)
 #error "Require all of DEFAULT_WIFI_SSID, DEFAULT_WIFI_PASS, DEFAULT_MQTT_USER, DEFAULT_MQTT_PASS"
 #endif
 #ifndef DEFAULT_MQTT_HOST
@@ -102,33 +102,33 @@
 */
 
 #if defined(HARDWARE_ESP32_C3_ZERO)
-#define PIN_DS18B0_DAT 21
-#define PIN_CD74HC4067_EN 20
-#define PIN_CD74HC4067_SIG 0
+#define PIN_DS18B0_DAT         21
+#define PIN_CD74HC4067_EN      20
+#define PIN_CD74HC4067_SIG     0
 #define PIN_CD74HC4067_ADDR_S0 10
 #define PIN_CD74HC4067_ADDR_S1 9
 #define PIN_CD74HC4067_ADDR_S2 8
 #define PIN_CD74HC4067_ADDR_S3 7
-#define PIN_OSQMD_I2CSDA 1
-#define PIN_OSQMD_I2CSCL 2
-#define PIN_OSQMD_PWM_0 3
-#define PIN_OSQMD_PWM_1 4
-#define PIN_OSQMD_PWM_2 5
-#define PIN_OSQMD_PWM_3 6
+#define PIN_OSQMD_I2CSDA       1
+#define PIN_OSQMD_I2CSCL       2
+#define PIN_OSQMD_PWM_0        3
+#define PIN_OSQMD_PWM_1        4
+#define PIN_OSQMD_PWM_2        5
+#define PIN_OSQMD_PWM_3        6
 #elif defined(HARDWARE_ESP32_S3_YD_ESP32_S3_C)
-#define PIN_DS18B0_DAT 1            // MOVE
-#define PIN_CD74HC4067_EN 2         // MOVE
-#define PIN_CD74HC4067_SIG 13       // AS IS
-#define PIN_CD74HC4067_ADDR_S0 3    // AS IS
-#define PIN_CD74HC4067_ADDR_S1 4    // AS IS
-#define PIN_CD74HC4067_ADDR_S2 5    // AS IS
-#define PIN_CD74HC4067_ADDR_S3 6    // AS IS
-#define PIN_OSQMD_I2CSDA 12         // AS IS
-#define PIN_OSQMD_I2CSCL 11         // AS IS
-#define PIN_OSQMD_PWM_0 10          // AS IS
-#define PIN_OSQMD_PWM_1 9           // AS IS
-#define PIN_OSQMD_PWM_2 8           // AS IS
-#define PIN_OSQMD_PWM_3 7           // AS IS
+#define PIN_DS18B0_DAT         1     // MOVE
+#define PIN_CD74HC4067_EN      2     // MOVE
+#define PIN_CD74HC4067_SIG     13    // AS IS
+#define PIN_CD74HC4067_ADDR_S0 3     // AS IS
+#define PIN_CD74HC4067_ADDR_S1 4     // AS IS
+#define PIN_CD74HC4067_ADDR_S2 5     // AS IS
+#define PIN_CD74HC4067_ADDR_S3 6     // AS IS
+#define PIN_OSQMD_I2CSDA       12    // AS IS
+#define PIN_OSQMD_I2CSCL       11    // AS IS
+#define PIN_OSQMD_PWM_0        10    // AS IS
+#define PIN_OSQMD_PWM_1        9     // AS IS
+#define PIN_OSQMD_PWM_2        8     // AS IS
+#define PIN_OSQMD_PWM_3        7     // AS IS
 #endif
 
 // TBC
@@ -140,7 +140,7 @@
 #define PIN_DALY_BALANCE_SERIAL_RX GPIO_NUM_15
 #define PIN_DALY_BALANCE_SERIAL_TX GPIO_NUM_16
 #define PIN_DALY_BALANCE_SERIAL_EN GPIO_NUM_17
-#define PIN_RANDOM_NOISE GPIO_NUM_1
+#define PIN_RANDOM_NOISE           GPIO_NUM_1
 
 // -----------------------------------------------------------------------------------------------
 
@@ -156,20 +156,20 @@ struct Config {
 
     // hardware interfaces
     TemperatureInterface::Config temperatureInterface = {
-        .hardware = { .PIN_EN = PIN_CD74HC4067_EN, .PIN_SIG = PIN_CD74HC4067_SIG, .PIN_ADDR = { PIN_CD74HC4067_ADDR_S0, PIN_CD74HC4067_ADDR_S1, PIN_CD74HC4067_ADDR_S2, PIN_CD74HC4067_ADDR_S3 } },
+        .hardware = {     .PIN_EN = PIN_CD74HC4067_EN, .PIN_SIG = PIN_CD74HC4067_SIG, .PIN_ADDR = { PIN_CD74HC4067_ADDR_S0, PIN_CD74HC4067_ADDR_S1, PIN_CD74HC4067_ADDR_S2, PIN_CD74HC4067_ADDR_S3 } },
 #ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION
-        .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
+        .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0,                                                                                    .NOMINAL_TEMPERATURE = 25.0 }
 #endif
     };
     TemperatureCalibrator::Config temperatureCalibrator = {
         .filename = "/temperaturecalibrations.json",
-        .strategyDefault = { .A = -0.012400427786, .B = 0.006860769298, .C = -0.001057743719, .D = 0.000056166727 }    // XXX populate from calibration data
+        .strategyDefault = { .A = -0.012400427786, .B = 0.006860769298, .C = -0.001057743719, .D = 0.000056166727 }  // XXX populate from calibration data
     };
     FanInterface::Config fanInterface = {
         .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = PIN_OSQMD_I2CSDA, .PIN_I2C_SCL = PIN_OSQMD_I2CSCL, .PIN_PWMS = { PIN_OSQMD_PWM_0, PIN_OSQMD_PWM_1, PIN_OSQMD_PWM_2, PIN_OSQMD_PWM_3 }, .frequency = 5000, .invertedPWM = true },
         .DIRECTION = OpenSmart_QuadMotorDriver::MOTOR_CLOCKWISE,
         .MIN_SPEED = 96,
-        .MAX_SPEED = 255,    // duplicated, not ideal
+        .MAX_SPEED = 255, // duplicated, not ideal
         .MOTOR_ORDER = { 0, 1, 2, 3 },
         .MOTOR_ROTATE = 5 * 60 * 1000
     };
@@ -192,26 +192,26 @@ struct Config {
     // bms
     DalyBMSManager::Config batteryManager = {
         .manager = {
-            .manager = {
-                .id = "manager",
-                .capabilities = daly_bms::Capabilities::Managing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex - daly_bms::Capabilities::RealTimeClock,
-                .categories = daly_bms::Categories::All,
-                .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
-            },
-            .serialId = PIN_DALY_MANAGER_SERIAL_ID,
-            .serialRxPin = PIN_DALY_MANAGER_SERIAL_RX,
-            .serialTxPin = PIN_DALY_MANAGER_SERIAL_TX,
-            .enPin = PIN_DALY_MANAGER_SERIAL_EN },
+                    .manager = {
+                    .id = "manager",
+                    .capabilities = daly_bms::Capabilities::Managing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex - daly_bms::Capabilities::RealTimeClock,
+                    .categories = daly_bms::Categories::All,
+                    .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
+                    },
+                    .serialId = PIN_DALY_MANAGER_SERIAL_ID,
+                    .serialRxPin = PIN_DALY_MANAGER_SERIAL_RX,
+                    .serialTxPin = PIN_DALY_MANAGER_SERIAL_TX,
+                    .enPin = PIN_DALY_MANAGER_SERIAL_EN },
         .balance = { .manager = {
-                         .id = "balance",
-                         .capabilities = daly_bms::Capabilities::Balancing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex,
-                         .categories = daly_bms::Categories::All,
-                         .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
-                     },
-                     .serialId = PIN_DALY_BALANCE_SERIAL_ID,
-                     .serialRxPin = PIN_DALY_BALANCE_SERIAL_RX,
-                     .serialTxPin = PIN_DALY_BALANCE_SERIAL_TX,
-                     .enPin = PIN_DALY_BALANCE_SERIAL_EN },
+ .id = "balance",
+ .capabilities = daly_bms::Capabilities::Balancing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex,
+ .categories = daly_bms::Categories::All,
+ .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
+ },
+                    .serialId = PIN_DALY_BALANCE_SERIAL_ID,
+                    .serialRxPin = PIN_DALY_BALANCE_SERIAL_RX,
+                    .serialTxPin = PIN_DALY_BALANCE_SERIAL_TX,
+                    .enPin = PIN_DALY_BALANCE_SERIAL_EN },
         .intervalInstant = 15 * 1000,
         .intervalStatus = 60 * 1000,
         .intervalDiagnostics = 5 * 60 * 1000
@@ -232,7 +232,7 @@ struct Config {
         .host = DEFAULT_NAME, .ssid = DEFAULT_WIFI_SSID, .pass = DEFAULT_WIFI_PASS, .intervalConnectionCheck = 1 * 60 * 1000
     };
     NettimeManager::Config nettime = {
-        .useragent = String(DEFAULT_NAME) + String("/1.0"), .server = "http://matthewgream.net", .intervalUpdate = 60 * 60 * 1000, .intervalAdjust = 60 * 1000, .failureLimit = 3
+        .useragent = String (DEFAULT_NAME) + String ("/1.0"), .server = "http://matthewgream.net", .intervalUpdate = 60 * 60 * 1000, .intervalAdjust = 60 * 1000, .failureLimit = 3
     };
 
     // data managers
@@ -252,7 +252,7 @@ struct Config {
 
     // program
     ControlManager::Config control = { .url_version = "/version" };
-    UpdateManager::Config updater = { .startupCheck = true, .updateImmmediately = true, .intervalCheck = 1 * 24 * 60 * 60 * 1000, .intervalLong = (interval_t)28 * 24 * 60 * 60 * 1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase() };
+    UpdateManager::Config updater = { .startupCheck = true, .updateImmmediately = true, .intervalCheck = 1 * 24 * 60 * 60 * 1000, .intervalLong = (interval_t) 28 * 24 * 60 * 60 * 1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase () };
     AlarmManager::Config alarms = {};
     ActivablePIN::Config alarmsInterface = { .PIN = -1, .ACTIVE = LOW };
     DiagnosticManager::Config diagnostics = {};

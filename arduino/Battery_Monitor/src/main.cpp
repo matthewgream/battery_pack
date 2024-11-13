@@ -7,10 +7,10 @@
 #ifdef PLATFORMIO
 
 void setup () {
-    app_setup();
+    app_setup ();
 }
-void loop() {
-    app_loop();
+void loop () {
+    app_loop ();
 }
 
 #endif

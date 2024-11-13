@@ -8,6 +8,8 @@
 #define DEBUG_LOGGER_INITIAL_SERIAL
 #define DEBUG_LOGGER_SERIAL_BAUD 115200
 
+// clang-format off
+
 #ifdef DEBUG
 #ifndef DEBUG_OLD
     typedef void (*__DebugLoggerFunc) (const char*, ...);
@@ -41,12 +43,16 @@
     #define DEBUG_ONLY(...)
 #endif
 
+// clang-format on
+
 // -----------------------------------------------------------------------------------------------
 
 #include "Program.hpp"
 #include "Factory.hpp"
 
 // -----------------------------------------------------------------------------------------------
+
+// clang-format off
 
 #define BUILD_Y ((__DATE__[7] - '0') * 1000 + (__DATE__[8] - '0') * 100 + (__DATE__[9] - '0') * 10 + (__DATE__[10] - '0'))
 #define BUILD_M ((__DATE__[0] == 'J') ? ((__DATE__[1] == 'a') ? 1 : ((__DATE__[2] == 'n') ? 6 : 7)) : (__DATE__[0] == 'F') ? 2 : (__DATE__[0] == 'M') ? ((__DATE__[2] == 'r') ? 3 : 5) \
@@ -65,6 +71,8 @@ static inline String __build_plat () { String platform = ESP.getChipModel (); pl
 
 const String build (String (__build_name) + " V" + String (__build_vers) + "-" + String (__build_time) + " (" + __build_plat () + ")");
 
+// clang-format on
+
 // -----------------------------------------------------------------------------------------------
 
 Program *program;
@@ -75,7 +83,7 @@ void app_setup () {
     delay (DEFAULT_INITIAL_DELAY);
 
     DEBUG_START ();
-    const std::pair <String, String> r = getResetDetails ();
+    const std::pair<String, String> r = getResetDetails ();
     DEBUG_PRINTF ("\n[%s: %s]", r.first.c_str (), r.second.c_str ());
     DEBUG_PRINTF ("\n*** %s ***\n\n", build.c_str ());
 
