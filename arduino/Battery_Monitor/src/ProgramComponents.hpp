@@ -10,7 +10,7 @@ public:
         MQTTClient::Config mqtt;
         WebServer::Config webserver;
         WebSocket::Config websocket;
-        WiFiDevice::Config wifi;
+        WiFiNetworkClient::Config wifi;
 
     } Config;
 
@@ -25,7 +25,7 @@ private:
     MQTTClient _mqtt;
     WebServer _webserver;
     WebSocket _websocket;
-    WiFiDevice _wifi;
+    WiFiNetworkClient _wifi;
 
 public:
     explicit ProgramComponents (const Config &cfg, const BooleanFunc networkIsAvailable) :
@@ -72,7 +72,7 @@ public:
     WebSocket &websocket () {
         return _websocket;
     }
-    WiFiDevice &wifi () {
+    WiFiNetworkClient &wifi () {
         return _wifi;
     }
 

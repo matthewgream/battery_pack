@@ -128,7 +128,7 @@ private:
     int _current = 0, _attempts = 0;
 
 public:
-    ConnectionPeers (const Config &config, Parser parser) :
+    ConnectionPeers (const Config &config, const Parser& parser) :
         _config (config),
         _parser (std::move (parser)) { }
 
