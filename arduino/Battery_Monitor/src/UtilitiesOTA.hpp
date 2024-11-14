@@ -18,46 +18,47 @@ inline String encodeUrlWithParameters (const String &url, A &&...args) {
 
 // -----------------------------------------------------------------------------------------------
 
+#include <Arduino.h>
 #include <flashz.hpp>
 #include <esp32fota.h>
 #include <WiFi.h>
 
 static bool __ota_image_update_check (esp32FOTA &ota, const char *json, const char *type, const char *vers, const char *addr, char *newr) {
-    DEBUG_PRINTF ("OTA_IMAGE_CHECK: fetch json=%s, type=%s, vers=%s, addr=%s ...", json, type, vers, addr);
+    Serial.printf ("OTA_IMAGE_CHECK: fetch json=%s, type=%s, vers=%s, addr=%s ...", json, type, vers, addr);
     ota.setManifestURL (encodeUrlWithParameters (json, "type", type, "vers", vers, "addr", addr).c_str ());
     const bool update = ota.execHTTPcheck ();
     if (update) {
         ota.getPayloadVersion (newr);
-        DEBUG_PRINTF (" newer version=%s\n", newr);
+        Serial.printf (" newer version=%s\n", newr);
         return true;
     } else {
-        DEBUG_PRINTF (" no newer version (or error)\n");
+        Serial.printf (" no newer version (or error)\n");
         return false;
     }
 }
 static void __ota_image_update_execute (esp32FOTA &ota, const char *newr, const std::function<void ()> &func) {
     bool updated = false;
-    DEBUG_PRINTF ("OTA_IMAGE_UPDATE: download and install, vers=%s\n", newr);
+    Serial.printf ("OTA_IMAGE_UPDATE: download and install, vers=%s\n", newr);
     ota.setProgressCb ([&] (size_t progress, size_t size) {
         if (progress >= size)
             updated = true;
-        DEBUG_PRINTF (! updated ? "." : "\n");
+        Serial.printf (! updated ? "." : "\n");
     });
     ota.setUpdateBeginFailCb ([&] (int partition) {
         if (! updated)
-            DEBUG_PRINTF ("\n");
-        DEBUG_PRINTF ("\nOTA_IMAGE_UPDATE: failed begin, partition=%\n", partition == U_SPIFFS ? "spiffs" : "firmware");
+            Serial.printf ("\n");
+        Serial.printf ("\nOTA_IMAGE_UPDATE: failed begin, partition=%\n", partition == U_SPIFFS ? "spiffs" : "firmware");
     });
     ota.setUpdateCheckFailCb ([&] (int partition, int error) {
         if (! updated)
-            DEBUG_PRINTF ("\n");
-        DEBUG_PRINTF ("OTA_IMAGE_UPDATE: failed check, partition=%s, error=%d\n", partition == U_SPIFFS ? "spiffs" : "firmware", error);
+            Serial.printf ("\n");
+        Serial.printf ("OTA_IMAGE_UPDATE: failed check, partition=%s, error=%d\n", partition == U_SPIFFS ? "spiffs" : "firmware", error);
     });
     bool restart = false;
     ota.setUpdateFinishedCb ([&] (int partition, bool _restart) {
         if (! updated)
-            DEBUG_PRINTF ("\n");
-        DEBUG_PRINTF ("OTA_IMAGE_UPDATE: success, partition=%s, restart=%d\n", partition == U_SPIFFS ? "spiffs" : "firmware", _restart);
+            Serial.printf ("\n");
+        Serial.printf ("OTA_IMAGE_UPDATE: success, partition=%s, restart=%d\n", partition == U_SPIFFS ? "spiffs" : "firmware", _restart);
         restart = _restart;
     });
     ota.execOTA ();

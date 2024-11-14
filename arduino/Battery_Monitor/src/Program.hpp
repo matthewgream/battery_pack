@@ -58,6 +58,7 @@ static String __DEFAULT_TYPE_BUILDER (const char *prefix, const char *board, con
 #include <Arduino.h>
 
 #include "Utilities.hpp"
+#include "UtilitiesMath.hpp"
 #include "UtilitiesJson.hpp"
 #include "UtilitiesPlatform.hpp"
 
