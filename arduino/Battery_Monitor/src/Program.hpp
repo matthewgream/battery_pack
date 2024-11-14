@@ -71,11 +71,13 @@ static String __DEFAULT_TYPE_BUILDER (const char *prefix, const char *board, con
 using AlarmInterface = ActivablePIN;
 
 #include "ProgramBase.hpp"
+#include "ProgramTime.hpp"
+#include "ProgramNetwork.hpp"
 #include "ProgramManage.hpp"
 #include "ProgramHardwareInterface.hpp"
 #include "ProgramHardwareManage.hpp"
-#include "ProgramNetworkManage.hpp"
-#include "ComponentsHardwareDalyBMS.hpp"    // XXX
+#include "ComponentsHardwareDalyBMS.hpp"          // XXX
+#include "ComponentsHardwareBluetoothTPMS.hpp"    // XXX
 #include "ProgramDataManage.hpp"
 #include "ProgramTemperatureCalibration.hpp"
 #include "UtilitiesOTA.hpp"    // breaks if included earlier due to SPIFFS headers
@@ -176,11 +178,12 @@ class Program : public Component, public Diagnosticable {
     DeviceManager devices;
 
     NetwerkManager network;
-    NettimeManager nettime;
     ControlManager control;    //
     DeliverManager deliver;    //
     PublishManager publish;    //
     StorageManager storage;    //
+
+    BluetoothTPMSManager tyrePressureManager; // XXX needs to be after bluetooth deliver has initialised. need to refactor this
 
     UpdateManager updater;
     AlarmInterface alarmsInterface;
@@ -291,24 +294,24 @@ public:
         fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, [&] () {
             return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ());
         }),
-        batteryManager (config.batteryManager),
+       batteryManager (config.batteryManager),
         devices (config.devices, [&] () { return network.available (); }),
         network (config.network, devices.mdns ()),
-        nettime (config.nettime, [&] () { return network.available (); }),
         control (config.control, address, devices),
         deliver (config.deliver, address, devices.blue (), devices.mqtt (), devices.websocket ()),
         publish (config.publish, address, devices.mqtt ()),
         storage (config.storage),
-        updater (config.updater, [&] () { return network.available (); }),
+        tyrePressureManager (config.tyrePressureManager), // XXX needs to be earlier
+         updater (config.updater, [&] () { return network.available (); }),
         alarmsInterface (config.alarmsInterface),
-        alarms (config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &nettime, &deliver, &publish, &storage, &platform }),
-        diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &batteryManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
+        alarms (config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &deliver, &publish, &storage, &platform }),
+        diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &tyrePressureManager, &batteryManager, &devices, &network, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
         operational (this),
         intervalDeliver (config.intervalDeliver),
         intervalCapture (config.intervalCapture),
         intervalDiagnose (config.intervalDiagnose),
         intervalProcess (config.intervalProcess),
-        components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &batteryManager, &devices, &network, &nettime, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
+        components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &tyrePressureManager, &batteryManager, &devices, &network, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
         DEBUG_PRINTF ("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
 

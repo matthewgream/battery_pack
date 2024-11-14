@@ -120,13 +120,20 @@ int LoggingHandler::_bufferOffset = 0;
 
 class DeviceManager : public Component, public Diagnosticable {
 public:
+    struct Config_i2c {
+        int PIN_SDA, PIN_SCL;
+    };
     typedef struct {
+        Config_i2c i2c0, i2c1;
         BluetoothDevice::Config blue;
         MulticastDNS::Config mdns;
         MQTTPublisher::Config mqtt;
         WebServer::Config webserver;
         WebSocket::Config websocket;
         LoggingHandler::Config logging;
+
+        RealtimeClock::Config timeHardware;
+        NetworkTime::Config timeNetwork;
     } Config;
 
     using BooleanFunc = std::function<bool ()>;
@@ -135,6 +142,8 @@ private:
     const Config &config;
     const BooleanFunc _networkIsAvailable;
 
+    TwoWire i2c_bus0, i2c_bus1;
+
     BluetoothDevice _blue;
     MulticastDNS _mdns;
     MQTTPublisher _mqtt;
@@ -142,16 +151,27 @@ private:
     WebSocket _websocket;
     LoggingHandler _logging;
 
+    RealtimeClock _timeHardware;
+    NetworkTime _timeNetwork;
+
 public:
     explicit DeviceManager (const Config &cfg, const BooleanFunc networkIsAvailable) :
         config (cfg),
         _networkIsAvailable (networkIsAvailable),
+        i2c_bus0 (0),
+        i2c_bus1 (1),
         _blue (config.blue),
         _mdns (config.mdns),
         _mqtt (config.mqtt),
         _webserver (config.webserver),
         _websocket (config.websocket),
-        _logging (config.logging, getMacAddressBase (""), &_mqtt) { }
+        _logging (config.logging, getMacAddressBase (""), &_mqtt),
+        _timeHardware (config.timeHardware, i2c_bus0),
+        _timeNetwork (config.timeNetwork)
+    {
+        i2c_bus0.setPins (config.i2c0.PIN_SDA, config.i2c0.PIN_SCL);
+        i2c_bus1.setPins (config.i2c1.PIN_SDA, config.i2c1.PIN_SCL);
+    }
 
     void begin () override {
         _blue.begin ();
@@ -159,6 +179,8 @@ public:
         _mqtt.begin ();
         _webserver.begin ();
         _websocket.begin ();
+        _timeHardware.begin ();
+        _timeNetwork.begin ();
     }
     void process () override {
         _blue.process ();
@@ -167,7 +189,9 @@ public:
             _mqtt.process ();
             _webserver.process ();
             _websocket.process ();
+            _timeNetwork.process ();
         }
+        _timeHardware.process ();
     }
     //
     MulticastDNS &mdns () {
@@ -185,6 +209,12 @@ public:
     WebSocket &websocket () {
         return _websocket;
     }
+    RealtimeClock &timeHardware () {
+        return _timeHardware;
+    }
+    NetworkTime &timeNetwork () {
+        return _timeNetwork;
+    }
 
 protected:
     void collectDiagnostics (JsonVariant &obj) const override {
@@ -194,6 +224,9 @@ protected:
         sub ["mqtt"] = _mqtt;
         sub ["webserver"] = _webserver;
         sub ["websocket"] = _websocket;
+        JsonObject time = obj ["time"].to<JsonObject> ();
+        time ["hardware"] = _timeHardware;
+        time ["network"] = _timeNetwork;
     }
 };
 

@@ -189,6 +189,10 @@ struct Config {
     double FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
     FanManager::Config fanManager = {};
 
+    // tpms
+    BluetoothTPMSManager::Config tyrePressureManager = {
+        .front = "38:89:00:00:36:02", .rear = "38:8b:00:00:ed:63"
+    };
     // bms
     DalyBMSManager::Config batteryManager = {
         .manager = {
@@ -219,20 +223,21 @@ struct Config {
 
     // devices
     DeviceManager::Config devices = {
+        .i2c0 = { .PIN_SDA = -1, .PIN_SCL = -1 },
+        .i2c1 = { .PIN_SDA = -1, .PIN_SCL = -1 },
         .blue = { .name = DEFAULT_NAME, .serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", .characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", .pin = DEFAULT_BLUE_PIN, .intervalConnectionCheck = 1 * 60 * 1000 },
         .mdns = {},
         .mqtt = { .client = DEFAULT_NAME, .host = DEFAULT_MQTT_HOST, .port = DEFAULT_MQTT_PORT, .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .bufferSize = 3 * 1024 },
         .webserver = { .enabled = true, .port = 80 },
         .websocket = { .enabled = true, .port = 81, .root = "/" },
-        .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME }
+        .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME },
+        .timeHardware = {},
+        .timeNetwork = { .useragent = String (DEFAULT_NAME) + String ("/1.0"), .server = "http://matthewgream.net", .intervalUpdate = 60 * 60 * 1000, .intervalAdjust = 60 * 1000, .failureLimit = 3 }
     };
 
     // network managers
     NetwerkManager::Config network = {
         .host = DEFAULT_NAME, .ssid = DEFAULT_WIFI_SSID, .pass = DEFAULT_WIFI_PASS, .intervalConnectionCheck = 1 * 60 * 1000
-    };
-    NettimeManager::Config nettime = {
-        .useragent = String (DEFAULT_NAME) + String ("/1.0"), .server = "http://matthewgream.net", .intervalUpdate = 60 * 60 * 1000, .intervalAdjust = 60 * 1000, .failureLimit = 3
     };
 
     // data managers

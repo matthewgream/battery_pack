@@ -72,9 +72,9 @@ private:
         }
     }
     static void __gapEventHandler (esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
-        auto device = Singleton<BluetoothDevice>::instance ();
-        if (device != nullptr)
-            device->events (event, param);
+        auto instance = Singleton<BluetoothDevice>::instance ();
+        if (instance != nullptr)
+            instance->events (event, param);
     }
 
     //
