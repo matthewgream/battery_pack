@@ -9,7 +9,7 @@
 
 #include <tuple>
 
-class DalyBMSManager : public Component, public Diagnosticable {
+class ProgramInterfaceDalyBMS : public Component, public Diagnosticable {
 
 public:
     struct Config {
@@ -25,7 +25,7 @@ private:
     Enableable enabled;
 
 public:
-    DalyBMSManager (const Config &conf) :
+    ProgramInterfaceDalyBMS (const Config &conf) :
         config (conf),
         dalyInterfaces ({
             .interfaces = { config.manager, config.balance }

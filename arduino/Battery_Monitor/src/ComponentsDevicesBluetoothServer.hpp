@@ -66,7 +66,7 @@ private:
     void events (const esp_gap_ble_cb_event_t event, const esp_ble_gap_cb_param_t *param) {
         if (event == ESP_GAP_BLE_READ_RSSI_COMPLETE_EVT) {
             if (param->read_rssi_cmpl.status == ESP_BT_STATUS_SUCCESS) {
-                DEBUG_PRINTF ("BluetoothDevice::events: BLE_READ_RSSI_COMPLETE, (rssi=%d, quality=%s)\n", param->read_rssi_cmpl.rssi, ConnectionSignalTracker::toString (ConnectionSignalTracker::signalQuality (param->read_rssi_cmpl.rssi)).c_str ());
+                DEBUG_PRINTF ("BluetoothDevice::events: BLE_READ_RSSI_COMPLETE, (rssi=%d, quality=%s)\n", param->read_rssi_cmpl.rssi, ConnectionSignal::toString (ConnectionSignal::signalQuality (param->read_rssi_cmpl.rssi)).c_str ());
                 _connected_rssiResponse (param->read_rssi_cmpl.rssi);
             }
         }
@@ -135,7 +135,7 @@ private:
     ActivationTracker _connections;
     ActivationTrackerWithDetail _disconnections;
     Intervalable _connectionActiveChecker;
-    ConnectionSignalTracker _connectionSignalTracker;
+    ConnectionSignal _connectionSignalTracker;
     bool _connectionActive = false;
     void _connect () {
         _advertisingEnable ();
@@ -230,7 +230,7 @@ private:
     //
 
 public:
-    explicit BluetoothDevice (const Config &cfg, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) :
+    explicit BluetoothDevice (const Config &cfg, const ConnectionSignal::Callback connectionSignalCallback = nullptr) :
         Singleton<BluetoothDevice> (this),
         ConnectionReceiver<BluetoothDevice>::Insertable (&_connectionReceiver),
         config (cfg),

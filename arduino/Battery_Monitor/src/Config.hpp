@@ -4,19 +4,14 @@
 
 #include "Secrets.hpp"
 
-// #define DEFAULT_WIFI_SSID "wifi_ssid" // Secrets.hpp
-// #define DEFAULT_WIFI_PASS "wifi_pass" // Secrets.hpp
-// #define DEFAULT_MQTT_USER "mqtt_user" // Secrets.hpp
-// #define DEFAULT_MQTT_PASS "mqtt_pass" // Secrets.hpp
+// #define DEFAULT_WIFI_PEERS { "ssid:pass", "_Heathrow Wi-Fi" }
+// #define DEFAULT_MQTT_PEERS { "mqtt.in.the.cloud/user@pass", "mqtt.local:1883/user@pass" }
 
-#if ! defined(DEFAULT_WIFI_SSID) || ! defined(DEFAULT_WIFI_PASS) || ! defined(DEFAULT_MQTT_USER) || ! defined(DEFAULT_MQTT_PASS)
-#error "Require all of DEFAULT_WIFI_SSID, DEFAULT_WIFI_PASS, DEFAULT_MQTT_USER, DEFAULT_MQTT_PASS"
+#if ! defined(DEFAULT_WIFI_PEERS)
+#error "Require DEFAULT_WIFI_PEERS"
 #endif
-#ifndef DEFAULT_MQTT_HOST
-#define DEFAULT_MQTT_HOST "mqtt.local"
-#endif
-#ifndef DEFAULT_MQTT_PORT
-#define DEFAULT_MQTT_PORT 1883
+#ifndef DEFAULT_MQTT_PEERS
+#define DEFAULT_MQTT_PEERS { "mqtt.local:1883/user@pass" } 
 #endif
 #ifndef DEFAULT_BLUE_PIN
 #define DEFAULT_BLUE_PIN 123456    // Secrets.hpp
@@ -156,9 +151,9 @@ struct Config {
 
     // hardware interfaces
     TemperatureInterface::Config temperatureInterface = {
-        .hardware = {     .PIN_EN = PIN_CD74HC4067_EN, .PIN_SIG = PIN_CD74HC4067_SIG, .PIN_ADDR = { PIN_CD74HC4067_ADDR_S0, PIN_CD74HC4067_ADDR_S1, PIN_CD74HC4067_ADDR_S2, PIN_CD74HC4067_ADDR_S3 } },
+        .hardware = { .PIN_EN = PIN_CD74HC4067_EN,     .PIN_SIG = PIN_CD74HC4067_SIG, .PIN_ADDR = { PIN_CD74HC4067_ADDR_S0, PIN_CD74HC4067_ADDR_S1, PIN_CD74HC4067_ADDR_S2, PIN_CD74HC4067_ADDR_S3 } },
 #ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION
-        .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0,                                                                                    .NOMINAL_TEMPERATURE = 25.0 }
+        .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0                                                                                    }
 #endif
     };
     TemperatureCalibrator::Config temperatureCalibrator = {
@@ -190,28 +185,28 @@ struct Config {
     FanManager::Config fanManager = {};
 
     // tpms
-    BluetoothTPMSManager::Config tyrePressureManager = {
+    ProgramInterfaceBluetoothTPMS::Config tyrePressureManager = {
         .front = "38:89:00:00:36:02", .rear = "38:8b:00:00:ed:63"
     };
     // bms
-    DalyBMSManager::Config batteryManager = {
+    ProgramInterfaceDalyBMS::Config batteryManager = {
         .manager = {
                     .manager = {
-                    .id = "manager",
-                    .capabilities = daly_bms::Capabilities::Managing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex - daly_bms::Capabilities::RealTimeClock,
-                    .categories = daly_bms::Categories::All,
-                    .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
-                    },
+                .id = "manager",
+                .capabilities = daly_bms::Capabilities::Managing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex - daly_bms::Capabilities::RealTimeClock,
+                .categories = daly_bms::Categories::All,
+                .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
+            },
                     .serialId = PIN_DALY_MANAGER_SERIAL_ID,
                     .serialRxPin = PIN_DALY_MANAGER_SERIAL_RX,
                     .serialTxPin = PIN_DALY_MANAGER_SERIAL_TX,
                     .enPin = PIN_DALY_MANAGER_SERIAL_EN },
         .balance = { .manager = {
- .id = "balance",
- .capabilities = daly_bms::Capabilities::Balancing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex,
- .categories = daly_bms::Categories::All,
- .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
- },
+                         .id = "balance",
+                         .capabilities = daly_bms::Capabilities::Balancing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex,
+                         .categories = daly_bms::Categories::All,
+                         .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
+                     },
                     .serialId = PIN_DALY_BALANCE_SERIAL_ID,
                     .serialRxPin = PIN_DALY_BALANCE_SERIAL_RX,
                     .serialTxPin = PIN_DALY_BALANCE_SERIAL_TX,
@@ -222,12 +217,12 @@ struct Config {
     };
 
     // devices
-    DeviceManager::Config devices = {
+    ProgramDeviceManager::Config devices = {
         .i2c0 = { .PIN_SDA = -1, .PIN_SCL = -1 },
         .i2c1 = { .PIN_SDA = -1, .PIN_SCL = -1 },
         .blue = { .name = DEFAULT_NAME, .serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", .characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", .pin = DEFAULT_BLUE_PIN, .intervalConnectionCheck = 1 * 60 * 1000 },
         .mdns = {},
-        .mqtt = { .client = DEFAULT_NAME, .host = DEFAULT_MQTT_HOST, .port = DEFAULT_MQTT_PORT, .user = DEFAULT_MQTT_USER, .pass = DEFAULT_MQTT_PASS, .bufferSize = 3 * 1024 },
+        .mqtt = { .client = DEFAULT_NAME, .peers =  { .order = DEFAULT_MQTT_PEERS, .retries = 3 }, .bufferSize = 3 * 1024 },
         .webserver = { .enabled = true, .port = 80 },
         .websocket = { .enabled = true, .port = 81, .root = "/" },
         .logging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME },
@@ -236,8 +231,8 @@ struct Config {
     };
 
     // network managers
-    NetwerkManager::Config network = {
-        .host = DEFAULT_NAME, .ssid = DEFAULT_WIFI_SSID, .pass = DEFAULT_WIFI_PASS, .intervalConnectionCheck = 1 * 60 * 1000
+    ProgramNetworkManager::Config network = {
+        .host = DEFAULT_NAME, .peers = { .order = DEFAULT_WIFI_PEERS, .retries = 3 }, .intervalConnectionCheck = 1 * 60 * 1000
     };
 
     // data managers
@@ -257,7 +252,7 @@ struct Config {
 
     // program
     ControlManager::Config control = { .url_version = "/version" };
-    UpdateManager::Config updater = { .startupCheck = true, .updateImmmediately = true, .intervalCheck = 1 * 24 * 60 * 60 * 1000, .intervalLong = (interval_t) 28 * 24 * 60 * 60 * 1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase () };
+    ProgramUpdateManager::Config updater = { .startupCheck = true, .updateImmmediately = true, .intervalCheck = 1 * 24 * 60 * 60 * 1000, .intervalLong = (interval_t) 28 * 24 * 60 * 60 * 1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase () };
     AlarmManager::Config alarms = {};
     ActivablePIN::Config alarmsInterface = { .PIN = -1, .ACTIVE = LOW };
     DiagnosticManager::Config diagnostics = {};

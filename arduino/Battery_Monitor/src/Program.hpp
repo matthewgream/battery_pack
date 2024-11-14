@@ -61,23 +61,32 @@ static String __DEFAULT_TYPE_BUILDER (const char *prefix, const char *board, con
 #include "UtilitiesJson.hpp"
 #include "UtilitiesPlatform.hpp"
 
-#include "Components.hpp"
-#include "ComponentsHardware.hpp"
-#include "ComponentsDevices.hpp"
-#include "ComponentsDevicesBluetooth.hpp"
-#include "ComponentsTime.hpp"
+#include "ComponentsDevicesHardware.hpp"
+#include "ComponentsDevicesTools.hpp"
+#include "ComponentsDevicesMulticastDNS.hpp"
+#include "ComponentsDevicesWebSocket.hpp"
+#include "ComponentsDevicesWebServer.hpp"
+#include "ComponentsDevicesBluetoothServer.hpp"
+#include "ComponentsDevicesMQTT.hpp"
+#include "ComponentsDevicesSPIFFS.hpp"
+#include "ComponentsDevicesNetworkTime.hpp"
 
 // -----------------------------------------------------------------------------------------------
 
 using AlarmInterface = ActivablePIN;
 
 #include "ProgramBase.hpp"
-#include "ProgramNetwork.hpp"
-#include "ProgramManage.hpp"
-#include "ProgramHardwareInterface.hpp"
-#include "ProgramHardwareManage.hpp"
-#include "ComponentsHardwareDalyBMS.hpp"          // XXX
-#include "ComponentsHardwareBluetoothTPMS.hpp"    // XXX
+#include "ProgramHardwareTemperatureSensors.hpp"
+#include "ProgramHardwareFans.hpp"
+#include "ProgramInterfaceSerialDalyBMS.hpp"
+#include "ProgramInterfaceBluetoothTPMS.hpp"
+#include "ProgramInterfaceTemperatureSensors.hpp"
+#include "ProgramInterfaceFans.hpp"
+#include "ProgramManageUpdates.hpp"
+#include "ProgramManageLogging.hpp"
+#include "ProgramManageTime.hpp"
+#include "ProgramManageNetwork.hpp"
+#include "ProgramManageDevices.hpp"
 #include "ProgramDataManage.hpp"
 #include "ProgramTemperatureCalibration.hpp"
 #include "UtilitiesOTA.hpp"    // breaks if included earlier due to SPIFFS headers
@@ -173,19 +182,19 @@ class Program : public Component, public Diagnosticable {
     FanInterface fanInterface;
     FanManager fanManager;
 
-    DalyBMSManager batteryManager;
+    ProgramInterfaceDalyBMS batteryManager;
 
-    DeviceManager devices;
+    ProgramDeviceManager devices;
 
-    NetwerkManager network;
+    ProgramNetworkManager network;
     ControlManager control;    //
     DeliverManager deliver;    //
     PublishManager publish;    //
     StorageManager storage;    //
 
-    BluetoothTPMSManager tyrePressureManager;    // XXX needs to be after bluetooth deliver has initialised. need to refactor this
+    ProgramInterfaceBluetoothTPMS tyrePressureManager;    // XXX needs to be after bluetooth deliver has initialised. need to refactor this
 
-    UpdateManager updater;
+    ProgramUpdateManager updater;
     AlarmInterface alarmsInterface;
     AlarmManager alarms;
 
@@ -305,13 +314,13 @@ public:
         updater (config.updater, [&] () { return network.available (); }),
         alarmsInterface (config.alarmsInterface),
         alarms (config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &deliver, &publish, &storage, &platform }),
-        diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &tyrePressureManager, &batteryManager, &devices, &network, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
+        diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &tyrePressureManager, &devices, &network, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
         operational (this),
         intervalDeliver (config.intervalDeliver),
         intervalCapture (config.intervalCapture),
         intervalDiagnose (config.intervalDiagnose),
         intervalProcess (config.intervalProcess),
-        components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &tyrePressureManager, &batteryManager, &devices, &network, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
+        components ({ &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &alarms, &tyrePressureManager, &devices, &network, &deliver, &publish, &storage, &control, &updater, &diagnostics, this }) {
         DEBUG_PRINTF ("Program::constructor: intervals - process=%lu, deliver=%lu, capture=%lu, diagnose=%lu\n", config.intervalProcess, config.intervalDeliver, config.intervalCapture, config.intervalDiagnose);
     };
 

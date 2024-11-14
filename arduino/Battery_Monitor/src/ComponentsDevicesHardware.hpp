@@ -2,6 +2,50 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
+#include <Wire.h>
+#include <DS3231.h>
+
+class RealtimeClock_DS3231  {
+public:
+    typedef struct {
+    } Config;
+
+private:
+    const Config &config;
+
+    TwoWire &_wire;
+    DS3231 _device;
+
+    void timeLoad () {
+        if (_device.oscillatorCheck ())
+            DEBUG_PRINTF ("RealtimeClock::timeLoad WARNING: oscillator failed check\n");
+        const struct timeval tv = { .tv_sec = RTClib::now ().unixtime (), .tv_usec = 0 };
+        settimeofday (&tv, nullptr);
+    }
+
+public:
+    RealtimeClock_DS3231 (const Config &conf, TwoWire &wire) :
+        config (conf),
+        _wire (wire),
+        _device (_wire) {
+    }
+    void begin () {
+        DEBUG_PRINTF ("RealtimeClock::begin\n");
+        _device.setClockMode (false);
+        _device.enable32kHz (false);
+        timeLoad ();
+    }
+    void process () { }
+    void setTime (const time_t time) {
+        const struct timeval tv = { .tv_sec = time, .tv_usec = 0 };
+        _device.setEpoch (tv.tv_sec);
+        settimeofday (&tv, nullptr);
+    }
+};
+
+// -----------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+
 #include <Arduino.h>
 
 class ActivablePIN {

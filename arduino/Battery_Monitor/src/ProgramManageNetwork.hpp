@@ -6,10 +6,17 @@
 
 // -----------------------------------------------------------------------------------------------
 
-class NetwerkManager : private Singleton<NetwerkManager>, public Component, public Diagnosticable {    // Netwerk due to conflict w/ system class
+class ProgramNetworkManager : private Singleton<ProgramNetworkManager>, public Component, public Diagnosticable { 
 public:
+    struct Peer {
+        String ssid;
+        String pass;
+    };
+    using PeersManager = ConnectionPeers<Peer>;
+
     typedef struct {
-        String host, ssid, pass;
+        String host;
+        PeersManager::Config peers;
         interval_t intervalConnectionCheck;
     } Config;
 
@@ -25,7 +32,7 @@ private:
                           (int) info.wifi_sta_connected.channel,
                           _authmode_to_string (info.wifi_sta_connected.authmode).c_str (),
                           rssi,
-                          ConnectionSignalTracker::toString (ConnectionSignalTracker::signalQuality (rssi)).c_str ());
+                          ConnectionSignal::toString (ConnectionSignal::signalQuality (rssi)).c_str ());
             _connected (rssi);
         } else if (event == WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP) {
             const IPAddress address (info.got_ip.ip_info.ip.addr);
@@ -41,17 +48,16 @@ private:
         }
     }
     static void __wiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info) {
-        NetwerkManager *instance = Singleton<NetwerkManager>::instance ();
+        ProgramNetworkManager *instance = Singleton<ProgramNetworkManager>::instance ();
         if (instance != nullptr)
             instance->events (event, info);
     }
 
-    //
-
     const Config &config;
 
+    PeersManager _peers;
     MulticastDNS &_mdns;
-    ConnectionSignalTracker _connectionSignalTracker;
+    ConnectionSignal _connectionSignalTracker;
     Intervalable _intervalConnectionCheck;
     ActivationTracker _connections, _allocations;
     ActivationTrackerWithDetail _disconnections;
@@ -59,9 +65,10 @@ private:
     bool _connectionActive = false, _connectionAvailable = false;
 
     void _connect () {
-        if (! _connectionActive) {
-            DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", config.ssid.c_str (), config.pass.c_str (), getMacAddressWifi ().c_str (), config.host.c_str ());
-            WiFi.begin (config.ssid.c_str (), config.pass.c_str ());
+        if (! _connectionActive && _peers.available () > 0) {
+            const Peer peer = _peers.select ();
+            DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", peer.ssid.c_str (), peer.pass.c_str (), getMacAddressWifi ().c_str (), config.host.c_str ());
+            WiFi.begin (peer.ssid.c_str (), peer.pass.c_str ());
             WiFi.setTxPower (WIFI_POWER_8_5dBm);    // XXX ?!? for AUTH_EXPIRE ... flash access problem ...  https://github.com/espressif/arduino-esp32/issues/2144
         }
     }
@@ -73,6 +80,7 @@ private:
             _connectionActive = true;
             _connectionAvailable = false;
             _connectionSignalTracker.update (rssi);
+            _peers.update (true);
         }
     }
     void _connected_allocated (const IPAddress &address) {    // careful, reallocations
@@ -107,6 +115,7 @@ private:
                 const String reason ("LOCAL_TIMEOUT");
                 _connectionActive = false;
                 _disconnections += reason;
+                _peers.update (false);
                 _connect ();
             } else {
                 _connectionSignalTracker.update (WiFi.RSSI ());
@@ -115,9 +124,17 @@ private:
         }
     }
 
+    //
+
 public:
-    explicit NetwerkManager (const Config &cfg, MulticastDNS &mdns, const ConnectionSignalTracker::Callback connectionSignalCallback = nullptr) :
-        Singleton<NetwerkManager> (this),
+    explicit ProgramNetworkManager (const Config &cfg, MulticastDNS &mdns, const ConnectionSignal::Callback connectionSignalCallback = nullptr) :
+        Singleton<ProgramNetworkManager> (this),
+        _peers (config.peers, [] (const String &details) {    // ssid:pass
+            return details.indexOf (':') != -1
+                       ? Peer { .ssid = details.substring (0, details.indexOf (':')), .pass = details.substring (details.indexOf (':') + 1) }
+                       : Peer { .ssid = details };
+        }),
+
         config (cfg),
         _mdns (mdns),
         _connectionSignalTracker (connectionSignalCallback),

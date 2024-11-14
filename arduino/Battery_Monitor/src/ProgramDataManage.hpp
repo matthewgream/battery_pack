@@ -31,7 +31,7 @@ private:
     const Config &config;
 
     const String _id;
-    DeviceManager &_devices;
+    ProgramDeviceManager &_devices;
 
     class WebSocketReceiver_TypeInfo : public ConnectionReceiver_TypeSpecific<WebSocket> {
     public:
@@ -75,7 +75,7 @@ private:
     };
 
 public:
-    explicit ControlManager (const Config &cfg, const String &id, DeviceManager &devices) :
+    explicit ControlManager (const Config &cfg, const String &id, ProgramDeviceManager &devices) :
         config (cfg),
         _id (id),
         _devices (devices) { }
