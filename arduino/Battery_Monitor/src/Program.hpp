@@ -65,13 +65,13 @@ static String __DEFAULT_TYPE_BUILDER (const char *prefix, const char *board, con
 #include "ComponentsHardware.hpp"
 #include "ComponentsDevices.hpp"
 #include "ComponentsDevicesBluetooth.hpp"
+#include "ComponentsTime.hpp"
 
 // -----------------------------------------------------------------------------------------------
 
 using AlarmInterface = ActivablePIN;
 
 #include "ProgramBase.hpp"
-#include "ProgramTime.hpp"
 #include "ProgramNetwork.hpp"
 #include "ProgramManage.hpp"
 #include "ProgramHardwareInterface.hpp"
@@ -183,7 +183,7 @@ class Program : public Component, public Diagnosticable {
     PublishManager publish;    //
     StorageManager storage;    //
 
-    BluetoothTPMSManager tyrePressureManager; // XXX needs to be after bluetooth deliver has initialised. need to refactor this
+    BluetoothTPMSManager tyrePressureManager;    // XXX needs to be after bluetooth deliver has initialised. need to refactor this
 
     UpdateManager updater;
     AlarmInterface alarmsInterface;
@@ -294,15 +294,15 @@ public:
         fanManager (config.fanManager, fanInterface, fanControllingAlgorithm, fanSmoothingAlgorithm, [&] () {
             return FanManager::TargetSet (temperatureManagerBatterypack.setpoint (), temperatureManagerBatterypack.current ());
         }),
-       batteryManager (config.batteryManager),
+        batteryManager (config.batteryManager),
         devices (config.devices, [&] () { return network.available (); }),
         network (config.network, devices.mdns ()),
         control (config.control, address, devices),
         deliver (config.deliver, address, devices.blue (), devices.mqtt (), devices.websocket ()),
         publish (config.publish, address, devices.mqtt ()),
         storage (config.storage),
-        tyrePressureManager (config.tyrePressureManager), // XXX needs to be earlier
-         updater (config.updater, [&] () { return network.available (); }),
+        tyrePressureManager (config.tyrePressureManager),    // XXX needs to be earlier
+        updater (config.updater, [&] () { return network.available (); }),
         alarmsInterface (config.alarmsInterface),
         alarms (config.alarms, alarmsInterface, { &temperatureManagerEnvironment, &temperatureManagerBatterypack, &deliver, &publish, &storage, &platform }),
         diagnostics (config.diagnostics, { &temperatureCalibrator, &temperatureInterface, &fanInterface, &temperatureManagerBatterypack, &temperatureManagerEnvironment, &fanManager, &tyrePressureManager, &batteryManager, &devices, &network, &deliver, &publish, &storage, &control, &updater, &alarms, &platform, this }),
