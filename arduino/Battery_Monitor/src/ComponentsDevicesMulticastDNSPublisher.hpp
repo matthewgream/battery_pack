@@ -5,7 +5,7 @@
 #include <WiFiUdp.h>
 #include <LightMDNS.hpp>
 
-class MulticastDNS : public JsonSerializable {
+class MulticastDNSPublisher : public JsonSerializable {
 public:
     typedef struct {
     } Config;
@@ -18,7 +18,7 @@ private:
     MDNS _mdns;
 
 public:
-    explicit MulticastDNS (const Config &cfg) :
+    explicit MulticastDNSPublisher (const Config &cfg) :
         config (cfg),
         _mdns (_udp) { }
 

@@ -12,7 +12,7 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class ProgramInterfaceBluetoothTPMS : private Singleton<ProgramInterfaceBluetoothTPMS>, public Component, public Diagnosticable, protected BLEAdvertisedDeviceCallbacks {
+class ProgramManageBluetoothTPMS : private Singleton<ProgramManageBluetoothTPMS>, public Component, public Diagnosticable, protected BLEAdvertisedDeviceCallbacks {
 
     static constexpr int SCAN_TIME = 5;                                // seconds
     static constexpr uint16_t SCAN_INTERVAL = 75, SCAN_WINDOW = 50;    // scan for 75 msec, window for 50 msec
@@ -34,8 +34,8 @@ private:
     bool scanning = false;
 
 public:
-    explicit ProgramInterfaceBluetoothTPMS (const Config &conf) :
-        Singleton<ProgramInterfaceBluetoothTPMS> (this),
+    explicit ProgramManageBluetoothTPMS (const Config &conf) :
+        Singleton<ProgramManageBluetoothTPMS> (this),
         config (conf) { }
 
     void begin () override {
@@ -67,7 +67,7 @@ protected:
         }
     }
     static void __endOfScan (BLEScanResults) {
-        auto instance = Singleton<ProgramInterfaceBluetoothTPMS>::instance ();
+        auto instance = Singleton<ProgramManageBluetoothTPMS>::instance ();
         if (instance != nullptr)
             instance->scanStart ();
     }

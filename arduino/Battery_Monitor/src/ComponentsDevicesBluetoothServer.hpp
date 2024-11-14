@@ -11,7 +11,7 @@
 
 // -----------------------------------------------------------------------------------------------
 
-class BluetoothDevice : private Singleton<BluetoothDevice>, public ConnectionReceiver<BluetoothDevice>::Insertable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks, public JsonSerializable {
+class BluetoothServer : private Singleton<BluetoothServer>, public ConnectionReceiver<BluetoothServer>::Insertable, protected BLEServerCallbacks, protected BLECharacteristicCallbacks, public JsonSerializable {
 public:
     static inline constexpr uint16_t MIN_MTU = 32, MAX_MTU = 517;
 
@@ -72,7 +72,7 @@ private:
         }
     }
     static void __gapEventHandler (esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
-        auto instance = Singleton<BluetoothDevice>::instance ();
+        auto instance = Singleton<BluetoothServer>::instance ();
         if (instance != nullptr)
             instance->events (event, param);
     }
@@ -130,8 +130,8 @@ private:
     esp_bd_addr_t _peerAddress;
     uint16_t _peerConnId = 0;
     uint16_t _peerMtu = 0;
-    ConnectionReceiver<BluetoothDevice> _connectionReceiver;
-    ConnectionSender<BluetoothDevice> _connectionSender;
+    ConnectionReceiver<BluetoothServer> _connectionReceiver;
+    ConnectionSender<BluetoothServer> _connectionSender;
     ActivationTracker _connections;
     ActivationTrackerWithDetail _disconnections;
     Intervalable _connectionActiveChecker;
@@ -230,9 +230,9 @@ private:
     //
 
 public:
-    explicit BluetoothDevice (const Config &cfg, const ConnectionSignal::Callback connectionSignalCallback = nullptr) :
-        Singleton<BluetoothDevice> (this),
-        ConnectionReceiver<BluetoothDevice>::Insertable (&_connectionReceiver),
+    explicit BluetoothServer (const Config &cfg, const ConnectionSignal::Callback connectionSignalCallback = nullptr) :
+        Singleton<BluetoothServer> (this),
+        ConnectionReceiver<BluetoothServer>::Insertable (&_connectionReceiver),
         config (cfg),
         _connectionReceiver (this),
         _connectionSender ([&] (const String &str) {

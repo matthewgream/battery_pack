@@ -41,10 +41,10 @@ public:
 
         DEBUG_PRINTF ("*** Tester_HardwareInterfaces:: all (%d repetitions)\n", repetitions);
         // FanInterfaceStrategy_motorMap strategyMap;
-        FanInterfaceStrategy_motorAll strategyAll;
-        FanInterface fanInterface (config.fanInterface, strategyAll);
+        ProgramInterfaceFanControllersStrategy_motorAll strategyAll;
+        ProgramInterfaceFanControllers fanInterface (config.fanControllersInterface, strategyAll);
         // TemperatureSensor_DS18B20 ds18b20 (config.ds18b20);
-        TemperatureInterface temperatureInterface (config.temperatureInterface, [&] (const int channel, const uint16_t resistance) {
+        ProgramInterfaceTemperatureSensors temperatureInterface (config.temperatureSensorsInterface, [&] (const int channel, const uint16_t resistance) {
             return steinharthart_calculator (static_cast<float> (resistance), 4095.0f, 10000.0f, 10000.0f, 25.0f);
         });
         fanInterface.begin ();
@@ -58,9 +58,9 @@ public:
             if (speed > SPEED_MAX)
                 speed = SPEED_MIN;
 
-            DEBUG_PRINTF ("+++ TEMPERATURE: channels=%d\n", TemperatureInterface::CHANNELS);
+            DEBUG_PRINTF ("+++ TEMPERATURE: channels=%d\n", ProgramInterfaceTemperatureSensors::CHANNELS);
             // DEBUG_PRINTF ("ds18b20[ref]: %.2f\n", ds18b20.getTemperature ());
-            for (int channel = 0; channel < TemperatureInterface::CHANNELS; channel++) {
+            for (int channel = 0; channel < ProgramInterfaceTemperatureSensors::CHANNELS; channel++) {
                 float temperature;
                 if (temperatureInterface.getTemperature (channel, &temperature))
                     DEBUG_PRINTF ("channel [%2d]: %.2f\n", channel, temperature);
@@ -95,14 +95,14 @@ void factory_temperatureCalibration (bool use_static = false) {
 
     const Config config;
 
-    TemperatureCalibrator calibrator (config.temperatureCalibrator);
+    ProgramManageTemperatureSensorsCalibration calibrator (config.temperatureSensorsCalibrator);
 
     if (use_static) {
         calibrator.calibrateTemperatures ();
     } else {
         TemperatureSensor_DS18B20 ds18b20 (config.ds18b20);
-        analogReadResolution (TemperatureInterface::AdcResolution);
-        MuxInterface_CD74HC4067<TemperatureInterface::AdcValueType> interface (config.temperatureInterface.hardware);
+        analogReadResolution (ProgramInterfaceTemperatureSensors::AdcResolution);
+        MuxInterface_CD74HC4067<ProgramInterfaceTemperatureSensors::AdcValueType> interface (config.temperatureSensorsInterface.hardware);
         interface.enable ();
 
         calibrator.calibrateTemperatures ([&] () { return ds18b20.getTemperature (); }, [&] (size_t channel) { return interface.get (channel); });

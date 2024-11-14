@@ -2,16 +2,22 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class ProgramTimeManager : public JsonSerializable {
+class ProgramTime : public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
+        RealtimeClock_DS3231::Config hardware;
         String useragent, server;
         interval_t intervalUpdate, intervalAdjust;
         int failureLimit;
     } Config;
 
+    using BooleanFunc = std::function<bool ()>;
+
 private:
     const Config &config;
+    const BooleanFunc _networkIsAvailable;
+
+    RealtimeClock_DS3231 _hardware;
 
     NetworkTimeFetcher _fetcher;
     ActivationTrackerWithDetail _fetches;
@@ -26,10 +32,12 @@ private:
     Intervalable _intervalUpdate, _intervalAdjust;
 
 public:
-    explicit ProgramTimeManager (const Config &cfg) :
-        // Alarmable ({ AlarmCondition (ALARM_TIME_SYNC, [this] () { return _failures > config.failureLimit; }),
-        //              AlarmCondition (ALARM_TIME_DRIFT, [this] () { return _drifter.highDrift () != 0; }) }),
+    explicit ProgramTime (const Config &cfg, TwoWire& wire, const BooleanFunc networkIsAvailable) :
+        Alarmable ({ AlarmCondition (ALARM_TIME_SYNC, [this] () { return _failures > config.failureLimit; }),
+                     AlarmCondition (ALARM_TIME_DRIFT, [this] () { return _drifter.highDrift () != 0; }) }),
         config (cfg),
+        _networkIsAvailable (networkIsAvailable),
+        _hardware (cfg.hardware, wire),
         _fetcher (cfg.useragent, cfg.server),
         _persistentData ("nettime"),
         _persistentDrift (_persistentData, "drift", 0),
@@ -44,11 +52,10 @@ public:
         DEBUG_PRINTF ("NettimeManager::constructor: persistentTime=%lu, persistentDrift=%ld, time=%s\n", (unsigned long) _persistentTime, (long) _persistentDrift, getTimeString ().c_str ());
     }
 
-    void begin () { }
-    void process () {
+    void process () override {
         interval_t interval;
 
-        if (_intervalUpdate.passed (&interval, true)) {
+        if (_networkIsAvailable () && _intervalUpdate.passed (&interval, true)) {
             const time_t fetchedTime = _fetcher.fetch ();
             if (fetchedTime > 0) {
                 _fetches += ArithmeticToString (fetchedTime);
@@ -74,15 +81,16 @@ public:
         }
     }
     //
-    void serialize (JsonVariant &obj) const override {
-        obj ["now"] = getTimeString ();
-        obj ["drift"] = _drifter.drift ();
+    void collectDiagnostics (JsonVariant &obj) const override {
+        JsonObject sub = obj ["time"].to<JsonObject> ();
+        sub ["now"] = getTimeString ();
+        sub ["drift"] = _drifter.drift ();
         if (_drifter.highDrift () != 0)
-            obj ["highdrift"] = _drifter.highDrift ();
+            sub ["highdrift"] = _drifter.highDrift ();
         if (_fetches)
-            obj ["fetches"] = _fetches;
+            sub ["fetches"] = _fetches;
         if (_failures)
-            obj ["failures"] = _fetches;
+            sub ["failures"] = _fetches;
     }
 };
 

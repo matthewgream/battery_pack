@@ -6,7 +6,7 @@
 #include <mutex>
 #endif
 
-class ProgramLoggingManager : private Singleton<ProgramLoggingManager> {
+class ProgramLogging : private Singleton<ProgramLogging> {
 public:
     typedef struct {
         bool enableSerial, enableMqtt;
@@ -19,18 +19,18 @@ private:
 
     bool _enableSerial = false, _enableMqtt = false;
     __DebugLoggerFunc __debugLoggerPrevious = nullptr;
-    MQTTPublisher *_mqttClient;
+    MQTTClient *_mqttClient;
     const String _mqttTopic;
 
 public:
-    explicit ProgramLoggingManager (const Config &cfg, const String &id, MQTTPublisher *mqttClient = nullptr) :
-        Singleton<ProgramLoggingManager> (this),
+    explicit ProgramLogging (const Config &cfg, const String &id, MQTTClient *mqttClient = nullptr) :
+        Singleton<ProgramLogging> (this),
         config (cfg),
         _mqttClient (mqttClient),
         _mqttTopic (config.mqttTopic + "/logs/" + id) {
         init ();
     }
-    ~ProgramLoggingManager () {
+    ~ProgramLogging () {
         term ();
     }
 
@@ -67,7 +67,7 @@ private:
 
     static void __debugLoggerMQTT (const char *format, ...) {
 
-        auto logging = Singleton<ProgramLoggingManager>::instance ();
+        auto logging = Singleton<ProgramLogging>::instance ();
         if (! logging)
             return;
 
@@ -110,9 +110,9 @@ private:
 };
 
 #ifdef DEBUG
-std::mutex ProgramLoggingManager::_bufferMutex;
-char ProgramLoggingManager::_bufferContent [_bufferLength];
-int ProgramLoggingManager::_bufferOffset = 0;
+std::mutex ProgramLogging::_bufferMutex;
+char ProgramLogging::_bufferContent [_bufferLength];
+int ProgramLogging::_bufferOffset = 0;
 #endif
 
 // -----------------------------------------------------------------------------------------------

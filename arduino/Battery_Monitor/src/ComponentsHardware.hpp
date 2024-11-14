@@ -5,7 +5,7 @@
 #include <Wire.h>
 #include <DS3231.h>
 
-class RealtimeClock_DS3231  {
+class RealtimeClock_DS3231 {
 public:
     typedef struct {
     } Config;

@@ -2,7 +2,7 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class FanManager : public Component, public Diagnosticable {
+class ProgramManageFanControllers : public Component, public Diagnosticable {
 public:
     typedef struct {
     } Config;
@@ -13,16 +13,16 @@ public:
 private:
     const Config &config;
 
-    FanInterface &_fan;
-    PidController<double> &_controllerAlgorithm;    // XXX should be an abstract interface
-    AlphaSmoothing<double> &_smootherAlgorithm;     // XXX should be an abstract interface
+    ProgramInterfaceFanControllers &_fan;
+    PidController<double>& _controllerAlgorithm;    // XXX should be an abstract interface
+    AlphaSmoothing<double>& _smootherAlgorithm;     // XXX should be an abstract interface
 
     const TargetSetFunc _targetValues;
     float _value = 0.0f;
     Stats<float> _statsValue;
 
 public:
-    FanManager (const Config &cfg, FanInterface &fan, PidController<double> &controller, AlphaSmoothing<double> &smoother, const TargetSetFunc targetValues) :
+    ProgramManageFanControllers (const Config &cfg, ProgramInterfaceFanControllers &fan, PidController<double> &controller, AlphaSmoothing<double> &smoother, const TargetSetFunc targetValues) :
         config (cfg),
         _fan (fan),
         _controllerAlgorithm (controller),

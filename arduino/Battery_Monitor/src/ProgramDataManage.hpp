@@ -4,128 +4,7 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-template <typename C>
-class ConnectionReceiver_TypeSpecific : public ConnectionReceiver<C>::Handler {
-protected:
-    const String _type;
-
-public:
-    ConnectionReceiver_TypeSpecific (const String &type) :
-        _type (type) { }
-    virtual bool process (C &, const String &, JsonDocument &) = 0;
-    bool process (C &c, JsonDocument &doc) override {
-        const char *type = doc [_type.c_str ()], *time = doc ["time"];
-        return (type != nullptr && time != nullptr) ? process (c, String (time), doc) : false;
-    }
-};
-
-// -----------------------------------------------------------------------------------------------
-
-class ControlManager : public Component, public Diagnosticable {
-public:
-    typedef struct {
-        String url_version;
-    } Config;
-
-private:
-    const Config &config;
-
-    const String _id;
-    ProgramDeviceManager &_devices;
-
-    class WebSocketReceiver_TypeInfo : public ConnectionReceiver_TypeSpecific<WebSocket> {
-    public:
-        WebSocketReceiver_TypeInfo () :
-            ConnectionReceiver_TypeSpecific<WebSocket> ("info") {};
-        bool process (WebSocket &device, const String &time, JsonDocument &doc) override {
-            String content = doc ["info"] | "(not provided)";
-            DEBUG_PRINTF ("WebSocketReceiver_TypeInfo:: type=info, time=%s, info='%s'\n", time.c_str (), content.c_str ());
-            return true;
-        }
-    };
-
-    class BluetoothReceiver_TypeInfo : public ConnectionReceiver_TypeSpecific<BluetoothDevice> {
-    public:
-        BluetoothReceiver_TypeInfo () :
-            ConnectionReceiver_TypeSpecific<BluetoothDevice> ("info") {};
-        bool process (BluetoothDevice &device, const String &time, JsonDocument &doc) override {
-            String content = doc ["info"] | "(not provided)";
-            DEBUG_PRINTF ("BluetoothReceiver_TypeInfo:: type=info, time=%s, info='%s'\n", time.c_str (), content.c_str ());
-            return true;
-        }
-    };
-    class BluetoothReceiver_TypeCtrl : public ConnectionReceiver_TypeSpecific<BluetoothDevice> {
-    public:
-        BluetoothReceiver_TypeCtrl () :
-            ConnectionReceiver_TypeSpecific<BluetoothDevice> ("ctrl") {};
-        bool process (BluetoothDevice &device, const String &time, JsonDocument &doc) override {
-            String content = doc ["ctrl"] | "(not provided)";
-            DEBUG_PRINTF ("BluetoothReceiver_TypeCtrl:: type=ctrl, time=%s, ctrl='%s'\n", time.c_str (), content.c_str ());
-            // XXX
-            // request controllables
-            // process controllables
-            // force reboot
-            // turn on/off diag/logging
-            // wipe spiffs data file
-            // disable/enable wifi
-            // change wifi user/pass
-            // suppress specific alarms
-            return true;
-        }
-    };
-
-public:
-    explicit ControlManager (const Config &cfg, const String &id, ProgramDeviceManager &devices) :
-        config (cfg),
-        _id (id),
-        _devices (devices) { }
-
-    void begin () override {
-        extern const String build;
-        const String addr = getMacAddressBase ("");
-        _devices.webserver ().__implementation ().on (config.url_version.c_str (), HTTP_GET, [] (AsyncWebServerRequest *request) {
-            request->send (200, "text/plain", build);
-        });
-        // XXX for now ...
-        _devices.blue ().insertReceivers ({
-            { String ("ctrl"), std::make_shared<BluetoothReceiver_TypeCtrl> () },
-            { String ("info"), std::make_shared<BluetoothReceiver_TypeInfo> () }
-        });
-        _devices.websocket ().insertReceivers ({
-            { String ("info"), std::make_shared<WebSocketReceiver_TypeInfo> () }
-        });
-
-        auto text = MDNS::Service::TXT::Builder ()
-                        .add ("name", DEFAULT_NAME)
-                        .add ("addr", addr)
-                        .add ("build", build)
-                        .build ();
-        _devices.mdns ().__implementation ().serviceInsert (
-            MDNS::Service::Builder ()
-                .withName ("webserver._http")
-                .withPort (80)
-                .withProtocol (MDNS::Service::Protocol::TCP)
-                .withTXT (text)
-                .build ());
-        _devices.mdns ().__implementation ().serviceInsert (
-            MDNS::Service::Builder ()
-                .withName ("webserver._ws")
-                .withPort (81)
-                .withProtocol (MDNS::Service::Protocol::TCP)
-                .withTXT (text)
-                .build ());
-    }
-    //
-
-protected:
-    void collectDiagnostics (JsonVariant &) const override {
-    }
-};
-
-// -----------------------------------------------------------------------------------------------
-// -----------------------------------------------------------------------------------------------
-
-class DeliverManager : public Component, public Alarmable, public Diagnosticable {
+class ProgramDataDeliver : public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
         String topic;
@@ -136,14 +15,14 @@ private:
     const Config &config;
 
     const String _id;
-    BluetoothDevice &_blue;
-    MQTTPublisher &_mqtt;
+    BluetoothServer &_blue;
+    MQTTClient &_mqtt;
     WebSocket &_webs;
     ActivationTrackerWithDetail _delivers;
     ActivationTracker _failures;
 
 public:
-    explicit DeliverManager (const Config &cfg, const String &id, BluetoothDevice &blue, MQTTPublisher &mqtt, WebSocket &webs) :
+    explicit ProgramDataDeliver (const Config &cfg, const String &id, BluetoothServer &blue, MQTTClient &mqtt, WebSocket &webs) :
         Alarmable ({ AlarmCondition (ALARM_DELIVER_FAIL, [this] () { return _failures > config.failureLimit; }),
                      AlarmCondition (ALARM_DELIVER_SIZE, [this] () { return _blue.payloadExceeded (); }) }),
         config (cfg),
@@ -182,7 +61,7 @@ protected:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class PublishManager : public Component, public Alarmable, public Diagnosticable {
+class ProgramDataPublish : public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
         String topic;
@@ -195,12 +74,12 @@ private:
     const Config &config;
 
     const String _id;
-    MQTTPublisher &_mqtt;
+    MQTTClient &_mqtt;
     ActivationTrackerWithDetail _publishes;
     ActivationTracker _failures;
 
 public:
-    explicit PublishManager (const Config &cfg, const String &id, MQTTPublisher &mqtt) :
+    explicit ProgramDataPublish (const Config &cfg, const String &id, MQTTClient &mqtt) :
         Alarmable ({ AlarmCondition (ALARM_PUBLISH_FAIL, [this] () { return _failures > config.failureLimit; }),
                      AlarmCondition (ALARM_PUBLISH_SIZE, [this] () { return _mqtt.bufferExceeded (); }) }),
         config (cfg),
@@ -237,7 +116,7 @@ protected:
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class StorageManager : public Component, public Alarmable, public Diagnosticable {
+class ProgramDataStorage : public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
         String filename;
@@ -254,7 +133,7 @@ private:
     ActivationTracker _failures, _erasures;
 
 public:
-    explicit StorageManager (const Config &cfg) :
+    explicit ProgramDataStorage (const Config &cfg) :
         Alarmable ({ AlarmCondition (ALARM_STORAGE_FAIL, [this] () { return _failures > config.failureLimit; }),
                      AlarmCondition (ALARM_STORAGE_SIZE, [this] () { return _file.remains () < config.remainLimit; }) }),
         config (cfg),

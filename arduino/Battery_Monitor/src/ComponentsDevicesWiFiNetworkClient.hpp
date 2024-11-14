@@ -6,7 +6,7 @@
 
 // -----------------------------------------------------------------------------------------------
 
-class ProgramNetworkManager : private Singleton<ProgramNetworkManager>, public Component, public Diagnosticable {
+class WiFiNetworkClient : private Singleton<WiFiNetworkClient>, public JsonSerializable {
 public:
     struct Peer {
         String ssid;
@@ -48,7 +48,7 @@ private:
         }
     }
     static void __wiFiEventHandler (WiFiEvent_t event, WiFiEventInfo_t info) {
-        ProgramNetworkManager *instance = Singleton<ProgramNetworkManager>::instance ();
+        WiFiNetworkClient *instance = Singleton<WiFiNetworkClient>::instance ();
         if (instance != nullptr)
             instance->events (event, info);
     }
@@ -56,7 +56,7 @@ private:
     const Config &config;
 
     PeersManager _peers;
-    MulticastDNS &_mdns;
+    MulticastDNSPublisher &_mdns;
     ConnectionSignal _connectionSignalTracker;
     Intervalable _intervalConnectionCheck;
     ActivationTracker _connections, _allocations;
@@ -127,8 +127,8 @@ private:
     //
 
 public:
-    explicit ProgramNetworkManager (const Config &cfg, MulticastDNS &mdns, const ConnectionSignal::Callback connectionSignalCallback = nullptr) :
-        Singleton<ProgramNetworkManager> (this),
+    explicit WiFiNetworkClient (const Config &cfg, MulticastDNSPublisher &mdns, const ConnectionSignal::Callback connectionSignalCallback = nullptr) :
+        Singleton<WiFiNetworkClient> (this),
         _peers (config.peers, [] (const String &details) {    // ssid:pass
             return details.indexOf (':') != -1
                        ? Peer { .ssid = details.substring (0, details.indexOf (':')), .pass = details.substring (details.indexOf (':') + 1) }
@@ -140,11 +140,11 @@ public:
         _connectionSignalTracker (connectionSignalCallback),
         _intervalConnectionCheck (config.intervalConnectionCheck) { }
 
-    void begin () override {
+    void begin () {
         _connection_init ();
         _connect ();
     }
-    void process () override {
+    void process () {
         _connection_process ();
     }
     bool available () const {
@@ -152,20 +152,19 @@ public:
     }
 
 protected:
-    void collectDiagnostics (JsonVariant &obj) const override {
-        JsonObject sub = obj ["network"].to<JsonObject> ();
-        sub ["macaddr"] = getMacAddressWifi ();
-        if ((sub ["connected"] = _connectionActive)) {
-            if ((sub ["available"] = _connectionAvailable))
-                sub ["address"] = WiFi.localIP ();
+    void serialize (JsonVariant &obj) const {
+        obj ["macaddr"] = getMacAddressWifi ();
+        if ((obj ["connected"] = _connectionActive)) {
+            if ((obj ["available"] = _connectionAvailable))
+                obj ["address"] = WiFi.localIP ();
             obj ["signal"] = _connectionSignalTracker;
         }
         if (_connections)
-            sub ["connects"] = _connections;
+            obj ["connects"] = _connections;
         if (_allocations)
-            sub ["allocations"] = _allocations;
+            obj ["allocations"] = _allocations;
         if (_disconnections)
-            sub ["disconnects"] = _disconnections;
+            obj ["disconnects"] = _disconnections;
     }
 
 private:

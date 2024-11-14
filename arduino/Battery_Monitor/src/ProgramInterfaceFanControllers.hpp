@@ -2,15 +2,15 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-class FanInterface;
-class FanInterfaceStrategy {
+class ProgramInterfaceFanControllers;
+class ProgramInterfaceFanControllersStrategy {
 public:
     virtual String name () const = 0;
-    virtual void begin (FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) = 0;
+    virtual void begin (ProgramInterfaceFanControllers &interface, OpenSmart_QuadMotorDriver &hardware) = 0;
     virtual bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeed speed) = 0;
 };
 
-class FanInterface : public Component, public Diagnosticable {
+class ProgramInterfaceFanControllers : public Component, public Diagnosticable {
 public:
     using FanSpeedType = OpenSmart_QuadMotorDriver::MotorSpeed;
     using FanDirectionType = OpenSmart_QuadMotorDriver::MotorDirection;
@@ -28,7 +28,7 @@ public:
 private:
     const Config &config;
 
-    FanInterfaceStrategy &_strategy;
+    ProgramInterfaceFanControllersStrategy &_strategy;
     OpenSmart_QuadMotorDriver _hardware;
 
     FanSpeedType _speed = 0;
@@ -37,13 +37,13 @@ private:
     ActivationTracker _actives;
 
 public:
-    FanInterface (const Config &cfg, FanInterfaceStrategy &strategy) :
+    ProgramInterfaceFanControllers (const Config &cfg, ProgramInterfaceFanControllersStrategy &strategy) :
         config (cfg),
         _strategy (strategy),
         _hardware (config.hardware) {
         assert (config.MIN_SPEED < config.MAX_SPEED && "Bad configuration values");
     }
-    ~FanInterface () {
+    ~ProgramInterfaceFanControllers () {
         end ();
     }
     void begin () override {
@@ -86,33 +86,33 @@ protected:
 
 // -----------------------------------------------------------------------------------------------
 
-class FanInterfaceStrategy_motorAll : public FanInterfaceStrategy {
-    FanInterface *_interface = nullptr;
+class ProgramInterfaceFanControllersStrategy_motorAll : public ProgramInterfaceFanControllersStrategy {
+    ProgramInterfaceFanControllers *_interface = nullptr;
     OpenSmart_QuadMotorDriver *_hardware = nullptr;
 
 public:
     String name () const override {
         return "motorAll(" + ArithmeticToString (OpenSmart_QuadMotorDriver::MotorCount) + ")";
     }
-    void begin (FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
+    void begin (ProgramInterfaceFanControllers &interface, OpenSmart_QuadMotorDriver &hardware) override {
         _hardware = &hardware;
         _interface = &interface;
     }
     bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeed speed) override {
-        if (speed == FanInterface::FanSpeedMin) {
+        if (speed == ProgramInterfaceFanControllers::FanSpeedMin) {
             _hardware->stop (OpenSmart_QuadMotorDriver::MOTOR_ALL);
             _hardware->setSpeed (speed, OpenSmart_QuadMotorDriver::MOTOR_ALL);
         } else {
-            _hardware->setSpeed (map<OpenSmart_QuadMotorDriver::MotorSpeed> (speed, FanInterface::FanSpeedMin, FanInterface::FanSpeedMax, _interface->getConfig ().MIN_SPEED, _interface->getConfig ().MAX_SPEED), OpenSmart_QuadMotorDriver::MOTOR_ALL);
+            _hardware->setSpeed (map<OpenSmart_QuadMotorDriver::MotorSpeed> (speed, ProgramInterfaceFanControllers::FanSpeedMin, ProgramInterfaceFanControllers::FanSpeedMax, _interface->getConfig ().MIN_SPEED, _interface->getConfig ().MAX_SPEED), OpenSmart_QuadMotorDriver::MOTOR_ALL);
             _hardware->setDirection (_interface->getConfig ().DIRECTION);
         }
-        return speed > FanInterface::FanSpeedMin;
+        return speed > ProgramInterfaceFanControllers::FanSpeedMin;
     }
 };
 
-using FanInterfaceStrategy_default = FanInterfaceStrategy_motorAll;
+using ProgramInterfaceFanControllersStrategy_default = ProgramInterfaceFanControllersStrategy_motorAll;
 
-class FanInterfaceStrategy_motorMap : public FanInterfaceStrategy {
+class ProgramInterfaceFanControllersStrategy_motorMap : public ProgramInterfaceFanControllersStrategy {
     OpenSmart_QuadMotorDriver *_hardware = nullptr;
     OpenSmart_QuadMotorDriver::MotorSpeed _min_speed = OpenSmart_QuadMotorDriver::MotorSpeed (0), _max_speed = OpenSmart_QuadMotorDriver::MotorSpeed (0);
     std::array<OpenSmart_QuadMotorDriver::MotorSpeed, OpenSmart_QuadMotorDriver::MotorCount> _motorSpeeds;
@@ -124,7 +124,7 @@ public:
     String name () const override {
         return "motorMap(" + ArithmeticToString (OpenSmart_QuadMotorDriver::MotorCount) + ")";
     }
-    void begin (FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
+    void begin (ProgramInterfaceFanControllers &interface, OpenSmart_QuadMotorDriver &hardware) override {
         _hardware = &hardware;
         _min_speed = interface.getConfig ().MIN_SPEED;
         _max_speed = interface.getConfig ().MAX_SPEED;
@@ -133,13 +133,13 @@ public:
     }
     bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeed speed) override {
         int activated = 0;
-        for (int i = 0, currentThreshold = 0, totalSpeed = speed * OpenSmart_QuadMotorDriver::MotorCount; i < OpenSmart_QuadMotorDriver::MotorCount; i++, currentThreshold += FanInterface::FanSpeedRange) {
+        for (int i = 0, currentThreshold = 0, totalSpeed = speed * OpenSmart_QuadMotorDriver::MotorCount; i < OpenSmart_QuadMotorDriver::MotorCount; i++, currentThreshold += ProgramInterfaceFanControllers::FanSpeedRange) {
             const int motorId = _motorOrder [i];
             OpenSmart_QuadMotorDriver::MotorSpeed motorSpeed = 0;
-            if (totalSpeed >= (currentThreshold + FanInterface::FanSpeedRange))
+            if (totalSpeed >= (currentThreshold + ProgramInterfaceFanControllers::FanSpeedRange))
                 motorSpeed = _max_speed;
-            else if (totalSpeed > currentThreshold && totalSpeed < (currentThreshold + static_cast<int> (FanInterface::FanSpeedRange)))
-                motorSpeed = map (totalSpeed - currentThreshold, 0, FanInterface::FanSpeedRange, _min_speed, _max_speed);
+            else if (totalSpeed > currentThreshold && totalSpeed < (currentThreshold + static_cast<int> (ProgramInterfaceFanControllers::FanSpeedRange)))
+                motorSpeed = map (totalSpeed - currentThreshold, 0, ProgramInterfaceFanControllers::FanSpeedRange, _min_speed, _max_speed);
             if (motorSpeed != _motorSpeeds [motorId])
                 _hardware->setSpeed (motorSpeed, static_cast<OpenSmart_QuadMotorDriver::MotorID> (motorId)), _motorSpeeds [motorId] = motorSpeed;
             if (motorSpeed > 0)
@@ -149,27 +149,27 @@ public:
     }
 };
 
-class FanInterfaceStrategy_motorMapWithRotation : public FanInterfaceStrategy_motorMap {
+class ProgramInterfaceFanControllersStrategy_motorMapWithRotation : public ProgramInterfaceFanControllersStrategy_motorMap {
     Intervalable _rotationInterval;
 
 public:
     String name () const override {
         return "motorMapWithRotation(" + ArithmeticToString (OpenSmart_QuadMotorDriver::MotorCount) + ")";
     }
-    void begin (FanInterface &interface, OpenSmart_QuadMotorDriver &hardware) override {
+    void begin (ProgramInterfaceFanControllers &interface, OpenSmart_QuadMotorDriver &hardware) override {
         DEBUG_PRINTF ("FanInterfaceStrategy_motorMapWithRotation:: order=[");
         for (int i = 0; i < interface.getConfig ().MOTOR_ORDER.size (); i++)
             DEBUG_PRINTF ("%s%d", i == 0 ? "" : ",", interface.getConfig ().MOTOR_ORDER [i]);
         DEBUG_PRINTF ("], period=%lu\n", interface.getConfig ().MOTOR_ROTATE);
         _rotationInterval.reset (interface.getConfig ().MOTOR_ROTATE);
-        FanInterfaceStrategy_motorMap::begin (interface, hardware);
+        ProgramInterfaceFanControllersStrategy_motorMap::begin (interface, hardware);
     }
     bool setSpeed (const OpenSmart_QuadMotorDriver::MotorSpeed speed) override {
         if (_rotationInterval) {
             DEBUG_PRINTF ("FanInterfaceStrategy_motorMapWithRotation:: rotating\n");
             std::rotate (_motorOrder.begin (), _motorOrder.begin () + 1, _motorOrder.end ());
         }
-        return FanInterfaceStrategy_motorMap::setSpeed (speed);
+        return ProgramInterfaceFanControllersStrategy_motorMap::setSpeed (speed);
     }
 };
 

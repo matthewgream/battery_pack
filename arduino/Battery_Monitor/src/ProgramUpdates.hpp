@@ -7,7 +7,7 @@
 extern bool ota_image_update (const String &json, const String &type, const String &vers, const String &addr, const std::function<void ()> &func = nullptr);
 extern bool ota_image_check (const String &json, const String &type, const String &vers, const String &addr, String *newr);
 
-class ProgramUpdateManager : public Component, public Alarmable, public Diagnosticable {
+class ProgramUpdates : public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
         bool startupCheck, updateImmmediately;
@@ -29,7 +29,7 @@ private:
     bool _available;
 
 public:
-    ProgramUpdateManager (const Config &cfg, const BooleanFunc networkIsAvailable) :
+    ProgramUpdates (const Config &cfg, const BooleanFunc networkIsAvailable) :
         Alarmable ({
             AlarmCondition (ALARM_UPDATE_VERS, [this] () { return _available; }),
             AlarmCondition (ALARM_UPDATE_LONG, [this] () { return istoolong (); }),

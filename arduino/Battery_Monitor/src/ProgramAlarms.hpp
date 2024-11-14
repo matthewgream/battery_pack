@@ -1,49 +1,3 @@
-
-// -----------------------------------------------------------------------------------------------
-// -----------------------------------------------------------------------------------------------
-
-class Component {
-protected:
-    ~Component () {};
-
-public:
-    typedef std::vector<Component *> List;
-    virtual void begin () { }
-    virtual void process () { }
-};
-
-// -----------------------------------------------------------------------------------------------
-// -----------------------------------------------------------------------------------------------
-
-class Diagnosticable {
-protected:
-    ~Diagnosticable () {};
-
-public:
-    typedef std::vector<Diagnosticable *> List;
-    virtual void collectDiagnostics (JsonVariant &) const = 0;
-};
-
-class DiagnosticManager : public Component {
-public:
-    typedef struct {
-    } Config;
-
-private:
-    const Config &config;
-
-    const Diagnosticable::List _diagnosticables;
-
-public:
-    DiagnosticManager (const Config &cfg, const Diagnosticable::List &diagnosticables) :
-        config (cfg),
-        _diagnosticables (diagnosticables) { }
-    void collect (JsonVariant &obj) const {
-        for (const auto &diagnosticable : _diagnosticables)
-            diagnosticable->collectDiagnostics (obj);
-    }
-};
-
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
@@ -154,7 +108,7 @@ public:
     }
 };
 
-class AlarmManager : public Component, public Diagnosticable {
+class ProgramAlarms : public Component, public Diagnosticable {
 public:
     typedef struct {
     } Config;
@@ -162,14 +116,14 @@ public:
 private:
     const Config &config;
 
-    AlarmInterface &_interface;
+    ProgramAlarmsInterface &_interface;
     const Alarmable::List _alarmables;
 
     AlarmSet _alarms;
     std::array<ActivationTracker, _ALARM_COUNT> _activations, _deactivations;
 
 public:
-    AlarmManager (const Config &cfg, AlarmInterface &interface, const Alarmable::List &alarmables) :
+    ProgramAlarms (const Config &cfg, ProgramAlarmsInterface &interface, const Alarmable::List &alarmables) :
         config (cfg),
         _interface (interface),
         _alarmables (alarmables) { }

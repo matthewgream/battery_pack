@@ -6,7 +6,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 
-class MQTTPublisher : public JsonSerializable {
+class MQTTClient : public JsonSerializable {
 public:
     static inline constexpr uint16_t DEFAULT_PORT = 1883;
     struct Peer {
@@ -42,7 +42,7 @@ private:
     }
 
 public:
-    explicit MQTTPublisher (const Config &cfg) :
+    explicit MQTTClient (const Config &cfg) :
         config (cfg),
         _peers (config.peers, [] (const String &details) {    // host:port/user@pass
             Peer peer { .port = DEFAULT_PORT };
@@ -95,7 +95,7 @@ public:
     }
     //
     void serialize (JsonVariant &obj) const override {
-        PubSubClient &mqttClient = const_cast<MQTTPublisher *> (this)->_mqttClient;
+        PubSubClient &mqttClient = const_cast<MQTTClient *> (this)->_mqttClient;
         if ((obj ["connected"] = mqttClient.connected ())) {
             //
         }

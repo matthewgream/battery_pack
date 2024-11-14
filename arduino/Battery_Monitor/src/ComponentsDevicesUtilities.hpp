@@ -121,8 +121,9 @@ public:
         Peers order;
         int retries;
     };
+
 private:
-    const Config& _config;
+    const Config &_config;
     const Parser _parser;
     int _current = 0, _attempts = 0;
 
