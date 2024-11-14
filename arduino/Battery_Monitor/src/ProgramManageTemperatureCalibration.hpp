@@ -29,19 +29,13 @@ private:
 
     StrategyFactories createStrategyFactoriesForCalibration () const {    // store the lookup tables, but don't use them
         return StrategyFactories {
-            {    StrategyLookup::NAME, [] {
- return std::make_shared<StrategyLookup> ();
- } },
-            { StrategySteinhart::NAME, [] {
- return std::make_shared<StrategySteinhart> ();
- } }
+            { StrategyLookup::NAME, [] { return std::make_shared<StrategyLookup> (); } },
+            { StrategySteinhart::NAME, [] { return std::make_shared<StrategySteinhart> (); } }
         };
     }
     StrategyFactories createStrategyFactoriesForOperation () const {
         return StrategyFactories {
-            { StrategySteinhart::NAME, [] {
-                 return std::make_shared<StrategySteinhart> ();
-             } }
+            { StrategySteinhart::NAME, [] { return std::make_shared<StrategySteinhart> (); } }
         };
     }
 

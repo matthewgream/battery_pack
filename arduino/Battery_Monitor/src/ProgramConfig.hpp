@@ -145,9 +145,9 @@ struct Config {
         .strategyDefault = { .A = -0.012400427786, .B = 0.006860769298, .C = -0.001057743719, .D = 0.000056166727 }  // XXX populate from calibration data
     };
     ProgramInterfaceTemperatureSensors::Config temperatureSensorsInterface = {
-        .hardware = {     .PIN_EN = PIN_CD74HC4067_EN, .PIN_SIG = PIN_CD74HC4067_SIG, .PIN_ADDR = { PIN_CD74HC4067_ADDR_S0, PIN_CD74HC4067_ADDR_S1, PIN_CD74HC4067_ADDR_S2, PIN_CD74HC4067_ADDR_S3 } },
+        .hardware = { .PIN_EN = PIN_CD74HC4067_EN, .PIN_SIG = PIN_CD74HC4067_SIG, .PIN_ADDR = { PIN_CD74HC4067_ADDR_S0, PIN_CD74HC4067_ADDR_S1, PIN_CD74HC4067_ADDR_S2, PIN_CD74HC4067_ADDR_S3 } },
 #ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION
-        .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0,                                                                                    .NOMINAL_TEMPERATURE = 25.0 }
+        .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
 #endif
     };
     ProgramManageTemperatureSensorsBatterypack::Config temperatureSensorsManagerBatterypack = {
@@ -212,7 +212,7 @@ struct Config {
     ProgramDataControl::Config dataControl = { .url_version = "/version" };
     bool dataPublishEnabled = true, dataStorageEnabled = true, diagPublishEnabled = true, diagDeliverEnabled = true;
     interval_t dataProcessInterval = 5 * 1000, dataDeliverInterval = 5 * 1000, dataCaptureInterval = 15 * 1000, dataDiagnoseInterval = 60 * 1000;
-    
+
     // program
     ProgramPlatformArduino::Config programPlatform = { .pinRandomNoise = PIN_RANDOM_NOISE };
     struct {

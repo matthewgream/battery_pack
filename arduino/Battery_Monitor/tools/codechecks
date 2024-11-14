@@ -22,6 +22,7 @@ done
 
 jscpd $files
 
-cppcheck --force --enable=all --suppress=postfixOperator --suppress=syntaxError:Utilities.hpp --suppress=unusedStructMember:ProgramTemperatureCalibration.hpp --suppress=useStlAlgorithm:ProgramBase.hpp --suppress=missingIncludeSystem --std=c++21 $files
+cppcheck --force --enable=all --suppress=postfixOperator --suppress=missingIncludeSystem --std=c++21 --language=c++ -D DEBUG_PRINTF $files
 
-egrep -n '^[^/].*[^ ] {2,}[^ ]' $files | egrep -v '^\s*\/\/'
+egrep -n -e '^[^/].*[^ ] {2,}[^ ]' $files | egrep -v -n -e '\s{2,}\/\/' -e '"\s{2,}' | grep -v '#define'
+
