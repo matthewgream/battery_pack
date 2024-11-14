@@ -6,7 +6,7 @@
 
 // -----------------------------------------------------------------------------------------------
 
-class ProgramNetworkManager : private Singleton<ProgramNetworkManager>, public Component, public Diagnosticable { 
+class ProgramNetworkManager : private Singleton<ProgramNetworkManager>, public Component, public Diagnosticable {
 public:
     struct Peer {
         String ssid;
@@ -65,7 +65,7 @@ private:
     bool _connectionActive = false, _connectionAvailable = false;
 
     void _connect () {
-        if (! _connectionActive && _peers.available () > 0) {
+        if (! _connectionActive && _peers.available ()) {
             const Peer peer = _peers.select ();
             DEBUG_PRINTF ("NetworkManager::connect: ssid=%s, pass=%s, mac=%s, host=%s\n", peer.ssid.c_str (), peer.pass.c_str (), getMacAddressWifi ().c_str (), config.host.c_str ());
             WiFi.begin (peer.ssid.c_str (), peer.pass.c_str ());

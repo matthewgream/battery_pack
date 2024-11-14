@@ -34,7 +34,7 @@ private:
     bool scanning = false;
 
 public:
-    ProgramInterfaceBluetoothTPMS (const Config &conf) :
+    explicit ProgramInterfaceBluetoothTPMS (const Config &conf) :
         Singleton<ProgramInterfaceBluetoothTPMS> (this),
         config (conf) { }
 

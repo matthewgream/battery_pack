@@ -66,7 +66,7 @@ public:
     }
     void process () {
         _mqttClient.loop ();
-        if (! _mqttClient.connected () && _peers.available () > 0)
+        if (! _mqttClient.connected () && _peers.available ())
             connect ();
     }
     inline bool available () {

@@ -9,7 +9,7 @@
 #error "Require DEFAULT_WIFI_PEERS"
 #endif
 #ifndef DEFAULT_MQTT_PEERS
-#define DEFAULT_MQTT_PEERS { "mqtt.local:1883/user@pass" } 
+#define DEFAULT_MQTT_PEERS { "mqtt.local:1883/user@pass" }
 #endif
 #ifndef DEFAULT_BLUE_PIN
 #define DEFAULT_BLUE_PIN 123456    // Secrets.hpp

@@ -25,7 +25,7 @@ private:
     Enableable enabled;
 
 public:
-    ProgramInterfaceDalyBMS (const Config &conf) :
+    explicit ProgramInterfaceDalyBMS (const Config &conf) :
         config (conf),
         dalyInterfaces ({
             .interfaces = { config.manager, config.balance }
