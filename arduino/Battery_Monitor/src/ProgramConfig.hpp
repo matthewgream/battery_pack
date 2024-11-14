@@ -2,8 +2,6 @@
 // -----------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------
 
-#include "Secrets.hpp"
-
 // #define DEFAULT_WIFI_PEERS { "ssid:pass", "_Heathrow Wi-Fi" }
 // #define DEFAULT_MQTT_PEERS { "mqtt.in.the.cloud/user@pass", "mqtt.local:1883/user@pass" }
 

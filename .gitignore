@@ -9,3 +9,4 @@ arduino/Battery_Monitor/.theia
 arduino/Battery_Monitor/.pio
 arduino/Battery_Monitor/.vscode
 database
+arduino/Battery_Monitor/src/ProgramSecrets.hpp
