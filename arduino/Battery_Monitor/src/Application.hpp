@@ -47,8 +47,9 @@
 
 // -----------------------------------------------------------------------------------------------
 
-#include "Program.hpp"
-#include "ProgramFactory.hpp"
+#include "program/Program.hpp"
+#include "factory/FactoryTemperatureCalibration.hpp"
+#include "factory/FactoryHardwareTest.hpp"
 
 // -----------------------------------------------------------------------------------------------
 

@@ -139,86 +139,66 @@
 
 struct Config {
 
-    // Battery pack
-    ProgramManageTemperatureSensorsCalibration::Config temperatureSensorsCalibrator = {
-        .filename = "/temperaturecalibrations.json",
-        .strategyDefault = { .A = -0.012400427786, .B = 0.006860769298, .C = -0.001057743719, .D = 0.000056166727 }  // XXX populate from calibration data
-    };
-    ProgramInterfaceTemperatureSensors::Config temperatureSensorsInterface = {
-        .hardware = { .PIN_EN = PIN_CD74HC4067_EN, .PIN_SIG = PIN_CD74HC4067_SIG, .PIN_ADDR = { PIN_CD74HC4067_ADDR_S0, PIN_CD74HC4067_ADDR_S1, PIN_CD74HC4067_ADDR_S2, PIN_CD74HC4067_ADDR_S3 } },
-#ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION
-        .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
-#endif
-    };
-    ProgramManageTemperatureSensorsBatterypack::Config temperatureSensorsManagerBatterypack = {
-        .channels = { 0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15 },
-        .SETPOINT = 25.0,
-        .FAILURE = -100.0,
-        .MINIMAL = -20.0,
-        .WARNING = 35.0,
-        .MAXIMAL = 45.0
-    };
-    ProgramManageTemperatureSensorsEnvironment::Config temperatureSensorsManagerEnvironment = {
-        .channel = 8,
-        .FAILURE = -100.0
-    };
-    double FAN_CONTROL_P = 10.0, FAN_CONTROL_I = 0.1, FAN_CONTROL_D = 1.0, FAN_SMOOTH_A = 0.1;
-    ProgramInterfaceFanControllers::Config fanControllersInterface = {
-        .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = PIN_OSQMD_I2CSDA, .PIN_I2C_SCL = PIN_OSQMD_I2CSCL, .PIN_PWMS = { PIN_OSQMD_PWM_0, PIN_OSQMD_PWM_1, PIN_OSQMD_PWM_2, PIN_OSQMD_PWM_3 }, .frequency = 5000, .invertedPWM = true },
-        .DIRECTION = OpenSmart_QuadMotorDriver::MOTOR_CLOCKWISE,
-        .MIN_SPEED = 96,
-        .MAX_SPEED = 255, // duplicated, not ideal
-        .MOTOR_ORDER = { 0, 1, 2, 3 },
-        .MOTOR_ROTATE = 5 * 60 * 1000
-    };
-    ProgramManageFanControllers::Config fanControllersManager = {};
-    ProgramManageSerialDalyBMS::Config batteryManagerManager = {
-        .manager = {
-                    .manager = {
-                    .id = "manager",
-                    .capabilities = daly_bms::Capabilities::Managing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex - daly_bms::Capabilities::RealTimeClock,
-                    .categories = daly_bms::Categories::All,
-                    .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
-                    },
-                    .serialId = PIN_DALY_MANAGER_SERIAL_ID,
-                    .serialRxPin = PIN_DALY_MANAGER_SERIAL_RX,
-                    .serialTxPin = PIN_DALY_MANAGER_SERIAL_TX,
-                    .enPin = PIN_DALY_MANAGER_SERIAL_EN },
-        .balance = { .manager = {
- .id = "balance",
- .capabilities = daly_bms::Capabilities::Balancing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex,
- .categories = daly_bms::Categories::All,
- .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
- },
-                    .serialId = PIN_DALY_BALANCE_SERIAL_ID,
-                    .serialRxPin = PIN_DALY_BALANCE_SERIAL_RX,
-                    .serialTxPin = PIN_DALY_BALANCE_SERIAL_TX,
-                    .enPin = PIN_DALY_BALANCE_SERIAL_EN },
-        .intervalInstant = 15 * 1000,
-        .intervalStatus = 60 * 1000,
-        .intervalDiagnostics = 5 * 60 * 1000
-    };
-    TemperatureSensor_DS18B20::Config ds18b20 = { .PIN_DAT = PIN_DS18B0_DAT, .INDEX = 0 };
+    // PLATFORM
+    PlatformArduinoESP32::Config programPlatform = { .pinRandomNoise = PIN_RANDOM_NOISE };
+    struct {
+        int PIN_SDA, PIN_SCL;
+    } i2c0 = { .PIN_SDA = -1, .PIN_SCL = -1 }, i2c1 = { .PIN_SDA = -1, .PIN_SCL = -1 };
 
-    // other
+    // BATTERYPACK
+    ModuleBatterypack::Config moduleBatterypack = {
+        .temperatureSensorsCalibrator = { .filename = "/temperaturecalibrations.json", .strategyDefault = { .A = -0.012400427786, .B = 0.006860769298, .C = -0.001057743719, .D = 0.000056166727 } }, // XXX populate from calibration data
+        .temperatureSensorsInterface = { .hardware = { .PIN_EN = PIN_CD74HC4067_EN, .PIN_SIG = PIN_CD74HC4067_SIG, .PIN_ADDR = { PIN_CD74HC4067_ADDR_S0, PIN_CD74HC4067_ADDR_S1, PIN_CD74HC4067_ADDR_S2, PIN_CD74HC4067_ADDR_S3 } },
+#ifdef TEMPERATURE_INTERFACE_DONTUSECALIBRATION
+                                         .thermister = { .REFERENCE_RESISTANCE = 10000.0, .NOMINAL_RESISTANCE = 10000.0, .NOMINAL_TEMPERATURE = 25.0 }
+#endif
+        },
+        .temperatureSensorsManagerBatterypack = { .channels = { 0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15 }, .SETPOINT = 25.0, .FAILURE = -100.0, .MINIMAL = -20.0, .WARNING = 35.0, .MAXIMAL = 45.0 },
+        .temperatureSensorsManagerEnvironment = { .channel = 8, .FAILURE = -100.0 },
+        .FAN_CONTROL_P = 10.0,
+        .FAN_CONTROL_I = 0.1,
+        .FAN_CONTROL_D = 1.0,
+        .FAN_SMOOTH_A = 0.1,
+        .fanControllersInterface = { .hardware = { .I2C_ADDR = OpenSmart_QuadMotorDriver::I2cAddress, .PIN_I2C_SDA = PIN_OSQMD_I2CSDA, .PIN_I2C_SCL = PIN_OSQMD_I2CSCL, .PIN_PWMS = { PIN_OSQMD_PWM_0, PIN_OSQMD_PWM_1, PIN_OSQMD_PWM_2, PIN_OSQMD_PWM_3 }, .frequency = 5000, .invertedPWM = true },
+                                         .DIRECTION = OpenSmart_QuadMotorDriver::MOTOR_CLOCKWISE,
+                                         .MIN_SPEED = 96,
+                                         .MAX_SPEED = 255,
+                                         .MOTOR_ORDER = { 0, 1, 2, 3 },
+                                         .MOTOR_ROTATE = 5 * 60 * 1000 },
+        .fanControllersManager = {},
+        .batteryManagerManager = { .manager = { .manager = {
+                                                    .id = "manager",
+                                                    .capabilities = daly_bms::Capabilities::Managing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex - daly_bms::Capabilities::RealTimeClock,
+                                                    .categories = daly_bms::Categories::All,
+                                                    .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
+                                                },
+                                                .serialId = PIN_DALY_MANAGER_SERIAL_ID,
+                                                .serialRxPin = PIN_DALY_MANAGER_SERIAL_RX,
+                                                .serialTxPin = PIN_DALY_MANAGER_SERIAL_TX,
+                                                .enPin = PIN_DALY_MANAGER_SERIAL_EN },
+                                         .balance = { .manager = {
+                                                    .id = "balance",
+                                                    .capabilities = daly_bms::Capabilities::Balancing + daly_bms::Capabilities::TemperatureSensing - daly_bms::Capabilities::FirmwareIndex,
+                                                    .categories = daly_bms::Categories::All,
+                                                    .debugging = daly_bms::Debugging::Errors + daly_bms::Debugging::Requests + daly_bms::Debugging::Responses,
+                                                },
+                                                .serialId = PIN_DALY_BALANCE_SERIAL_ID,
+                                                .serialRxPin = PIN_DALY_BALANCE_SERIAL_RX,
+                                                .serialTxPin = PIN_DALY_BALANCE_SERIAL_TX,
+                                                .enPin = PIN_DALY_BALANCE_SERIAL_EN },
+                                         .intervalInstant = 15 * 1000,
+                                         .intervalStatus = 60 * 1000,
+                                         .intervalDiagnostics = 5 * 60 * 1000 },
+        .ds18b20 = { .PIN_DAT = PIN_DS18B0_DAT, .INDEX = 0 }
+    };
+
+    // CONDITIONS
     ProgramManageBluetoothTPMS::Config tyrePressureManager = {
         .front = "38:89:00:00:36:02", .rear = "38:8b:00:00:ed:63"
     };
 
-    // data
-    ProgramDataDeliver::Config dataDeliver = { .topic = DEFAULT_NAME, .failureLimit = 3 };
-    ProgramDataPublish::Config dataPublish = { .topic = DEFAULT_NAME, .failureLimit = 3 };
-    ProgramDataStorage::Config dataStorage = { .filename = "/data.log", .remainLimit = 0.20, .failureLimit = 3 };
-    ProgramDataControl::Config dataControl = { .url_version = "/version" };
-    bool dataPublishEnabled = true, dataStorageEnabled = true, diagPublishEnabled = true, diagDeliverEnabled = true;
-    interval_t dataProcessInterval = 5 * 1000, dataDeliverInterval = 5 * 1000, dataCaptureInterval = 15 * 1000, dataDiagnoseInterval = 60 * 1000;
-
-    // program
-    ProgramPlatformArduino::Config programPlatform = { .pinRandomNoise = PIN_RANDOM_NOISE };
-    struct {
-        int PIN_SDA, PIN_SCL;
-    } i2c0 = { .PIN_SDA = -1, .PIN_SCL = -1 }, i2c1 = { .PIN_SDA = -1, .PIN_SCL = -1 };
-    ProgramComponents::Config programComponents = {
+    // CONNECTIVITY
+    ModuleConnectivity::Config moduleConnectivity = {
         .blue = { .name = DEFAULT_NAME, .serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", .characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", .pin = DEFAULT_BLUE_PIN, .intervalConnectionCheck = 1 * 60 * 1000 },
         .mdns = {},
         .mqtt = { .client = DEFAULT_NAME, .peers = { .order = DEFAULT_MQTT_PEERS, .retries = 3 }, .bufferSize = 3 * 1024 },
@@ -226,12 +206,22 @@ struct Config {
         .websocket = { .enabled = true, .port = 81, .root = "/" },
         .wifi = { .host = DEFAULT_NAME, .peers = { .order = DEFAULT_WIFI_PEERS, .retries = 3 }, .intervalConnectionCheck = 1 * 60 * 1000 }
     };
+
+    // CONTENT
+    ProgramDataDeliver::Config dataDeliver = { .topic = DEFAULT_NAME, .failureLimit = 3 };
+    ProgramDataPublish::Config dataPublish = { .topic = DEFAULT_NAME, .failureLimit = 3 };
+    ProgramDataStorage::Config dataStorage = { .filename = "/data.log", .remainLimit = 0.20, .failureLimit = 3 };
+    ProgramDataControl::Config dataControl = { .url_version = "/version" };
+    bool dataPublishEnabled = true, dataStorageEnabled = true, diagPublishEnabled = true, diagDeliverEnabled = true;
+    interval_t dataProcessInterval = 5 * 1000, dataDeliverInterval = 5 * 1000, dataCaptureInterval = 15 * 1000, dataDiagnoseInterval = 60 * 1000;
+
+    // PROGRAM
     ProgramTime::Config programTime = { .hardware = {}, .useragent = String (DEFAULT_NAME) + String ("/1.0"), .server = "http://matthewgream.net", .intervalUpdate = 60 * 60 * 1000, .intervalAdjust = 60 * 1000, .failureLimit = 3 };
     ProgramLogging::Config programLogging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME };
     ProgramUpdates::Config programUpdater = { .startupCheck = true, .updateImmmediately = true, .intervalCheck = 1 * 24 * 60 * 60 * 1000, .intervalLong = (interval_t) 28 * 24 * 60 * 60 * 1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase () };
     ProgramAlarmsInterface::Config programAlarmsInterface = { .PIN = -1, .ACTIVE = LOW };
     ProgramAlarms::Config programAlarms = {};
-    ProgramDiagnostics::Config programDiagnostics = {};
+    DiagnosticablesManager::Config programDiagnostics = {};
     interval_t programInterval = 5 * 1000;
 };
 

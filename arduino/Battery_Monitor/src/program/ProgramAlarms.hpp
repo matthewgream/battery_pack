@@ -97,7 +97,6 @@ protected:
     const std::vector<AlarmCondition> _conditions;
 
 public:
-    typedef std::vector<Alarmable *> List;
     Alarmable (const std::initializer_list<AlarmCondition> &conditions) :
         _conditions (conditions) { }
     virtual ~Alarmable () {};
@@ -113,17 +112,19 @@ public:
     typedef struct {
     } Config;
 
+    using List = std::vector<const Alarmable *>;
+
 private:
     const Config &config;
 
     ProgramAlarmsInterface &_interface;
-    const Alarmable::List _alarmables;
+    const List _alarmables;
 
     AlarmSet _alarms;
     std::array<ActivationTracker, _ALARM_COUNT> _activations, _deactivations;
 
 public:
-    ProgramAlarms (const Config &cfg, ProgramAlarmsInterface &interface, const Alarmable::List &alarmables) :
+    ProgramAlarms (const Config &cfg, ProgramAlarmsInterface &interface, const List &alarmables) :
         config (cfg),
         _interface (interface),
         _alarmables (alarmables) { }

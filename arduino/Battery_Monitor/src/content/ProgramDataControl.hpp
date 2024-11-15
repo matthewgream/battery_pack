@@ -29,7 +29,7 @@ private:
     const Config &config;
 
     const String _id;
-    ProgramComponents &_components;
+    ModuleConnectivity &_components;
 
     class WebSocketReceiver_TypeInfo : public ConnectionReceiver_TypeSpecific<WebSocket> {
     public:
@@ -73,7 +73,7 @@ private:
     };
 
 public:
-    explicit ProgramDataControl (const Config &cfg, const String &id, ProgramComponents &components) :
+    explicit ProgramDataControl (const Config &cfg, const String &id, ModuleConnectivity &components) :
         config (cfg),
         _id (id),
         _components (components) { }

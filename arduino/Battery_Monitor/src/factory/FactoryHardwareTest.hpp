@@ -42,9 +42,9 @@ public:
         DEBUG_PRINTF ("*** Tester_HardwareInterfaces:: all (%d repetitions)\n", repetitions);
         // FanInterfaceStrategy_motorMap strategyMap;
         ProgramInterfaceFanControllersStrategy_motorAll strategyAll;
-        ProgramInterfaceFanControllers fanInterface (config.fanControllersInterface, strategyAll);
+        ProgramInterfaceFanControllers fanInterface (config.moduleBatterypack.fanControllersInterface, strategyAll);
         // TemperatureSensor_DS18B20 ds18b20 (config.ds18b20);
-        ProgramInterfaceTemperatureSensors temperatureInterface (config.temperatureSensorsInterface, [&] (const int channel, const uint16_t resistance) {
+        ProgramInterfaceTemperatureSensors temperatureInterface (config.moduleBatterypack.temperatureSensorsInterface, [&] (const int channel, const uint16_t resistance) {
             return steinharthart_calculator (static_cast<float> (resistance), 4095.0f, 10000.0f, 10000.0f, 25.0f);
         });
         fanInterface.begin ();
@@ -87,26 +87,6 @@ public:
 void factory_hardwareInterfaceTest () {
     Tester_HardwareInterfaces tester;
     tester.run ();
-}
-
-// -----------------------------------------------------------------------------------------------
-
-void factory_temperatureCalibration (bool use_static = false) {
-
-    const Config config;
-
-    ProgramManageTemperatureSensorsCalibration calibrator (config.temperatureSensorsCalibrator);
-
-    if (use_static) {
-        calibrator.calibrateTemperatures ();
-    } else {
-        TemperatureSensor_DS18B20 ds18b20 (config.ds18b20);
-        analogReadResolution (ProgramInterfaceTemperatureSensors::AdcResolution);
-        MuxInterface_CD74HC4067<ProgramInterfaceTemperatureSensors::AdcValueType> interface (config.temperatureSensorsInterface.hardware);
-        interface.enable ();
-
-        calibrator.calibrateTemperatures ([&] () { return ds18b20.getTemperature (); }, [&] (size_t channel) { return interface.get (channel); });
-    }
 }
 
 // -----------------------------------------------------------------------------------------------

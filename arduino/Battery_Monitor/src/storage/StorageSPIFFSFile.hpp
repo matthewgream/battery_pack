@@ -5,7 +5,7 @@
 #include <SPIFFS.h>
 
 // should be two classes
-class SPIFFSFile : public JsonSerializable {
+class StorageSPIFFSFile : public JsonSerializable {
 public:
     class LineCallback {
     public:
@@ -125,9 +125,9 @@ private:
     }
 
 public:
-    explicit SPIFFSFile (const String &filename) :
+    explicit StorageSPIFFSFile (const String &filename) :
         _filename (filename) { }
-    ~SPIFFSFile () {
+    ~StorageSPIFFSFile () {
         close ();
     }
 
@@ -141,7 +141,7 @@ public:
     long size () const {
         if (_mode == MODE_CLOSED)
             if (_size < 0)
-                const_cast<SPIFFSFile *> (this)->_ssize ();    // zero if not exists
+                const_cast<StorageSPIFFSFile *> (this)->_ssize ();    // zero if not exists
         if (_mode == MODE_ERROR)
             return -1;
         return _size;

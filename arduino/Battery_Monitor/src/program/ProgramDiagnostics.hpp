@@ -7,22 +7,22 @@ protected:
     ~Diagnosticable () {};
 
 public:
-    typedef std::vector<Diagnosticable *> List;
     virtual void collectDiagnostics (JsonVariant &) const = 0;
 };
 
-class ProgramDiagnostics : public Component {
+class DiagnosticablesManager : public Component {
 public:
     typedef struct {
     } Config;
 
+    using List = std::vector<Diagnosticable *>;
+
 private:
     const Config &config;
-
-    const Diagnosticable::List _diagnosticables;
+    const List _diagnosticables;
 
 public:
-    ProgramDiagnostics (const Config &cfg, const Diagnosticable::List &diagnosticables) :
+    DiagnosticablesManager (const Config &cfg, const List &diagnosticables) :
         config (cfg),
         _diagnosticables (diagnosticables) { }
     void collect (JsonVariant &obj) const {

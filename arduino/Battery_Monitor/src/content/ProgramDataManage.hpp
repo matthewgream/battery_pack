@@ -123,12 +123,12 @@ public:
         float remainLimit;
         counter_t failureLimit;
     } Config;
-    typedef SPIFFSFile::LineCallback LineCallback;
+    typedef StorageSPIFFSFile::LineCallback LineCallback;
 
 private:
     const Config &config;
 
-    SPIFFSFile _file;
+    StorageSPIFFSFile _file;
     ActivationTrackerWithDetail _appends;
     ActivationTracker _failures, _erasures;
 

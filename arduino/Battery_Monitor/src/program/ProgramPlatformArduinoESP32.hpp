@@ -4,7 +4,7 @@
 
 #include <driver/temperature_sensor.h>
 
-class ProgramPlatformArduino : public Alarmable, public Diagnosticable {
+class PlatformArduinoESP32 : public Alarmable, public Diagnosticable {
 
 public:
     struct Config {
@@ -24,7 +24,7 @@ private:
     const bool reset_okay;
 
 public:
-    explicit ProgramPlatformArduino (const Config &conf) :
+    explicit PlatformArduinoESP32 (const Config &conf) :
         Alarmable ({ AlarmCondition (ALARM_SYSTEM_MEMORYLOW, [this] () { return ((100 * esp_get_minimum_free_heap_size ()) / heap_size) < HEAP_FREE_PERCENTAGE_MINIMUM; }),
                      AlarmCondition (ALARM_SYSTEM_BADRESET, [this] () { return ! reset_okay; }) }),
         config (conf),

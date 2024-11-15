@@ -403,7 +403,7 @@ public:
         JsonObject strategyDefault = doc ["default"].to<JsonObject> ();
         defaultStrategy.serialize (strategyDefault);
 
-        SPIFFSFile file (filename);
+        StorageSPIFFSFile file (filename);
         size_t size;
         if (! file.begin () || ! ((size = file.write (doc)) > 0)) {
             DEBUG_PRINTF ("TemperatureCalibrationStorage::serialize: could not write to '%s'\n", filename.c_str ());
@@ -416,7 +416,7 @@ public:
     static int deserialize (const String &filename, StrategyDefault &defaultStrategy, CalibrationStrategies &calibrationStrategies, const StrategyFactories &strategyFactories) {
         JsonDocument doc;
 
-        SPIFFSFile file (filename);
+        StorageSPIFFSFile file (filename);
         size_t size;
         if (! file.begin () || ! ((size = file.read (doc)) > 0)) {
             DEBUG_PRINTF ("TemperatureCalibrationStorage::deserialize: could not read from '%s'\n", filename.c_str ());
