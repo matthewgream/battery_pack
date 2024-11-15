@@ -15,7 +15,7 @@ process_file() {
         rm "$temp_file"
     fi
 }
-files=`ls *.[ch]pp`
+files=`ls *.[ch]pp */*.[ch]pp`
 for file in $files; do
     process_file "$file"
 done

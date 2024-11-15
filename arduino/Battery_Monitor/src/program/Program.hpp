@@ -236,7 +236,7 @@ private:
     }
 
 public:
-    ModuleBatterypack (const Config &conf) :
+    explicit ModuleBatterypack (const Config &conf) :
         config (conf),
         //
         fanControllingAlgorithm (config.FAN_CONTROL_P, config.FAN_CONTROL_I, config.FAN_CONTROL_D),
