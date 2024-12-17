@@ -5,41 +5,111 @@
 #include <Wire.h>
 #include <DS3231.h>
 
-class RealtimeClock_DS3231 {
+class Hardware_AnalogDevicesDS3231 : Singleton<Hardware_AnalogDevicesDS3231> {
 public:
+    struct AlarmConfig {
+        int second = 0, minute = 0, hour = 0, day = 0;
+        enum Matches : uint8_t {
+            MATCH_ALL = 0b00000000,
+            MATCH_SEC = 0b00000001,
+            MATCH_MIN = 0b00000010,
+            MATCH_HOUR = 0b00000100,
+            MATCH_DAYW = 0b00001000,
+            MATCH_DAYM = 0b00010000,
+            MATCH_MASK_HMS = 0b00001111,
+        };
+        Matches matches = MATCH_ALL;
+        bool repeat = false;
+    };
     typedef struct {
+        int PIN_INTERRUPT;
     } Config;
+    using AlarmCallbackFunc = std::function<void (void)>;
 
 private:
     const Config &config;
 
     TwoWire &_wire;
     DS3231 _device;
+    AlarmConfig _alarmConfig;
+    AlarmCallbackFunc _alarmCallback = nullptr;
 
     void timeLoad () {
         if (_device.oscillatorCheck ())
-            DEBUG_PRINTF ("RealtimeClock::timeLoad WARNING: oscillator failed check\n");
-        const struct timeval tv = { .tv_sec = RTClib::now ().unixtime (), .tv_usec = 0 };
+            Serial.printf ("RealtimeClock::timeLoad WARNING: oscillator failed check\n");
+        const struct timeval tv = { .tv_sec = RTClib::now (_wire).unixtime (), .tv_usec = 0 };
         settimeofday (&tv, nullptr);
     }
 
+    static void __interruptHandler (void) {
+        auto instance = Singleton<Hardware_AnalogDevicesDS3231>::instance ();
+        if (instance != nullptr) {
+            if (instance->_alarmCallback) {
+                instance->_alarmCallback ();
+                if (instance->_alarmConfig.repeat)
+                    instance->alarmRestart ();
+            }
+        }
+    }
+
 public:
-    RealtimeClock_DS3231 (const Config &conf, TwoWire &wire) :
+    DS3231 &_implementation () { return _device; };
+    Hardware_AnalogDevicesDS3231 (const Config &conf, TwoWire &wire) :
+        Singleton<Hardware_AnalogDevicesDS3231> (this),
         config (conf),
         _wire (wire),
         _device (_wire) {
+        if (config.PIN_INTERRUPT >= 0) {
+            pinMode (config.PIN_INTERRUPT, INPUT_PULLUP);
+            attachInterrupt (digitalPinToInterrupt (config.PIN_INTERRUPT), __interruptHandler, FALLING);
+        }
     }
-    void begin () {
-        DEBUG_PRINTF ("RealtimeClock::begin\n");
+    void begin (const bool load = true) {
+        Serial.printf ("RealtimeClock::begin\n");
         _device.setClockMode (false);
         _device.enable32kHz (false);
-        timeLoad ();
+        _device.turnOffAlarm (1);
+        _device.checkIfAlarm (1);
+        _device.turnOffAlarm (2);
+        _device.checkIfAlarm (2);
+        if (load)
+            timeLoad ();
     }
     void process () { }
-    void setTime (const time_t time) {
-        const struct timeval tv = { .tv_sec = time, .tv_usec = 0 };
-        _device.setEpoch (tv.tv_sec);
+    //
+    void setTime (time_t timet = 0) {
+        if (timet == 0)
+            time (&timet);
+        const struct timeval tv = { .tv_sec = timet, .tv_usec = 0 };
+        _device.setEpoch (tv.tv_sec, false);
+        _device.setClockMode (false);
         settimeofday (&tv, nullptr);
+    }
+    time_t getTime () const {
+        return RTClib::now (_wire).unixtime ();
+    }
+    //
+    float getTemperature () const {
+        return const_cast<DS3231 *> (&_device)->getTemperature ();
+    }
+    //
+    void alarmEnable (const AlarmConfig &alarmConfig, const AlarmCallbackFunc &alarmCallback) {
+        _device.turnOffAlarm (1);
+        _alarmConfig = alarmConfig;
+        _alarmCallback = alarmCallback;
+        const byte alarmMatchesHMS = ~((_alarmConfig.matches & AlarmConfig::MATCH_SEC) | (_alarmConfig.matches & AlarmConfig::MATCH_MIN) | (_alarmConfig.matches & AlarmConfig::MATCH_HOUR)) & AlarmConfig::MATCH_MASK_HMS;
+        const bool alarmMatchesDAY = _alarmConfig.matches & AlarmConfig::MATCH_DAYW;
+        _device.setA1Time (_alarmConfig.day, _alarmConfig.hour, _alarmConfig.minute, _alarmConfig.second, alarmMatchesHMS, alarmMatchesDAY, false, false);
+        _device.turnOnAlarm (1);
+        _device.checkIfAlarm (1);
+    }
+    void alarmDisable () {
+        _alarmCallback = nullptr;
+        _device.turnOffAlarm (1);
+        _device.checkIfAlarm (1);
+    }
+    void alarmRestart () {
+        _device.checkIfAlarm (1);
     }
 };
 

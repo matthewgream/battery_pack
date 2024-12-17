@@ -216,7 +216,7 @@ struct Config {
     interval_t dataProcessInterval = 5 * 1000, dataDeliverInterval = 5 * 1000, dataCaptureInterval = 15 * 1000, dataDiagnoseInterval = 60 * 1000;
 
     // PROGRAM
-    ProgramTime::Config programTime = { .hardware = {}, .useragent = String (DEFAULT_NAME) + String ("/1.0"), .server = "http://matthewgream.net", .intervalUpdate = 60 * 60 * 1000, .intervalAdjust = 60 * 1000, .failureLimit = 3 };
+    ProgramTime::Config programTime = { .hardware = { .PIN_INTERRUPT = -1 }, .useragent = String (DEFAULT_NAME) + String ("/1.0"), .server = "http://matthewgream.net", .intervalUpdate = 60 * 60 * 1000, .intervalAdjust = 60 * 1000, .failureLimit = 3 };
     ProgramLogging::Config programLogging = { .enableSerial = true, .enableMqtt = true, .mqttTopic = DEFAULT_NAME };
     ProgramUpdates::Config programUpdater = { .startupCheck = true, .updateImmmediately = true, .intervalCheck = 1 * 24 * 60 * 60 * 1000, .intervalLong = (interval_t) 28 * 24 * 60 * 60 * 1000, .json = DEFAULT_JSON, .type = DEFAULT_TYPE, .vers = DEFAULT_VERS, .addr = getMacAddressBase () };
     ProgramAlarmsInterface::Config programAlarmsInterface = { .PIN = -1, .ACTIVE = LOW };

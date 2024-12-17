@@ -5,7 +5,7 @@
 class ProgramTime : public Component, public Alarmable, public Diagnosticable {
 public:
     typedef struct {
-        RealtimeClock_DS3231::Config hardware;
+        Hardware_AnalogDevicesDS3231::Config hardware;
         String useragent, server;
         interval_t intervalUpdate, intervalAdjust;
         int failureLimit;
@@ -17,7 +17,7 @@ private:
     const Config &config;
     const BooleanFunc _networkIsAvailable;
 
-    RealtimeClock_DS3231 _hardware;
+    Hardware_AnalogDevicesDS3231 _hardware;
 
     NetworkTimeFetcher _fetcher;
     ActivationTrackerWithDetail _fetches;
